@@ -1,6 +1,6 @@
 {
   "name": "vela-studio",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "IDE de banco de dados SQL e NoSQL — limpa, rápida e didática",
   "main": "./out/main/index.js",
   "author": "Lucas Pardinho",

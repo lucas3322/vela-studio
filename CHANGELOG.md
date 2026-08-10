@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.1.4 — 2026-08-10
+
+### Outras mudanças
+
+- ajusta posição das curvas batimétricas para evitar rolagem horizontal indesejada (817d902)
+
 ## 0.1.3 — 2026-08-10
 
 ### Outras mudanças
