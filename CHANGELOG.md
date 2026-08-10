@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.1.6 — 2026-08-10
+
+### Outras mudanças
+
+- adiciona arquivos de configuração para o servidor Caddy e Docker (f03f0d3)
+
 ## 0.1.5 — 2026-08-10
 
 ### Outras mudanças
