@@ -43,7 +43,14 @@ sucedido.
 
 ### Quando der 502
 
-Significa que o Railway respondeu mas o container não. Nessa ordem:
+**Causa nº 1, já vista neste projeto: porta.** O Railway escolhe uma porta ao
+criar o domínio — se o primeiro deploy falhou no build, ele chuta (aconteceu:
+ficou em 3001) e não corrige sozinho depois. O Caddy escuta na 8080.
+
+Networking → lápis ao lado do domínio → **Port: 8080**. Ou, equivalente,
+Variables → `PORT=3001`, que faz o Caddy seguir o que o Railway espera.
+
+Se não for isso, nessa ordem:
 
 1. **Deployments → último deploy → Build Logs.** Se o build falhou, não há
    container rodando. O erro aparece aqui.
