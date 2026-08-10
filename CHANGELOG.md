@@ -1,0 +1,14 @@
+# Changelog
+
+Todas as mudanças relevantes do Vela Studio.
+Gerado por `npm run release` a partir dos commits.
+
+## 0.1.2 — 2026-08-10
+
+### Outras mudanças
+
+- adiciona workflow de release e documentação sobre versionamento (5133e1d)
+- adiciona informações de versão e commit na tela inicial e no painel "Sobre" (f3312b3)
+- adiciona workflow de build e atualiza documentação sobre geração de instaladores (4197ff5)
+- adiciona ícones da aplicação e atualiza a configuração do electron-builder (b24ad85)
+- criando IDE de banco de dados (e728c3a)
