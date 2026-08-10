@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.1.5 — 2026-08-10
+
+### Outras mudanças
+
+- ajusta configuração de assinatura ad-hoc no macOS e corrige repositório no README (7add2d6)
+
 ## 0.1.4 — 2026-08-10
 
 ### Outras mudanças
