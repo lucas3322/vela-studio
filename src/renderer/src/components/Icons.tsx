@@ -224,3 +224,15 @@ export const IconEject = (p: IconProps): React.JSX.Element => (
     <path d="M3 12.5h10" />
   </Icon>
 )
+
+/**
+ * A marca do Vela: o mesmo veleiro do ícone do app, simplificado para 16px.
+ * Sem o mastro e sem as linhas d'água — a esse tamanho viram sujeira.
+ */
+export const IconSail = (p: IconProps): React.JSX.Element => (
+  <Icon {...p} fill="currentColor" stroke="none">
+    <path d="M8.6 1.6c1.9 3 2.8 5.7 2.8 8.2H8.6V1.6Z" />
+    <path d="M7.4 3.6v6.2H4.9c.7-2 1.5-4 2.5-6.2Z" opacity="0.65" />
+    <path d="M2.6 11.2h10.8c-.8 1.9-2.4 2.9-5.4 2.9s-4.6-1-5.4-2.9Z" />
+  </Icon>
+)

@@ -3,7 +3,7 @@ import { useConnectionStore } from '../store/connections'
 import {
   IconHelp,
   IconHistory,
-  IconLeaf,
+  IconSail,
   IconMoon,
   IconSidebar,
   IconSun
@@ -25,7 +25,7 @@ export function TitleBar(): React.JSX.Element {
   return (
     <header className="titlebar drag-region">
       <div className="titlebar__brand no-drag">
-        <IconLeaf size={15} />
+        <IconSail size={15} />
         Vela
       </div>
 

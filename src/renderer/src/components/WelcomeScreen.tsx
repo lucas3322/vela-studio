@@ -1,7 +1,7 @@
 import { DRIVERS } from '@shared/types'
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
-import { IconDatabase, IconLeaf, IconPlus } from './Icons'
+import { IconDatabase, IconSail, IconPlus } from './Icons'
 
 /**
  * Primeira tela de quem abre o app.
@@ -29,7 +29,7 @@ export function WelcomeScreen(): React.JSX.Element {
 
   return (
     <div className="welcome">
-      <IconLeaf size={44} className="welcome__logo" />
+      <IconSail size={44} className="welcome__logo" />
       <div>
         <div className="welcome__title">Vela Studio</div>
         <p className="welcome__text">

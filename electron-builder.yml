@@ -17,14 +17,17 @@ files:
 asarUnpack:
   - '**/node_modules/better-sqlite3/**'
 
+# ── macOS ────────────────────────────────────────────────────────────
 mac:
   category: public.app-category.developer-tools
+  icon: build/icon.icns
+  darkModeSupport: true
   # Universal cobre Apple Silicon e os Intel que ainda estão por aí.
   target:
     - target: dmg
       arch: [arm64, x64]
-  icon: build/icon.icns
-  darkModeSupport: true
+    - target: zip
+      arch: [arm64, x64]
   hardenedRuntime: true
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
@@ -42,5 +45,38 @@ dmg:
       y: 200
       type: link
       path: /Applications
+
+# ── Windows ──────────────────────────────────────────────────────────
+win:
+  icon: build/icon.ico
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+
+nsis:
+  # Instalador por usuário: não pede elevação de administrador.
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Vela Studio
+  artifactName: ${productName}-${version}-setup.${ext}
+  uninstallDisplayName: ${productName}
+
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
+
+# ── Linux (bônus: sai de graça do mesmo build) ───────────────────────
+linux:
+  icon: build/icon.png
+  category: Development
+  target:
+    - AppImage
+    - deb
+
+afterPack: scripts/after-pack.mjs
 
 npmRebuild: true
