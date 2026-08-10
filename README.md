@@ -50,16 +50,37 @@ npm install
 npm run dev
 ```
 
-Gerar o app para macOS:
+## Gerando os instaladores
 
 ```bash
-npm run mac
+npm run mac      # DMG + ZIP  (arm64 e x64)
+npm run win      # instalador .exe + portátil .exe  (x64)
+npm run linux    # AppImage + .deb
+npm run dist     # macOS e Windows de uma vez
 ```
 
-O DMG universal (Apple Silicon + Intel) sai em `release/`.
+Tudo sai em `release/`. Para regerar os ícones a partir de `build/icon.svg`:
 
-> Sem uma conta Apple Developer o build não é assinado nem notarizado: o app
-> funciona, mas o Gatekeeper avisa na primeira abertura. Botão direito → Abrir.
+```bash
+npm run icons
+```
+
+**Sobre o build de Windows feito no Mac.** Ele funciona — o electron-builder
+baixa o próprio wine e o NSIS. Mas há uma armadilha: `@electron/rebuild` não faz
+compilação cruzada, então o `better-sqlite3` que iria dentro do `.exe` seria o
+binário do macOS. O instalador sairia sem erro nenhum e o app abriria; só o
+SQLite quebraria, na primeira conexão. O hook `scripts/after-pack.mjs` corrige
+isso trocando pelo binário oficial pré-compilado do Windows — e **aborta o
+build** se não conseguir, porque um instalador silenciosamente quebrado é pior
+que build nenhum.
+
+Para builds de release, prefira o CI (`.github/workflows/build.yml`): cada
+sistema compila nativamente e nada depende de prebuild publicado.
+
+**Assinatura.** Sem conta Apple Developer o `.app` não é assinado nem
+notarizado: funciona, mas o Gatekeeper avisa na primeira abertura (botão direito
+→ Abrir). No Windows, sem certificado de code signing o SmartScreen mostra o
+aviso de editor desconhecido.
 
 ## Atalhos
 

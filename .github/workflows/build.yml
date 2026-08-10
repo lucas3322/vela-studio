@@ -1,0 +1,60 @@
+# Gera os instaladores em cada sistema nativamente.
+#
+# Por que existe: módulos nativos (better-sqlite3) compilam para o sistema
+# onde o build roda. Empacotar Windows a partir do macOS funciona só porque
+# baixamos um binário pré-compilado no hook `afterPack` — aqui a compilação é
+# nativa e não depende de existir prebuild publicado.
+
+name: build
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            script: mac
+          - os: windows-latest
+            script: win
+          - os: ubuntu-latest
+            script: linux
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Verificar tipos e testes
+        run: |
+          npm run typecheck
+          npm test
+
+      - name: Empacotar
+        run: npm run ${{ matrix.script }}
+        env:
+          # Sem certificado configurado o electron-builder pula a assinatura
+          # em vez de falhar. Adicione os secrets quando tiver as contas.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vela-${{ matrix.os }}
+          path: |
+            release/*.dmg
+            release/*.exe
+            release/*.AppImage
+            release/*.deb
+          if-no-files-found: warn

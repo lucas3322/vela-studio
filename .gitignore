@@ -6,5 +6,8 @@ dist/
 .DS_Store
 .vite/
 
+
 # Bundles temporários gerados pelos testes de ponta a ponta dos drivers.
 src/tests/.*-bundle.mjs
+release/
+build/qltmp/
