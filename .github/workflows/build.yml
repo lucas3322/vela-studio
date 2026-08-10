@@ -58,3 +58,42 @@ jobs:
             release/*.AppImage
             release/*.deb
           if-no-files-found: warn
+
+  # Só quando o push é de uma tag `v*` — ou seja, quando `npm run release` rodou.
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artefatos
+          merge-multiple: true
+
+      - name: Extrair a seção desta versão do CHANGELOG
+        id: notas
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # Pega da linha "## <versão>" até o próximo "## ", sem incluí-lo.
+          awk -v v="## $VERSION" '
+            $0 ~ "^"v" " || $0 == v {captura=1; next}
+            captura && /^## / {exit}
+            captura {print}
+          ' CHANGELOG.md > notas.md
+          # Sem changelog não travamos a release: publicamos sem corpo.
+          [ -s notas.md ] || echo "Consulte o CHANGELOG.md." > notas.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          body_path: notas.md
+          draft: false
+          files: |
+            artefatos/*.dmg
+            artefatos/*.exe
+            artefatos/*.AppImage
+            artefatos/*.deb

@@ -50,6 +50,45 @@ npm install
 npm run dev
 ```
 
+## Versionamento
+
+Um comando faz tudo: lê os commits desde a última tag, decide o salto, escreve
+a versão, gera o CHANGELOG, commita, cria a tag e dá push.
+
+```bash
+npm run release
+```
+
+O salto sai dos commits, se eles seguirem Conventional Commits:
+
+| Commit | Salto |
+|---|---|
+| `feat!:` ou `BREAKING CHANGE:` no corpo | **major** — 1.4.2 → 2.0.0 |
+| `feat:` | **minor** — 1.4.2 → 1.5.0 |
+| `fix:`, `refactor:`, qualquer outro | **patch** — 1.4.2 → 1.4.3 |
+
+Se os commits não seguem a convenção, ele avisa e usa patch. Nesse caso diga o
+salto na mão — o argumento explícito sempre vence:
+
+```bash
+npm run release minor
+```
+
+Antes de confiar, veja o que ele faria:
+
+```bash
+npm run release:dry
+```
+
+A tag `vX.Y.Z` dispara o workflow, que compila nos três sistemas e publica uma
+GitHub Release com os instaladores e as notas do CHANGELOG.
+
+**Versão dentro do app.** `__APP_VERSION__`, `__GIT_SHA__` e `__BUILD_DATE__`
+são substituídos em tempo de build e aparecem no menu *Sobre* e na tela inicial.
+O commit vai junto de propósito: saber que alguém está na 0.2.1 não diz se a
+correção de ontem entrou; o hash diz. Um build com alterações não commitadas sai
+marcado como `abc1234+alterado`.
+
 ## Gerando os instaladores
 
 ```bash
