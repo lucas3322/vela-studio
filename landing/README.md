@@ -17,13 +17,53 @@ de cada arquivo. Se a consulta falhar — repositório privado, limite de
 requisições, sem internet — os botões continuam levando à página de versões,
 que sempre funciona.
 
-## Publicando
+## Publicando no Railway
 
-Qualquer host de estáticos serve. Aponte o diretório de saída para `landing/`:
+O `Dockerfile` daqui sobe um Caddy servindo os estáticos.
+
+**Atenção ao contexto do build.** Os `COPY` partem da **raiz do repositório**,
+não desta pasta — é assim que o Railway constrói quando se aponta o
+"Dockerfile Path" para `/landing/Dockerfile` sem definir o "Root Directory".
+Com `COPY Caddyfile` (sem prefixo) o build falha com `"/Caddyfile": not found`.
+
+Configuração do serviço:
+
+| Campo | Valor |
+|---|---|
+| Builder | Dockerfile |
+| Dockerfile Path | `/landing/Dockerfile` |
+| Root Directory | *(vazio)* |
+| Watch Paths | `/landing/**` |
+| Variables | `PORT=8080` |
+
+O `PORT` não é estritamente necessário — o Caddyfile usa `{$PORT:8080}` e cai
+no 8080 quando a variável não existe — mas defini-lo elimina a dúvida, que é a
+causa mais comum de `502 Application failed to respond` depois de um build bem
+sucedido.
+
+### Quando der 502
+
+Significa que o Railway respondeu mas o container não. Nessa ordem:
+
+1. **Deployments → último deploy → Build Logs.** Se o build falhou, não há
+   container rodando. O erro aparece aqui.
+2. **Deploy Logs.** O Caddy loga `server running` com o endereço em que
+   escutou. Se não aparecer, ele nem subiu.
+3. **Networking → Target Port.** Precisa bater com a porta do log (8080).
+
+Para reproduzir localmente exatamente como o Railway faz — contexto na raiz:
+
+```bash
+docker build -f landing/Dockerfile -t vela-landing .
+docker run --rm -e PORT=8080 -p 8080:8080 vela-landing
+```
+
+## Outros hosts
+
+Como é HTML estático, qualquer host serve sem o Docker:
 
 - **Vercel / Netlify / Cloudflare Pages** — sem comando de build; diretório `landing`
-- **Railway** — serviço estático apontando para `landing`
-- **GitHub Pages** — publique a pasta `landing` no branch `gh-pages`
+- **GitHub Pages** — publique a pasta `landing`
 
 ## Detalhes que importam
 
