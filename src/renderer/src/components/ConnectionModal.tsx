@@ -386,17 +386,21 @@ export function ConnectionModal(): React.JSX.Element {
                   ← Ver salvas
                 </button>
               )}
-              <button className="btn btn--secondary" onClick={() => void handleTest()} disabled={testing}>
+              <button
+                className="btn btn--secondary"
+                onClick={() => void handleTest()}
+                disabled={testing || connecting}
+              >
                 {testing ? <span className="spinner" /> : null}
-                Testar
+                {testing ? 'Testando…' : 'Testar'}
               </button>
               <button
                 className="btn btn--primary"
                 onClick={() => void handleConnect()}
-                disabled={connecting}
+                disabled={connecting || testing}
               >
                 {connecting ? <span className="spinner" /> : null}
-                Conectar
+                {connecting ? 'Conectando…' : 'Conectar'}
               </button>
             </div>
           </>

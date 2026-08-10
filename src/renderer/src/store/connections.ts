@@ -62,7 +62,17 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
         connecting: false
       })
       await get().refreshSaved()
-      await get().reloadSchema()
+
+      // O schema NÃO é esperado aqui, de propósito.
+      //
+      // `loadAll` faz uma consulta de colunas por tabela — em um banco com 200
+      // tabelas são centenas de idas ao catálogo. Esperar por isso mantinha o
+      // modal de conexão aberto e imóvel enquanto a interface atrás dele já
+      // tinha mudado, o que parece travamento.
+      //
+      // A conexão está aberta neste ponto; a barra lateral tem o próprio
+      // indicador ("Lendo estrutura do banco…") enquanto o resto chega.
+      void get().reloadSchema()
     } catch (error) {
       set({ connecting: false })
       throw error

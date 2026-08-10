@@ -32,6 +32,7 @@ import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
 
 export default async function afterPack(context) {
+  if (context.electronPlatformName === 'darwin') return assinarAdHoc(context)
   if (context.electronPlatformName !== 'win32') return
 
   const arch = context.arch === 1 ? 'x64' : context.arch === 3 ? 'arm64' : 'x64'
@@ -88,5 +89,65 @@ export default async function afterPack(context) {
     throw new Error(`afterPack: ${error.message}`)
   } finally {
     await rm(work, { recursive: true, force: true })
+  }
+}
+
+/**
+ * Assina o app em ad-hoc quando não há certificado de desenvolvedor.
+ *
+ * POR QUE
+ * -------
+ * O macOS amarra cada item das Chaves ao **código assinado** que o criou. Sem
+ * assinatura válida, ele não consegue confirmar que "Vela Studio" é o mesmo app
+ * de antes — e pede a senha do usuário a cada abertura, com o aviso "a
+ * autenticidade não pode ser verificada". Marcar "Permitir Sempre" não resolve:
+ * não há identidade estável para registrar na lista de permissões.
+ *
+ * O electron-builder pula a assinatura quando não acha um "Developer ID", e o
+ * bundle fica com a assinatura ad-hoc que o Electron traz de fábrica — que é
+ * *inválida* depois que empacotamos nossos arquivos dentro dele
+ * (`code has no resources but signature indicates they must be present`).
+ *
+ * Assinar em ad-hoc aqui dá ao app uma identidade válida e estável para aquele
+ * binário. Efeito prático: "Permitir Sempre" passa a valer, e a senha só é
+ * pedida de novo quando sai uma versão nova (binário novo = hash novo).
+ *
+ * LIMITE HONESTO
+ * --------------
+ * Ad-hoc não substitui o Developer ID: o Gatekeeper continua avisando na
+ * primeira abertura e o app não pode ser notarizado. Para distribuir sem
+ * atrito é preciso a conta paga da Apple.
+ */
+async function assinarAdHoc(context) {
+  const temCertificado =
+    process.env.CSC_LINK || process.env.CSC_NAME || process.env.CSC_IDENTITY
+
+  if (temCertificado) {
+    console.log('  • certificado configurado; deixando a assinatura com o electron-builder')
+    return
+  }
+
+  const app = join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`)
+
+  try {
+    await access(app)
+  } catch {
+    console.log(`  • afterPack: não achei o .app em ${app}; assinatura ad-hoc ignorada`)
+    return
+  }
+
+  console.log('  • assinando em ad-hoc (sem Developer ID configurado)')
+
+  const { execFileSync } = await import('node:child_process')
+  try {
+    // `--deep` é depreciado pela Apple para distribuição, mas é o caminho
+    // prático para selar os binários aninhados do Electron em ad-hoc.
+    execFileSync('codesign', ['--force', '--deep', '--sign', '-', app], { stdio: 'pipe' })
+    execFileSync('codesign', ['--verify', '--strict', app], { stdio: 'pipe' })
+    console.log('  • assinatura ad-hoc válida')
+  } catch (error) {
+    // Não derruba o build: sem assinatura o app ainda roda, só pede a senha
+    // das Chaves com mais frequência.
+    console.log(`  • aviso: assinatura ad-hoc falhou (${String(error.stderr || error.message).trim()})`)
   }
 }

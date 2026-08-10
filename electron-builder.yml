@@ -34,7 +34,9 @@ mac:
     # Para instalar na mão, o arquivo é o .dmg.
     - target: zip
       arch: [arm64, x64]
-  hardenedRuntime: true
+  # Só vale com Developer ID + notarização. Com assinatura ad-hoc ele apenas
+  # restringe o app sem nenhum ganho de confiança.
+  hardenedRuntime: false
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist

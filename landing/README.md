@@ -8,7 +8,7 @@ sobe em qualquer lugar arrastando a pasta.
 Abra `index.html` e ajuste a constante no topo do `<script>`:
 
 ```js
-const REPO = 'lucaspardinho/vela-studio';
+const REPO = 'lucas3322/vela-studio';
 ```
 
 É de lá que saem os links de download e do código. A página consulta a API do
