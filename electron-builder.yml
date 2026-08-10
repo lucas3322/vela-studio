@@ -36,7 +36,11 @@ mac:
     NSHumanReadableCopyright: Copyright © 2026 Lucas Pardinho
 
 dmg:
-  title: ${productName}
+  # O título vira o nome do volume montado em /Volumes. Incluir a arquitetura
+  # impede que os builds arm64 e x64 disputem o mesmo ponto de montagem —
+  # era essa colisão que fazia o `hdiutil detach` falhar.
+  title: ${productName} ${arch}
+  artifactName: ${productName}-${version}-${arch}.${ext}
   contents:
     - x: 140
       y: 200

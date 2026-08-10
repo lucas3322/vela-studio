@@ -56,6 +56,17 @@ function createWindow(): BrowserWindow {
 
 app.whenReady().then(() => {
   app.setName('Vela Studio')
+
+  // O painel "Sobre" nativo é onde alguém procura a versão para reportar um bug.
+  // O commit vai junto: versão sozinha não diz se a correção de ontem entrou.
+  app.setAboutPanelOptions({
+    applicationName: 'Vela Studio',
+    applicationVersion: __APP_VERSION__,
+    version: `${__GIT_SHA__} · ${__BUILD_DATE__}`,
+    copyright: 'IDE de banco de dados SQL e NoSQL',
+    credits: 'MySQL · PostgreSQL · SQLite · MongoDB'
+  })
+
   store = new ConnectionStore()
   registerIpcHandlers(manager, store)
 

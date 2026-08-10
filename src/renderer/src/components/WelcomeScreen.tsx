@@ -68,6 +68,14 @@ export function WelcomeScreen(): React.JSX.Element {
         <IconPlus size={13} />
         Nova conexão
       </button>
+
+      {/*
+        Versão e commit, discretos. Quem vem reportar um problema encontra
+        aqui o que precisa informar, sem ter que abrir o menu Sobre.
+      */}
+      <div className="welcome__version selectable">
+        v{__APP_VERSION__} · {__GIT_SHA__}
+      </div>
     </div>
   )
 }
