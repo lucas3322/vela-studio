@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.1.7 — 2026-08-10
+
+### Outras mudanças
+
+- substitui .dockerignore da pasta landing e atualiza Dockerfile para refletir a nova estrutura de diretórios; corrige descrição e adiciona tipo de repositório no package.json (8c64e20)
+
 ## 0.1.6 — 2026-08-10
 
 ### Outras mudanças
