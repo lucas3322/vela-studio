@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.1.9 — 2026-08-10
+
+### Outras mudanças
+
+- atualiznador eademe (fea5006)
+
 ## 0.1.8 — 2026-08-10
 
 ### Outras mudanças
