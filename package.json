@@ -1,9 +1,12 @@
 {
   "name": "vela-studio",
   "version": "0.1.7",
-  "description": "IDE de banco de dados SQL e NoSQL — limpa, rápida e didática",
+  "description": "IDE de banco de dados SQL e NoSQL \u2014 limpa, r\u00e1pida e did\u00e1tica",
   "main": "./out/main/index.js",
-  "author": "Lucas Pardinho",
+  "author": {
+    "name": "Lucas Pardinho",
+    "email": "lucass706@hotmail.com"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
