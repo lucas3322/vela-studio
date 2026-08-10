@@ -1,0 +1,75 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!--
+    Ícone do Vela Studio.
+
+    Um veleiro cujas linhas d'água são as linhas de uma tabela: o nome do app
+    e o que ele faz, na mesma forma. Duas velas em vez de uma porque a
+    composição fica centrada, e um barco é reconhecido instantaneamente
+    mesmo a 16px — uma vela sozinha vira uma mancha ambígua.
+
+    Regras que valem aqui: uma cor de acento só, nenhum traço fino
+    (some no Dock), conteúdo dentro dos 70% centrais do quadro.
+  -->
+  <defs>
+    <linearGradient id="fundo" x1="0.1" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#2E353F"/>
+      <stop offset="0.55" stop-color="#1C2027"/>
+      <stop offset="1" stop-color="#121519"/>
+    </linearGradient>
+
+    <linearGradient id="velaGrande" x1="0.1" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#FFD083"/>
+      <stop offset="0.5" stop-color="#F7AC2C"/>
+      <stop offset="1" stop-color="#E28C08"/>
+    </linearGradient>
+
+    <linearGradient id="velaPequena" x1="0.9" y1="0" x2="0.1" y2="1">
+      <stop offset="0" stop-color="#F0A828"/>
+      <stop offset="1" stop-color="#C97A05"/>
+    </linearGradient>
+
+    <linearGradient id="brilhoTopo" x1="0" y1="0" x2="0" y2="0.55">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Squircle: raio de 22,4% do lado, a proporção usada pelo macOS. -->
+  <rect width="1024" height="1024" rx="229" fill="url(#fundo)"/>
+  <rect width="1024" height="1024" rx="229" fill="url(#brilhoTopo)"/>
+
+  <!--
+    O conjunto é desenhado numa caixa que vai de y=196 a y=974 e depois
+    recentrado: sem isso o barco fica colado na base do quadro, porque a massa
+    visual (casco + linhas) está toda embaixo. Escala 0,94 deixa o conteúdo em
+    ~71% do lado, dentro da grade de ícone do macOS.
+  -->
+  <g transform="translate(512 518) scale(0.94) translate(-512 -585)">
+
+  <!-- Vela de proa (menor, à esquerda do mastro). -->
+  <path d="M 500 322
+           L 500 726
+           L 336 726
+           C 372 620, 430 470, 500 322 Z"
+        fill="url(#velaPequena)"/>
+
+  <!-- Vela grande (à direita do mastro). -->
+  <path d="M 524 196
+           C 646 392, 706 566, 706 726
+           L 524 726 Z"
+        fill="url(#velaGrande)"/>
+
+  <!-- Mastro: a folga escura entre as velas, que dá profundidade sem traço fino. -->
+  <rect x="500" y="196" width="24" height="530" fill="#121519" opacity="0.55"/>
+
+  <!--
+    Casco e linhas d'água. São também as três primeiras linhas de uma tabela:
+    a de cima cheia, as debaixo esmaecendo, como um resultado que continua.
+  -->
+  <path d="M 292 768 L 732 768 C 700 838, 636 872, 512 872 C 388 872, 324 838, 292 768 Z"
+        fill="#F7AC2C"/>
+  <rect x="336" y="906" width="352" height="24" rx="12" fill="#F7AC2C" opacity="0.62"/>
+  <rect x="396" y="954" width="232" height="20" rx="10" fill="#F7AC2C" opacity="0.34"/>
+
+  </g>
+</svg>

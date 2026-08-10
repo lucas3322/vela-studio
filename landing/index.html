@@ -1,0 +1,1038 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vela Studio — a IDE de banco que ajuda a escrever a query</title>
+<meta name="description" content="IDE de banco de dados para macOS e Windows. Autocomplete que conhece seu schema, ajuda em português no hover e erros traduzidos. MySQL, PostgreSQL, SQLite e MongoDB.">
+
+<meta property="og:title" content="Vela Studio">
+<meta property="og:description" content="A IDE de banco de dados que ajuda a escrever a query — não só a executá-la.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0A0E13">
+
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;450;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* ═══════════════════════════════════════════════════════════════════
+   VELA STUDIO — página de apresentação
+
+   Direção: carta náutica. Grid de coordenadas, curvas de profundidade,
+   anotações em mono nas margens, uma prancha clara no meio para quebrar
+   o ritmo. O nome do produto é "vela"; uma carta é o instrumento com que
+   se navega. A mesma ideia da IDE: precisão para atravessar território
+   desconhecido.
+
+   Uma cor de acento (âmbar, a do app). Todo o resto é tinta e papel.
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  --ink:        #0A0E13;
+  --ink-2:      #0E141B;
+  --ink-3:      #131B24;
+  --paper:      #EDE7DA;
+  --paper-2:    #E2DACA;
+
+  --amber:      #F5A623;
+  --amber-hi:   #FFC661;
+  --amber-lo:   #C97F0A;
+
+  --fog:        #93A0B0;
+  --fog-dim:    #5B6875;
+  --bone:       #F2EFE9;
+
+  --rule:       rgba(255,255,255,0.09);
+  --rule-soft:  rgba(255,255,255,0.05);
+  --chart:      rgba(245,166,35,0.10);
+
+  --display: 'Instrument Serif', 'Times New Roman', serif;
+  --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono: 'IBM Plex Mono', 'SF Mono', Menlo, monospace;
+
+  --gutter: clamp(20px, 5vw, 88px);
+  --measure: 1320px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--bone);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  /* `clip` em vez de `hidden`: `overflow-x: hidden` força `overflow-y: auto` e
+     transforma o body em container de rolagem, o que quebra scroll anchoring
+     e o comportamento de `scroll-behavior`. */
+  overflow-x: clip;
+}
+
+/* Grão sutil por cima de tudo: papel, não tela. */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 200;
+  opacity: 0.16;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+
+a { color: inherit; text-decoration: none; }
+img, svg { display: block; max-width: 100%; }
+
+::selection { background: var(--amber); color: var(--ink); }
+
+.wrap {
+  width: 100%;
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+/* ── Tipografia ──────────────────────────────────────────────────── */
+
+h1, h2, h3 { font-family: var(--display); font-weight: 400; line-height: 1.02; letter-spacing: -0.015em; margin: 0; }
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--amber);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.eyebrow::after {
+  content: '';
+  height: 1px;
+  flex: 1;
+  max-width: 90px;
+  background: linear-gradient(90deg, var(--amber), transparent);
+}
+
+.lede { font-size: clamp(17px, 1.5vw, 20px); line-height: 1.62; color: var(--fog); max-width: 54ch; }
+
+.mono-note {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fog-dim);
+}
+
+/* ── Grid de carta, fundo global ─────────────────────────────────── */
+
+.chart-field {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--chart) 1px, transparent 1px),
+    linear-gradient(90deg, var(--chart) 1px, transparent 1px);
+  background-size: 96px 96px;
+  mask-image: radial-gradient(ellipse 110% 75% at 62% 0%, #000 0%, transparent 78%);
+  opacity: 0.55;
+}
+
+/* ── Navegação ───────────────────────────────────────────────────── */
+
+.nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  border-bottom: 1px solid transparent;
+  transition: background 320ms ease, border-color 320ms ease, backdrop-filter 320ms ease;
+}
+.nav[data-scrolled='true'] {
+  background: rgba(10,14,19,0.82);
+  backdrop-filter: blur(14px) saturate(1.4);
+  border-bottom-color: var(--rule-soft);
+}
+.nav__inner {
+  display: flex; align-items: center; gap: 30px;
+  height: 68px;
+}
+.brand { display: flex; align-items: center; gap: 11px; font-family: var(--display); font-size: 22px; letter-spacing: -0.01em; }
+.brand svg { color: var(--amber); flex-shrink: 0; }
+.nav__links { display: flex; gap: 30px; margin-left: auto; font-size: 14px; color: var(--fog); }
+.nav__links a { transition: color 200ms ease; }
+.nav__links a:hover { color: var(--bone); }
+
+/* ── Botões ──────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  height: 50px; padding: 0 26px;
+  font-family: var(--sans); font-size: 15px; font-weight: 500;
+  border: 1px solid transparent; border-radius: 3px;
+  cursor: pointer; white-space: nowrap;
+  transition: transform 220ms cubic-bezier(.2,.8,.2,1), background 220ms ease, border-color 220ms ease, color 220ms ease;
+}
+.btn:active { transform: translateY(1px); }
+
+.btn--primary { background: var(--amber); color: var(--ink); font-weight: 600; position: relative; overflow: hidden; }
+.btn--primary::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,.45) 50%, transparent 70%);
+  transform: translateX(-130%);
+}
+.btn--primary:hover::after { animation: sheen 900ms ease; }
+@keyframes sheen { to { transform: translateX(130%); } }
+.btn--primary:hover { background: var(--amber-hi); }
+
+.btn--ghost { border-color: var(--rule); color: var(--bone); }
+.btn--ghost:hover { border-color: var(--amber); color: var(--amber); }
+
+.btn--sm { height: 38px; padding: 0 16px; font-size: 13.5px; }
+
+/* ── Hero ────────────────────────────────────────────────────────── */
+
+.hero { position: relative; padding: 168px 0 96px; z-index: 1; }
+
+.hero__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+  gap: clamp(36px, 5vw, 76px);
+  align-items: center;
+}
+
+.hero h1 {
+  font-size: clamp(46px, 6.6vw, 92px);
+  margin: 22px 0 26px;
+  letter-spacing: -0.028em;
+}
+.hero h1 em { font-style: italic; color: var(--amber); }
+
+.hero__actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; align-items: center; }
+
+.hero__alt { margin-top: 16px; font-size: 13.5px; color: var(--fog-dim); }
+.hero__alt a { color: var(--fog); border-bottom: 1px solid var(--rule); padding-bottom: 1px; transition: color 200ms ease, border-color 200ms ease; }
+.hero__alt a:hover { color: var(--amber); border-color: var(--amber); }
+
+/* Curvas batimétricas atrás do hero. */
+.contours { position: absolute; top: -8%; right: -14%; width: 78%; max-width: 1000px; z-index: -1; opacity: 0.5; pointer-events: none; }
+.contours path { fill: none; stroke: var(--amber); stroke-width: 1; opacity: 0.13; }
+
+/* ── Janela do app (mock em HTML, não imagem) ────────────────────── */
+
+.window {
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  background: #171B21;
+  box-shadow: 0 50px 100px -28px rgba(0,0,0,.85), 0 0 0 1px rgba(255,255,255,.03);
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+.window__bar {
+  display: flex; align-items: center; gap: 8px;
+  height: 34px; padding: 0 13px;
+  background: #12161B;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.dot { width: 10px; height: 10px; border-radius: 50%; }
+.window__title { margin: 0 auto; font-family: var(--sans); font-size: 11.5px; color: var(--fog-dim); letter-spacing: .02em; }
+
+.window__body { display: grid; grid-template-columns: 168px 1fr; min-height: 292px; }
+
+.mock-side { border-right: 1px solid var(--rule-soft); padding: 11px 0; background: #14181E; }
+.mock-side__h { font-family: var(--sans); font-size: 9.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--fog-dim); padding: 0 13px 8px; }
+.mock-row { display: flex; align-items: center; gap: 7px; padding: 4px 13px; color: #A9B4C0; font-size: 11.5px; }
+.mock-row svg { color: var(--amber); opacity: .75; flex-shrink: 0; }
+.mock-row--on { background: rgba(245,166,35,.11); color: var(--amber-hi); }
+
+.mock-editor { padding: 14px 16px; position: relative; }
+.mock-code { color: #D6DCE4; line-height: 1.85; white-space: pre; }
+.tok-kw { color: #FF9D4D; font-weight: 500; }
+.tok-fn { color: #C4B5FD; }
+.tok-str { color: #86EFAC; }
+.tok-num { color: #7DD3FC; }
+.caret { display: inline-block; width: 7px; height: 15px; background: var(--amber); vertical-align: -3px; animation: blink 1.05s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* Dropdown de autocomplete */
+.ac {
+  position: absolute; left: 132px; top: 46px;
+  width: 315px; max-width: calc(100% - 40px);
+  background: #22272F;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 5px;
+  box-shadow: 0 26px 52px rgba(0,0,0,.68);
+  overflow: hidden;
+  opacity: 0; transform: translateY(-6px) scale(.985);
+  transition: opacity 260ms ease, transform 260ms cubic-bezier(.2,.8,.2,1);
+}
+.ac[data-open='true'] { opacity: 1; transform: none; }
+.ac__item { display: flex; align-items: center; gap: 8px; padding: 6px 11px; font-size: 12px; color: #C9D2DC; }
+.ac__item--on { background: #333A45; }
+.ac__item b { color: var(--amber-hi); font-weight: 600; }
+.ac__meta { margin-left: auto; color: #6C7684; font-size: 10.5px; font-family: var(--sans); }
+.ac__kind { width: 13px; color: var(--amber); opacity: .8; flex-shrink: 0; }
+
+/* ── Seções ──────────────────────────────────────────────────────── */
+
+.section { position: relative; z-index: 1; padding: clamp(78px, 10vw, 132px) 0; }
+
+.plate-head { display: flex; align-items: baseline; gap: 20px; border-bottom: 1px solid var(--rule); padding-bottom: 18px; margin-bottom: 46px; }
+.plate-num { font-family: var(--mono); font-size: 12px; color: var(--amber); letter-spacing: .1em; flex-shrink: 0; }
+.plate-head h2 { font-size: clamp(28px, 3.6vw, 46px); flex: 1; }
+.plate-head .mono-note { flex-shrink: 0; display: none; }
+@media (min-width: 900px) { .plate-head .mono-note { display: block; } }
+
+/* ── Prancha clara: a tese ───────────────────────────────────────── */
+
+.thesis {
+  background: var(--paper);
+  color: #14181D;
+  position: relative;
+  z-index: 1;
+  border-top: 1px solid rgba(0,0,0,.1);
+  border-bottom: 1px solid rgba(0,0,0,.1);
+}
+.thesis::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image: linear-gradient(rgba(0,0,0,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.045) 1px, transparent 1px);
+  background-size: 34px 34px;
+  pointer-events: none;
+}
+.thesis__inner { position: relative; padding: clamp(72px, 9vw, 118px) 0; }
+.thesis blockquote {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(28px, 4.4vw, 58px);
+  line-height: 1.1;
+  letter-spacing: -0.022em;
+  max-width: 20ch;
+}
+.thesis blockquote em { font-style: italic; color: var(--amber-lo); }
+.thesis__note { margin-top: 34px; max-width: 46ch; color: #4C5560; font-size: 16px; line-height: 1.66; }
+.thesis__mark { font-family: var(--mono); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: #8A8272; margin-bottom: 26px; }
+
+/* ── Demonstrações ───────────────────────────────────────────────── */
+
+.demo { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.15fr); gap: clamp(30px, 4.5vw, 68px); align-items: center; }
+.demo + .demo { margin-top: clamp(64px, 8vw, 108px); }
+.demo--flip .demo__text { order: 2; }
+
+.demo h3 { font-size: clamp(24px, 2.9vw, 35px); margin-bottom: 16px; }
+.demo p { color: var(--fog); line-height: 1.68; margin: 0 0 14px; }
+.demo p strong { color: var(--bone); font-weight: 500; }
+
+.panel {
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: #171B21;
+  padding: 20px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  box-shadow: 0 30px 62px -26px rgba(0,0,0,.8);
+}
+
+/* Cartão de hover */
+.hovercard { border: 1px solid rgba(255,255,255,.13); border-radius: 6px; background: #22272F; padding: 15px 17px; max-width: 430px; }
+.hovercard__t { color: var(--amber-hi); font-weight: 600; margin-bottom: 7px; }
+.hovercard__d { color: #BCC6D2; font-family: var(--sans); font-size: 13.5px; line-height: 1.6; margin-bottom: 12px; }
+.hovercard__code { background: #12161B; border-radius: 4px; padding: 9px 11px; color: #9FE8B4; font-size: 11.5px; margin-bottom: 12px; overflow-x: auto; }
+.hovercard__warn { display: flex; gap: 8px; color: #FBBF24; font-family: var(--sans); font-size: 12.5px; line-height: 1.55; }
+
+/* Erro traduzido */
+.err-pair { display: grid; gap: 14px; }
+.err {
+  border-radius: 7px; padding: 15px 17px;
+  border: 1px solid;
+  font-family: var(--mono); font-size: 12px;
+}
+.err--raw { border-color: rgba(255,255,255,.09); background: #14181E; color: #6C7684; }
+.err--good { border-color: rgba(248,113,113,.5); background: rgba(248,113,113,.07); }
+.err__label { font-family: var(--sans); font-size: 10px; letter-spacing: .17em; text-transform: uppercase; color: var(--fog-dim); margin-bottom: 9px; }
+.err__title { color: #F2EFE9; font-family: var(--sans); font-size: 14.5px; font-weight: 500; margin-bottom: 6px; }
+.err__hint { color: #9FB0C2; font-family: var(--sans); font-size: 13px; line-height: 1.55; }
+.err__hint b { color: var(--amber-hi); font-weight: 600; }
+
+/* ── Bancos ──────────────────────────────────────────────────────── */
+
+.dbs { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1px; background: var(--rule-soft); border: 1px solid var(--rule-soft); }
+.db { background: var(--ink-2); padding: 30px 26px; transition: background 260ms ease; }
+.db:hover { background: var(--ink-3); }
+.db__dot { width: 9px; height: 9px; border-radius: 50%; margin-bottom: 16px; }
+.db__n { font-family: var(--display); font-size: 25px; margin-bottom: 6px; }
+.db__d { font-size: 13.5px; color: var(--fog-dim); line-height: 1.55; }
+
+/* ── Recursos ────────────────────────────────────────────────────── */
+
+.feats { display: grid; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); gap: 34px 44px; }
+.feat { border-top: 1px solid var(--rule); padding-top: 18px; }
+.feat__k { font-family: var(--mono); font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--amber); margin-bottom: 10px; }
+.feat__t { font-family: var(--display); font-size: 21px; margin-bottom: 7px; }
+.feat__d { font-size: 14px; color: var(--fog); line-height: 1.62; }
+
+/* ── Download ────────────────────────────────────────────────────── */
+
+.dl { border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; background: var(--ink-2); }
+.dl__top { padding: clamp(30px, 4vw, 46px); border-bottom: 1px solid var(--rule-soft); text-align: center; }
+.dl__top h2 { font-size: clamp(30px, 4vw, 48px); margin-bottom: 12px; }
+.dl__detected { font-family: var(--mono); font-size: 12px; color: var(--fog-dim); margin-top: 18px; letter-spacing: .04em; }
+.dl__detected b { color: var(--amber); }
+
+.dl__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+.dl__col { padding: 28px; border-right: 1px solid var(--rule-soft); }
+.dl__col:last-child { border-right: none; }
+.dl__os { display: flex; align-items: center; gap: 10px; font-family: var(--display); font-size: 22px; margin-bottom: 4px; }
+.dl__req { font-size: 12px; color: var(--fog-dim); margin-bottom: 18px; font-family: var(--mono); }
+.dl__list { display: flex; flex-direction: column; gap: 9px; }
+.dl__link {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 13px;
+  border: 1px solid var(--rule); border-radius: 4px;
+  font-size: 13.5px;
+  transition: border-color 220ms ease, background 220ms ease, transform 220ms cubic-bezier(.2,.8,.2,1);
+}
+.dl__link:hover { border-color: var(--amber); background: rgba(245,166,35,.06); transform: translateX(3px); }
+.dl__link[data-recommended='true'] { border-color: var(--amber); background: rgba(245,166,35,.09); }
+.dl__tag { margin-left: auto; font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--amber); }
+.dl__sub { font-family: var(--mono); font-size: 11px; color: var(--fog-dim); display: block; margin-top: 2px; }
+
+.notice {
+  margin-top: 22px;
+  display: flex; gap: 11px;
+  padding: 15px 17px;
+  border: 1px solid rgba(251,191,36,.28);
+  background: rgba(251,191,36,.06);
+  border-radius: 6px;
+  font-size: 13.5px; line-height: 1.6; color: #D9C79A;
+}
+.notice svg { flex-shrink: 0; margin-top: 2px; color: #FBBF24; }
+
+/* ── Rodapé ──────────────────────────────────────────────────────── */
+
+.footer { border-top: 1px solid var(--rule); padding: 46px 0; position: relative; z-index: 1; }
+.footer__in { display: flex; flex-wrap: wrap; gap: 22px; align-items: center; justify-content: space-between; font-size: 13.5px; color: var(--fog-dim); }
+.footer__links { display: flex; gap: 26px; }
+.footer__links a:hover { color: var(--amber); }
+
+/* ── Revelação no scroll ─────────────────────────────────────────── */
+
+.reveal { transition: opacity 780ms cubic-bezier(.2,.8,.2,1), transform 780ms cubic-bezier(.2,.8,.2,1); }
+/* Esconder é opt-in do JS. Se o script falhar, não carregar, ou o
+   IntersectionObserver não entregar os callbacks, o conteúdo aparece do mesmo
+   jeito — numa página de apresentação, texto invisível é falha total. */
+.js .reveal:not([data-seen='true']) { opacity: 0; transform: translateY(20px); }
+
+/* Entrada escalonada do hero. */
+.rise { opacity: 0; transform: translateY(22px); animation: rise 1s cubic-bezier(.2,.8,.2,1) forwards; }
+@keyframes rise { to { opacity: 1; transform: none; } }
+.d1 { animation-delay: .06s } .d2 { animation-delay: .16s } .d3 { animation-delay: .26s }
+.d4 { animation-delay: .36s } .d5 { animation-delay: .5s }
+
+/* ── Responsivo ──────────────────────────────────────────────────── */
+
+@media (max-width: 960px) {
+  .hero { padding-top: 128px; }
+  .hero__grid, .demo, .demo--flip .demo__text { grid-template-columns: 1fr; order: 0; }
+  .nav__links { display: none; }
+  .window__body { grid-template-columns: 1fr; }
+  .mock-side { display: none; }
+  .ac { left: 16px; top: 62px; }
+  .dl__col { border-right: none; border-bottom: 1px solid var(--rule-soft); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  .rise, .reveal { opacity: 1; transform: none; }
+  .caret { animation: none; }
+}
+</style>
+</head>
+
+<body>
+<div class="chart-field" aria-hidden="true"></div>
+
+<!-- ── Navegação ──────────────────────────────────────────────── -->
+<nav class="nav" id="nav">
+  <div class="wrap nav__inner">
+    <a class="brand" href="#top">
+      <svg width="22" height="22" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+        <path d="M8.6 1.6c1.9 3 2.8 5.7 2.8 8.2H8.6V1.6Z"/>
+        <path d="M7.4 3.6v6.2H4.9c.7-2 1.5-4 2.5-6.2Z" opacity=".62"/>
+        <path d="M2.6 11.2h10.8c-.8 1.9-2.4 2.9-5.4 2.9s-4.6-1-5.4-2.9Z"/>
+      </svg>
+      Vela
+    </a>
+    <div class="nav__links">
+      <a href="#recursos">Recursos</a>
+      <a href="#bancos">Bancos</a>
+      <a href="#download">Download</a>
+      <a href="#" data-repo-link>Código</a>
+    </div>
+    <a class="btn btn--primary btn--sm" href="#download">Baixar</a>
+  </div>
+</nav>
+
+<!-- ── Hero ───────────────────────────────────────────────────── -->
+<header class="hero" id="top">
+  <svg class="contours" viewBox="0 0 800 620" aria-hidden="true">
+    <path d="M-40 300C120 210 250 480 420 380S700 120 860 210"/>
+    <path d="M-40 350C130 255 260 525 430 425S710 170 870 260"/>
+    <path d="M-40 400C140 300 270 570 440 470S720 220 880 310"/>
+    <path d="M-40 460C160 350 290 620 460 520S740 275 890 370"/>
+    <path d="M-40 530C180 405 310 675 480 575S760 335 900 435"/>
+  </svg>
+
+  <div class="wrap hero__grid">
+    <div class="hero__text">
+      <p class="eyebrow rise d1">IDE de banco de dados · macOS e Windows</p>
+
+      <h1 class="rise d2">A IDE que ajuda a <em>escrever</em> a query.</h1>
+
+      <p class="lede rise d3">
+        Não só a executar. O editor conhece o seu schema, explica cada comando
+        em português e traduz os erros do banco — para quem tem vinte anos de
+        SQL e para quem escreveu o primeiro <code style="font-family:var(--mono);color:var(--amber-hi)">SELECT</code> hoje.
+      </p>
+
+      <div class="hero__actions rise d4">
+        <a class="btn btn--primary" href="#download" id="heroPrimary">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8 2v8M5 7.5 8 10.5l3-3M2.5 11v1.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V11"/>
+          </svg>
+          <span id="heroPrimaryLabel">Baixar grátis</span>
+        </a>
+        <a class="btn btn--ghost" href="#" data-repo-link>Ver o código</a>
+      </div>
+
+      <p class="hero__alt rise d4">
+        Gratuito e de código aberto · MIT ·
+        <a href="#download" id="heroAlt">todas as plataformas</a>
+      </p>
+    </div>
+
+    <!-- Janela do app, montada em HTML para ficar nítida em qualquer tela. -->
+    <div class="window rise d5" role="img" aria-label="Captura do Vela Studio mostrando o autocomplete que lê o schema do banco">
+      <div class="window__bar">
+        <span class="dot" style="background:#FF5F57"></span>
+        <span class="dot" style="background:#FEBC2E"></span>
+        <span class="dot" style="background:#28C840"></span>
+        <span class="window__title">CRM PROD — crmallcom</span>
+      </div>
+      <div class="window__body">
+        <aside class="mock-side">
+          <div class="mock-side__h">Tabelas · 209</div>
+          <div class="mock-row"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12M6.5 6v7.5"/></svg>accounts</div>
+          <div class="mock-row mock-row--on"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12M6.5 6v7.5"/></svg>contracts</div>
+          <div class="mock-row"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12M6.5 6v7.5"/></svg>activities</div>
+          <div class="mock-row"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12M6.5 6v7.5"/></svg>boletos</div>
+          <div class="mock-row"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12M6.5 6v7.5"/></svg>business_unity</div>
+          <div class="mock-row"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12M6.5 6v7.5"/></svg>cargo_user</div>
+        </aside>
+
+        <div class="mock-editor">
+          <div class="mock-code" id="typed"><span class="caret"></span></div>
+
+          <div class="ac" id="ac">
+            <div class="ac__item ac__item--on">
+              <svg class="ac__kind" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12M6.5 6v7.5"/></svg>
+              <span><b>acc</b>ounts</span><span class="ac__meta">~21 mil linhas</span>
+            </div>
+            <div class="ac__item">
+              <svg class="ac__kind" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12M6.5 6v7.5"/></svg>
+              <span><b>acc</b>ounts_economic_group</span><span class="ac__meta">tabela</span>
+            </div>
+            <div class="ac__item">
+              <svg class="ac__kind" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12M6.5 6v7.5"/></svg>
+              <span><b>acc</b>ount_blacklist_managers</span><span class="ac__meta">~1,2 mil</span>
+            </div>
+            <div class="ac__item">
+              <svg class="ac__kind" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12M6.5 6v7.5"/></svg>
+              <span>apn_<b>acc</b>ounts</span><span class="ac__meta">~79 linhas</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ── A tese ─────────────────────────────────────────────────── -->
+<section class="thesis">
+  <div class="wrap thesis__inner">
+    <p class="thesis__mark">A tese</p>
+    <blockquote>
+      Ferramentas de banco assumem que você <em>já sabe</em> SQL.
+    </blockquote>
+    <p class="thesis__note">
+      As poderosas são feias. As bonitas são rasas. E nenhuma assume que a
+      pessoa escrevendo a query pode estar aprendendo agora. O Vela conhece o
+      schema do seu banco e usa isso em três lugares — sugestão, explicação e
+      erro. O sênior ganha velocidade; quem está começando aprende fazendo,
+      sem sair da ferramenta.
+    </p>
+  </div>
+</section>
+
+<!-- ── Demonstrações ──────────────────────────────────────────── -->
+<section class="section" id="recursos">
+  <div class="wrap">
+
+    <div class="plate-head reveal">
+      <span class="plate-num">01</span>
+      <h2>Autocomplete que leu seu banco</h2>
+      <span class="mono-note">contexto do cursor</span>
+    </div>
+
+    <div class="demo reveal">
+      <div class="demo__text">
+        <h3>Sabe onde o cursor está.</h3>
+        <p>Depois de <strong>FROM</strong>, sugere tabelas. Depois de <strong>SELECT</strong> ou <strong>WHERE</strong>, sugere colunas. E resolve apelidos: digitar <strong>c.</strong> traz as colunas de <code style="font-family:var(--mono);color:var(--amber-hi)">contracts</code>, não uma lista alfabética de tudo.</p>
+        <p>Cada sugestão mostra o tipo, a chave primária, se aceita nulo e quantas linhas a tabela tem — antes de você rodar qualquer coisa.</p>
+      </div>
+      <div class="panel">
+        <div style="color:#D6DCE4;line-height:1.9;">
+          <span class="tok-kw">SELECT</span> c.<span style="color:var(--amber-hi)">|</span><br>
+          <span class="tok-kw">FROM</span> contracts c<br>
+          <span class="tok-kw">JOIN</span> accounts a <span class="tok-kw">ON</span> a.id = c.account_id
+        </div>
+        <div style="margin-top:14px;border:1px solid rgba(255,255,255,.12);border-radius:5px;background:#22272F;overflow:hidden;">
+          <div class="ac__item ac__item--on"><svg class="ac__kind" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5" cy="10.5" r="2.5"/><path d="M6.8 8.7 12.5 3M10.5 5l1.5 1.5M12.5 3l1.5 1.5"/></svg><span>id_contract</span><span class="ac__meta">int · chave primária</span></div>
+          <div class="ac__item"><svg class="ac__kind" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 3v10M8 3v10M12 3v10"/></svg><span>vendor_contract</span><span class="ac__meta">varchar(225)</span></div>
+          <div class="ac__item"><svg class="ac__kind" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6.5 9.5a2.5 2.5 0 0 0 3.5 0l2-2a2.5 2.5 0 0 0-3.5-3.5l-1 1"/><path d="M9.5 6.5a2.5 2.5 0 0 0-3.5 0l-2 2a2.5 2.5 0 0 0 3.5 3.5l1-1"/></svg><span>fk_client</span><span class="ac__meta">int · estrangeira</span></div>
+          <div class="ac__item"><svg class="ac__kind" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 3v10M8 3v10M12 3v10"/></svg><span>created_at</span><span class="ac__meta">timestamp</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="plate-head reveal" style="margin-top:clamp(78px,9vw,124px)">
+      <span class="plate-num">02</span>
+      <h2>Documentação onde a dúvida acontece</h2>
+      <span class="mono-note">hover · português</span>
+    </div>
+
+    <div class="demo demo--flip reveal">
+      <div class="demo__text">
+        <h3>Passe o mouse. Entenda.</h3>
+        <p>Toda palavra-chave explica o que faz, com exemplo — e com a <strong>pegadinha</strong> que ela costuma esconder.</p>
+        <p>Ninguém precisa sair para o navegador no meio de uma consulta. É a diferença entre uma ferramenta que executa e uma que ensina.</p>
+      </div>
+      <div class="hovercard">
+        <div class="hovercard__t">LEFT JOIN — tudo da esquerda, com o que casar da direita</div>
+        <div class="hovercard__d">Mantém <strong style="color:#E7EDF4">todas</strong> as linhas da tabela da esquerda. Quando não há correspondência na direita, as colunas dela vêm como <code style="font-family:var(--mono)">NULL</code>.</div>
+        <div class="hovercard__code">SELECT c.nome, p.id
+FROM clientes c
+LEFT JOIN pedidos p ON p.cliente_id = c.id</div>
+        <div class="hovercard__warn">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;margin-top:2px"><path d="M7.1 2.6 1.7 12a1 1 0 0 0 .9 1.5h10.8a1 1 0 0 0 .9-1.5L8.9 2.6a1 1 0 0 0-1.8 0Z"/><path d="M8 6v3"/></svg>
+          <span>Filtrar a tabela da direita no <code style="font-family:var(--mono)">WHERE</code> transforma o LEFT JOIN em INNER JOIN sem avisar. Coloque a condição no <code style="font-family:var(--mono)">ON</code>.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="plate-head reveal" style="margin-top:clamp(78px,9vw,124px)">
+      <span class="plate-num">03</span>
+      <h2>Erros que dizem o que fazer</h2>
+      <span class="mono-note">tradução + sugestão</span>
+    </div>
+
+    <div class="demo reveal">
+      <div class="demo__text">
+        <h3>O banco reclama. O Vela explica.</h3>
+        <p>Mensagem de banco é escrita para quem já sabe o que errou. O Vela reescreve em português e, quando reconhece o problema, <strong>sugere a correção</strong> comparando com o seu schema real.</p>
+        <p>A mensagem original continua a um clique de distância, para quem prefere ela.</p>
+      </div>
+      <div class="err-pair">
+        <div class="err err--raw">
+          <div class="err__label">O que o banco devolve</div>
+          ER_BAD_FIELD_ERROR: Unknown column 'nomee' in 'field list'
+        </div>
+        <div class="err err--good">
+          <div class="err__label">O que você lê</div>
+          <div class="err__title">A coluna "nomee" não existe.</div>
+          <div class="err__hint">Você quis dizer <b>nome</b>?</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── Bancos ─────────────────────────────────────────────────── -->
+<section class="section" id="bancos" style="padding-top:0">
+  <div class="wrap">
+    <div class="plate-head reveal">
+      <span class="plate-num">04</span>
+      <h2>Quatro bancos, uma interface</h2>
+      <span class="mono-note">relacional e documentos</span>
+    </div>
+
+    <div class="dbs reveal">
+      <div class="db">
+        <div class="db__dot" style="background:#00758F"></div>
+        <div class="db__n">MySQL</div>
+        <div class="db__d">E MariaDB. Cancelamento de query, índices, relações e o DDL da tabela.</div>
+      </div>
+      <div class="db">
+        <div class="db__dot" style="background:#5C93C4"></div>
+        <div class="db__n">PostgreSQL</div>
+        <div class="db__d">Schemas, JSONB, <code style="font-family:var(--mono);font-size:12px">ILIKE</code> e cancelamento por backend.</div>
+      </div>
+      <div class="db">
+        <div class="db__dot" style="background:#3FA9F5"></div>
+        <div class="db__n">SQLite</div>
+        <div class="db__d">Abra um arquivo <code style="font-family:var(--mono);font-size:12px">.db</code> e comece. Sem servidor, sem configuração.</div>
+      </div>
+      <div class="db">
+        <div class="db__dot" style="background:#00ED64"></div>
+        <div class="db__n">MongoDB</div>
+        <div class="db__d">Sintaxe do shell, com os campos inferidos por amostragem dos documentos.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Recursos ───────────────────────────────────────────────── -->
+<section class="section" style="padding-top:0">
+  <div class="wrap">
+    <div class="plate-head reveal">
+      <span class="plate-num">05</span>
+      <h2>O resto do instrumento</h2>
+      <span class="mono-note">detalhes que importam</span>
+    </div>
+
+    <div class="feats reveal">
+      <div class="feat"><div class="feat__k">Grid</div><div class="feat__t">50 mil linhas sem travar</div><div class="feat__d">Renderização virtualizada, cor por tipo de dado e coluna redimensionável.</div></div>
+      <div class="feat"><div class="feat__k">Receitas</div><div class="feat__t">25 consultas prontas</div><div class="feat__d">Achar duplicados, campos vazios, registros órfãos — com a sua tabela já preenchida.</div></div>
+      <div class="feat"><div class="feat__k">Segurança</div><div class="feat__t">Modo somente leitura</div><div class="feat__d">Bloqueia escrita no driver, não só na tela. E avisa antes de um UPDATE sem WHERE.</div></div>
+      <div class="feat"><div class="feat__k">Senhas</div><div class="feat__t">No Keychain, nunca em texto</div><div class="feat__d">Se a criptografia do sistema não estiver disponível, o Vela prefere não salvar.</div></div>
+      <div class="feat"><div class="feat__k">Abas</div><div class="feat__t">Uma sessão por conexão</div><div class="feat__d">Troque de banco e volte: suas abas, resultados e SQL continuam onde estavam.</div></div>
+      <div class="feat"><div class="feat__k">Tema</div><div class="feat__t">Claro e escuro de verdade</div><div class="feat__d">Desenhados separadamente, não invertidos. Acompanha o sistema se você quiser.</div></div>
+      <div class="feat"><div class="feat__k">Histórico</div><div class="feat__t">As últimas 500 queries</div><div class="feat__d">Com busca. Aquela consulta de ontem não se perde.</div></div>
+      <div class="feat"><div class="feat__k">Guia</div><div class="feat__t">Referência navegável</div><div class="feat__d">Todo comando de SQL e MongoDB explicado, buscável, dentro do app.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Download ───────────────────────────────────────────────── -->
+<section class="section" id="download" style="padding-top:0">
+  <div class="wrap">
+    <div class="dl reveal">
+      <div class="dl__top">
+        <h2>Baixe e conecte</h2>
+        <p class="lede" style="margin:0 auto;text-align:center">Gratuito, de código aberto, sem cadastro e sem telemetria.</p>
+        <p class="dl__detected" id="detected">Detectando seu sistema…</p>
+      </div>
+
+      <div class="dl__grid">
+        <div class="dl__col">
+          <div class="dl__os">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M11.2 8.5c0-1.5 1.2-2.2 1.3-2.3-.7-1-1.8-1.2-2.2-1.2-.9-.1-1.8.5-2.3.5s-1.2-.5-2-.5c-1 0-2 .6-2.5 1.5-1.1 1.9-.3 4.6.8 6.1.5.7 1.1 1.5 1.9 1.5.8 0 1-.5 2-.5s1.2.5 2 .5 1.3-.7 1.8-1.4c.6-.8.8-1.6.8-1.6s-1.6-.6-1.6-2.6ZM9.8 3.9c.4-.5.7-1.2.6-1.9-.6 0-1.4.4-1.8.9-.4.5-.7 1.2-.6 1.9.7.1 1.4-.4 1.8-.9Z"/></svg>
+            macOS
+          </div>
+          <div class="dl__req">11 Big Sur ou superior</div>
+          <div class="dl__list">
+            <a class="dl__link" data-dl="mac-arm64" href="#">
+              <span>Apple Silicon<span class="dl__sub">M1, M2, M3, M4 · .dmg</span></span>
+              <span class="dl__tag" data-tag-arm hidden>seu Mac</span>
+            </a>
+            <a class="dl__link" data-dl="mac-x64" href="#">
+              <span>Intel<span class="dl__sub">Macs até 2020 · .dmg</span></span>
+              <span class="dl__tag" data-tag-intel hidden>seu Mac</span>
+            </a>
+          </div>
+        </div>
+
+        <div class="dl__col">
+          <div class="dl__os">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M1.5 3.2 6.8 2.5v5.1H1.5V3.2Zm0 9.6 5.3.7V8.5H1.5v4.3Zm6.2.8 6.8.9V8.5H7.7v5.1Zm0-11.2v5.1h6.8V1.5L7.7 2.4Z"/></svg>
+            Windows
+          </div>
+          <div class="dl__req">Windows 10 ou 11 · 64 bits</div>
+          <div class="dl__list">
+            <a class="dl__link" data-dl="win-setup" href="#">
+              <span>Instalador<span class="dl__sub">Atalhos e desinstalação · .exe</span></span>
+              <span class="dl__tag" data-tag-win hidden>seu PC</span>
+            </a>
+            <a class="dl__link" data-dl="win-portable" href="#">
+              <span>Portátil<span class="dl__sub">Roda sem instalar · .exe</span></span>
+            </a>
+          </div>
+        </div>
+
+        <div class="dl__col">
+          <div class="dl__os">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 1.2c-1.7 0-2.3 1.3-2.2 2.6.1 1-.1 1.6-.6 2.4-.6.9-1.5 2-1.7 3.4-.2 1.2.3 1.6.8 1.7.2.6.6 1.2 1.3 1.6 1.3.8 3.3.8 4.7 0 .7-.4 1.1-1 1.3-1.6.5-.1 1-.5.8-1.7-.2-1.4-1.1-2.5-1.7-3.4-.5-.8-.7-1.4-.6-2.4C10.3 2.5 9.7 1.2 8 1.2Zm-1 2.5c.3 0 .5.3.5.7s-.2.7-.5.7-.5-.3-.5-.7.2-.7.5-.7Zm2 0c.3 0 .5.3.5.7s-.2.7-.5.7-.5-.3-.5-.7.2-.7.5-.7Z"/></svg>
+            Linux
+          </div>
+          <div class="dl__req">x86-64</div>
+          <div class="dl__list">
+            <a class="dl__link" data-dl="linux-appimage" href="#">
+              <span>AppImage<span class="dl__sub">Qualquer distribuição</span></span>
+              <span class="dl__tag" data-tag-linux hidden>seu sistema</span>
+            </a>
+            <a class="dl__link" data-dl="linux-deb" href="#">
+              <span>Debian / Ubuntu<span class="dl__sub">.deb</span></span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notice reveal">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="6.2"/><path d="M8 5.2v3.4"/><circle cx="8" cy="11" r=".7" fill="currentColor" stroke="none"/></svg>
+      <span>
+        <strong>Primeira abertura.</strong> O app ainda não tem assinatura de
+        desenvolvedor. No macOS, clique com o botão direito no app e escolha
+        <em>Abrir</em>; no Windows, clique em <em>Mais informações → Executar assim mesmo</em>.
+        É o aviso padrão para software sem certificado pago — o código está aberto para auditoria.
+      </span>
+    </div>
+  </div>
+</section>
+
+<!-- ── Rodapé ─────────────────────────────────────────────────── -->
+<footer class="footer">
+  <div class="wrap footer__in">
+    <span>Vela Studio · MIT · feito por Lucas Pardinho</span>
+    <div class="footer__links">
+      <a href="#" data-repo-link>GitHub</a>
+      <a href="#" data-repo-link-suffix="/releases">Versões</a>
+      <a href="#" data-repo-link-suffix="/issues">Reportar problema</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ═══════════════════════════════════════════════════════════════
+     ⚠ AJUSTE AQUI: usuário e repositório no GitHub.
+     Os links de download e do código saem daqui.
+     ═══════════════════════════════════════════════════════════════ */
+  const REPO = 'lucaspardinho/vela-studio';
+
+  const REPO_URL = `https://github.com/${REPO}`;
+  const RELEASES = `${REPO_URL}/releases`;
+  const LATEST = `${RELEASES}/latest`;
+
+  // ── Links do repositório ─────────────────────────────────────
+  document.querySelectorAll('[data-repo-link]').forEach((a) => { a.href = REPO_URL; a.target = '_blank'; a.rel = 'noopener'; });
+  document.querySelectorAll('[data-repo-link-suffix]').forEach((a) => {
+    a.href = REPO_URL + a.dataset.repoLinkSuffix; a.target = '_blank'; a.rel = 'noopener';
+  });
+
+  // Até a API responder, todo botão aponta para a página de versões.
+  const links = document.querySelectorAll('[data-dl]');
+  links.forEach((a) => { a.href = LATEST; a.target = '_blank'; a.rel = 'noopener'; });
+
+  // ── Detecção de sistema ──────────────────────────────────────
+  /**
+   * Apple Silicon não é detectável de forma confiável: por compatibilidade,
+   * os navegadores no macOS reportam "Intel Mac OS X" mesmo em M1/M2/M3.
+   * O renderizador do WebGL é a única pista prática. Por isso a interface
+   * apenas *destaca* uma opção e nunca esconde a outra.
+   */
+  function appleSilicon() {
+    try {
+      const gl = document.createElement('canvas').getContext('webgl');
+      const ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
+      const renderer = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : '';
+      return /apple\s?(m\d|gpu|silicon)/i.test(renderer);
+    } catch { return false; }
+  }
+
+  function detect() {
+    const ua = navigator.userAgent;
+    const platform = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
+    if (/Android/i.test(ua)) return { os: 'android' };
+    if (/iPhone|iPad|iPod/i.test(ua)) return { os: 'ios' };
+    if (/Mac/i.test(platform) || /Mac OS X/i.test(ua)) return { os: 'mac', arm: appleSilicon() };
+    if (/Win/i.test(platform) || /Windows/i.test(ua)) return { os: 'win' };
+    if (/Linux/i.test(platform) || /Linux/i.test(ua)) return { os: 'linux' };
+    return { os: 'other' };
+  }
+
+  const sys = detect();
+  const detected = document.getElementById('detected');
+  const heroLabel = document.getElementById('heroPrimaryLabel');
+
+  const RECOMMEND = {
+    mac:   () => (sys.arm ? 'mac-arm64' : 'mac-x64'),
+    win:   () => 'win-setup',
+    linux: () => 'linux-appimage'
+  };
+
+  let recommended = null;
+
+  if (RECOMMEND[sys.os]) {
+    recommended = RECOMMEND[sys.os]();
+    const el = document.querySelector(`[data-dl="${recommended}"]`);
+    if (el) el.dataset.recommended = 'true';
+
+    if (sys.os === 'mac') {
+      document.querySelector(sys.arm ? '[data-tag-arm]' : '[data-tag-intel]').hidden = false;
+      detected.innerHTML = sys.arm
+        ? 'Detectamos <b>macOS com Apple Silicon</b>. Se seu Mac for Intel, use a outra opção.'
+        : 'Detectamos <b>macOS</b>. Se seu Mac for M1 ou mais novo, prefira a versão Apple Silicon.';
+      heroLabel.textContent = 'Baixar para macOS';
+    } else if (sys.os === 'win') {
+      document.querySelector('[data-tag-win]').hidden = false;
+      detected.innerHTML = 'Detectamos <b>Windows</b>.';
+      heroLabel.textContent = 'Baixar para Windows';
+    } else {
+      document.querySelector('[data-tag-linux]').hidden = false;
+      detected.innerHTML = 'Detectamos <b>Linux</b>.';
+      heroLabel.textContent = 'Baixar para Linux';
+    }
+  } else {
+    detected.textContent = 'Disponível para macOS, Windows e Linux.';
+  }
+
+  // ── Links reais, vindos da última release ────────────────────
+  /**
+   * O nome dos arquivos carrega a versão, então não dá para montar a URL
+   * à mão sem quebrar a cada release. Perguntamos à API do GitHub qual é a
+   * última. Se falhar — repositório privado, limite de requisições, offline —
+   * os botões continuam levando à página de versões, que sempre funciona.
+   */
+  const MATCH = {
+    'mac-arm64':      (n) => n.endsWith('.dmg') && /arm64/i.test(n),
+    'mac-x64':        (n) => n.endsWith('.dmg') && /x64/i.test(n),
+    'win-setup':      (n) => n.endsWith('.exe') && /setup/i.test(n),
+    'win-portable':   (n) => n.endsWith('.exe') && /portable/i.test(n),
+    'linux-appimage': (n) => n.endsWith('.AppImage'),
+    'linux-deb':      (n) => n.endsWith('.deb')
+  };
+
+  const mb = (bytes) => `${(bytes / 1048576).toFixed(0)} MB`;
+
+  fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+    headers: { Accept: 'application/vnd.github+json' }
+  })
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+    .then((release) => {
+      const assets = release.assets || [];
+      links.forEach((a) => {
+        const test = MATCH[a.dataset.dl];
+        const asset = assets.find((x) => test && test(x.name));
+        if (!asset) return;
+        a.href = asset.browser_download_url;
+        a.removeAttribute('target');
+        const sub = a.querySelector('.dl__sub');
+        if (sub) sub.textContent += ` · ${mb(asset.size)}`;
+      });
+
+      if (release.tag_name) {
+        const note = document.createElement('span');
+        note.style.cssText = 'display:block;margin-top:8px;color:var(--fog-dim)';
+        note.textContent = `Versão ${release.tag_name.replace(/^v/, '')} · ${new Date(release.published_at).toLocaleDateString('pt-BR')}`;
+        detected.appendChild(note);
+      }
+
+      // O botão do topo leva direto ao arquivo certo para o sistema detectado.
+      if (recommended) {
+        const el = document.querySelector(`[data-dl="${recommended}"]`);
+        const hero = document.getElementById('heroPrimary');
+        if (el && hero && el.href && !el.href.endsWith('/latest')) hero.href = el.href;
+      }
+    })
+    .catch(() => {
+      /* Sem release publicada ainda: os botões seguem para /releases. */
+    });
+
+  // ── Navegação: fundo ao rolar ────────────────────────────────
+  const nav = document.getElementById('nav');
+  const onScroll = () => { nav.dataset.scrolled = String(window.scrollY > 20); };
+  addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  // ── Revelação no scroll ──────────────────────────────────────
+  /**
+   * Três camadas, porque conteúdo invisível numa página de apresentação é
+   * falha total — pior que não ter animação nenhuma:
+   *
+   *   1. o CSS só esconde sob `html.js`, marcado aqui embaixo;
+   *   2. o IntersectionObserver revela conforme a pessoa rola;
+   *   3. um temporizador revela tudo que sobrou, caso o observer não entregue
+   *      os callbacks (aba em segundo plano, motor de render pausado,
+   *      navegador antigo).
+   */
+  const reveals = [...document.querySelectorAll('.reveal')];
+  const revelar = (el) => { el.dataset.seen = 'true'; };
+  const revelarTudo = () => reveals.forEach(revelar);
+
+  document.documentElement.classList.add('js');
+
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (reduce || !('IntersectionObserver' in window)) {
+    revelarTudo();
+  } else {
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach((e) => {
+        if (e.isIntersecting) { revelar(e.target); io.unobserve(e.target); }
+      }),
+      { threshold: 0.08, rootMargin: '0px 0px -40px' }
+    );
+    reveals.forEach((el) => {
+      // O que já está na tela no carregamento não espera pelo observer.
+      const r = el.getBoundingClientRect();
+      if (r.top < innerHeight && r.bottom > 0) revelar(el);
+      else io.observe(el);
+    });
+
+    // Rede de segurança.
+    setTimeout(revelarTudo, 4000);
+  }
+
+  // ── Demonstração: digitação + autocomplete ───────────────────
+  const typed = document.getElementById('typed');
+  const ac = document.getElementById('ac');
+
+  const LINE_1 = 'select count(*) from ';
+  const TYPING = 'acc';
+
+  function paint(text, showCaret) {
+    const html = text
+      .replace(/\b(select|from|where|join|on)\b/gi, '<span class="tok-kw">$1</span>')
+      .replace(/\bcount\b/gi, '<span class="tok-fn">count</span>');
+    typed.innerHTML = html + (showCaret ? '<span class="caret"></span>' : '');
+  }
+
+  if (reduce) {
+    paint(LINE_1 + TYPING, true);
+    ac.dataset.open = 'true';
+  } else {
+    let i = 0;
+    const full = LINE_1 + TYPING;
+
+    const step = () => {
+      if (i <= full.length) {
+        paint(full.slice(0, i), true);
+        // Abre a lista quando o usuário começa a escrever o nome da tabela.
+        ac.dataset.open = String(i > LINE_1.length);
+        i++;
+        setTimeout(step, i < LINE_1.length ? 46 : 120);
+      } else {
+        // Segura o resultado à vista, apaga o trecho e repete.
+        setTimeout(() => {
+          ac.dataset.open = 'false';
+          setTimeout(() => { i = LINE_1.length; step(); }, 620);
+        }, 3200);
+      }
+    };
+    setTimeout(step, 900);
+  }
+})();
+</script>
+</body>
+</html>
