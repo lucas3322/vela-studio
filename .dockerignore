@@ -1,0 +1,11 @@
+# O contexto do build da landing page é a raiz do repositório, então tudo que
+# não é a página precisa ficar de fora — sem isso o Railway envia node_modules
+# e os instaladores de 230 MB a cada deploy.
+node_modules
+out
+release
+.git
+build/qltmp
+src/tests/.*-bundle.mjs
+*.log
+.DS_Store
