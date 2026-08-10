@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.1.8 — 2026-08-10
+
+### Outras mudanças
+
+- corrige a descrição e formata a seção de autor no package.json (219a1ff)
+
 ## 0.1.7 — 2026-08-10
 
 ### Outras mudanças
