@@ -32,6 +32,34 @@ const driver = new MySQLDriver()
 
 before(async () => {
   await driver.connect(config)
+  // O teste semeia o próprio schema: depender de seed externo já fez a suíte
+  // falhar inteira só porque o container tinha sido recriado.
+  await driver.query(
+    `DROP VIEW IF EXISTS vw_resumo;
+     DROP TABLE IF EXISTS pedidos;
+     DROP TABLE IF EXISTS clientes;
+     CREATE TABLE clientes (
+       id INT AUTO_INCREMENT PRIMARY KEY,
+       nome VARCHAR(120) NOT NULL COMMENT 'nome completo',
+       email VARCHAR(180),
+       cidade VARCHAR(80),
+       criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+     ) COMMENT='cadastro de clientes';
+     CREATE TABLE pedidos (
+       id INT AUTO_INCREMENT PRIMARY KEY,
+       cliente_id INT NOT NULL,
+       valor DECIMAL(10,2) NOT NULL,
+       status VARCHAR(20) DEFAULT 'novo',
+       KEY idx_status (status),
+       CONSTRAINT fk_pedidos_cliente FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
+     );
+     CREATE VIEW vw_resumo AS SELECT cidade, COUNT(*) t FROM clientes GROUP BY cidade;
+     INSERT INTO clientes (nome, email, cidade) VALUES
+       ('Ana','ana@x.com','Sao Paulo'),('Bruno',NULL,'Recife'),('Celia','c@x.com','Curitiba');
+     INSERT INTO pedidos (cliente_id, valor, status) VALUES
+       (1,199.90,'pago'),(1,50.00,'novo'),(2,1200.55,'enviado');`,
+    { queryId: 'seed' }
+  )
 })
 
 after(async () => {
@@ -179,6 +207,34 @@ test('lote de statements devolve um resultado por statement', async () => {
   assert.equal(results.length, 2)
   assert.equal(results[0].rows[0][0], 1)
   assert.equal(results[1].rows[0][0], 2)
+})
+
+test('SELECT sem LIMIT devolve só a prévia de 100 linhas', async () => {
+  // A tabela tem 3 linhas, então validamos que o LIMIT injetado é aceito pelo
+  // servidor e não altera o resultado quando ele já cabe na prévia.
+  const [result] = await driver.query('SELECT * FROM pedidos', { queryId: 'p1' })
+  assert.equal(result.rowCount, 3)
+})
+
+test('LIMIT explícito é respeitado, não substituído pela prévia', async () => {
+  const [result] = await driver.query('SELECT * FROM pedidos LIMIT 2', { queryId: 'p2' })
+  assert.equal(result.rowCount, 2)
+})
+
+test('a prévia realmente limita no servidor', async () => {
+  // Gera 500 linhas e confirma que sem LIMIT voltam 100, não 500.
+  await driver.query(
+    `INSERT INTO pedidos (cliente_id, valor, status)
+     SELECT 1, 1.0, 'novo' FROM information_schema.columns LIMIT 500`,
+    { queryId: 'p3' }
+  )
+  const [semLimite] = await driver.query('SELECT * FROM pedidos', { queryId: 'p4' })
+  assert.equal(semLimite.rowCount, 100)
+
+  const [comLimite] = await driver.query('SELECT * FROM pedidos LIMIT 300', { queryId: 'p5' })
+  assert.equal(comLimite.rowCount, 300)
+
+  await driver.query('DELETE FROM pedidos WHERE valor = 1.0', { queryId: 'p6' })
 })
 
 test('maxRows corta o resultado e sinaliza', async () => {

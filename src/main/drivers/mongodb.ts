@@ -9,7 +9,7 @@ import type {
   TableInfo,
   TestResult
 } from '../../shared/types'
-import { DEFAULT_MAX_ROWS, type DatabaseDriver, type QueryOptions } from './types'
+import { DEFAULT_MAX_ROWS, PREVIEW_ROWS, type DatabaseDriver, type QueryOptions } from './types'
 import { toGrid } from './value-types'
 import { parseMongoCommand, splitMongoCommands, type MongoPlan } from './mongo-parser'
 
@@ -185,7 +185,10 @@ export class MongoDriver implements DatabaseDriver {
   }
 
   async query(source: string, options: QueryOptions): Promise<QueryResult[]> {
-    const maxRows = options.maxRows ?? DEFAULT_MAX_ROWS
+    // Com `.limit()` explícito respeitamos o pedido até o teto de segurança;
+    // sem ele, devolvemos só a prévia.
+    const explicit = /\.limit\s*\(/.test(source)
+    const maxRows = options.maxRows ?? (explicit ? DEFAULT_MAX_ROWS : PREVIEW_ROWS)
     const results: QueryResult[] = []
 
     for (const command of splitMongoCommands(source)) {

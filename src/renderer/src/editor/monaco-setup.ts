@@ -145,6 +145,10 @@ export const editorOptions: monaco.editor.IStandaloneEditorConstructionOptions =
   wordWrap: 'on',
   // Sugestão aparece sozinha: quem está aprendendo não sabe que existe Ctrl+Space.
   quickSuggestions: { other: true, comments: false, strings: false },
+  // Meio segundo de espera. Sem isso a lista pisca a cada tecla enquanto a
+  // pessoa ainda está digitando o nome — vira ruído em vez de ajuda.
+  // Ctrl+Space continua abrindo na hora, para quem não quer esperar.
+  quickSuggestionsDelay: 500,
   suggestOnTriggerCharacters: true,
   // Enter aceita a sugestão — é o gesto que todo mundo já tem na mão.
   // Tab também aceita; Esc fecha a lista e devolve o Enter para nova linha.

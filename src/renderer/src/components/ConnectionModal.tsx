@@ -3,6 +3,7 @@ import { DRIVERS, type ConnectionConfig, type DriverId, type TestResult } from '
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
 import { IconCheck, IconClose, IconDatabase, IconTrash, IconWarning } from './Icons'
+import { needsPassword } from './WelcomeScreen'
 
 function emptyConfig(driver: DriverId = 'mysql'): ConnectionConfig {
   return {
@@ -87,6 +88,15 @@ export function ConnectionModal(): React.JSX.Element {
   const handleConnectSaved = async (id: string): Promise<void> => {
     const stored = saved.find((c) => c.id === id)
     if (!stored) return
+
+    // Sem senha guardada, abre o formulário desta conexão em vez de tentar
+    // conectar e receber um "Access denied" que não diz o que fazer.
+    if (needsPassword(stored)) {
+      setConfig({ ...stored, password: '' })
+      setShowList(false)
+      return
+    }
+
     setConnecting(true)
     try {
       await connect({ ...stored, password: undefined })
@@ -331,6 +341,13 @@ export function ConnectionModal(): React.JSX.Element {
                   Salvar senha
                 </label>
               </div>
+
+              {existing && !existing.hasPassword && shows('password') && (
+                <div className="field__hint" style={{ color: 'var(--warning)' }}>
+                  Esta conexão não tem senha salva. Informe a senha e mantenha
+                  "Salvar senha" marcado para não precisar digitá-la de novo.
+                </div>
+              )}
 
               {config.readOnly && (
                 <div className="field__hint" style={{ color: 'var(--info)' }}>

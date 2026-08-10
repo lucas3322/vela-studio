@@ -1,7 +1,18 @@
-import { DRIVERS } from '@shared/types'
+import { DRIVERS, type StoredConnection } from '@shared/types'
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
 import { IconDatabase, IconSail, IconPlus } from './Icons'
+
+/**
+ * A conexão exige senha e não tem nenhuma guardada?
+ * SQLite não usa senha, e uma string de conexão normalmente já a carrega.
+ */
+export function needsPassword(connection: StoredConnection): boolean {
+  if (connection.hasPassword) return false
+  if (!DRIVERS[connection.driver].fields.includes('password')) return false
+  if (connection.connectionString?.trim()) return false
+  return true
+}
 
 /**
  * Primeira tela de quem abre o app.
@@ -18,6 +29,16 @@ export function WelcomeScreen(): React.JSX.Element {
   const handleConnect = async (id: string): Promise<void> => {
     const stored = saved.find((c) => c.id === id)
     if (!stored) return
+
+    // Sem senha guardada, tentar conectar só produziria um "Access denied"
+    // do banco. Abrimos o formulário já preenchido para pedir a senha —
+    // é a única coisa que falta, e o usuário sabe qual é.
+    if (needsPassword(stored)) {
+      openModal('connection', stored.id)
+      notify('Informe a senha para conectar.', 'info')
+      return
+    }
+
     try {
       // A senha vem cifrada do store; `undefined` sinaliza ao main que ele resolve.
       await connect({ ...stored, password: undefined })

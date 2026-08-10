@@ -11,6 +11,9 @@ import type {
 } from '../../shared/types'
 import {
   DEFAULT_MAX_ROWS,
+  PREVIEW_ROWS,
+  applyPreviewLimit,
+  hasExplicitLimit,
   isMutation,
   splitStatements,
   type DatabaseDriver,
@@ -214,7 +217,6 @@ export class MySQLDriver implements DatabaseDriver {
 
   async query(sql: string, options: QueryOptions): Promise<QueryResult[]> {
     const pool = this.require()
-    const maxRows = options.maxRows ?? DEFAULT_MAX_ROWS
     const statements = splitStatements(sql)
     const results: QueryResult[] = []
 
@@ -231,11 +233,20 @@ export class MySQLDriver implements DatabaseDriver {
             'Conexão em modo somente-leitura: comandos de escrita estão bloqueados.'
           )
         }
+        // Sem LIMIT próprio, a query vai ao banco já limitada — cortar depois
+        // de receber não impede a varredura nem o tráfego.
+        const explicit = hasExplicitLimit(statement)
+        const maxRows = options.maxRows ?? (explicit ? DEFAULT_MAX_ROWS : PREVIEW_ROWS)
+        // Uma linha a mais que o teto: é assim que sabemos que havia mais e
+        // conseguimos avisar "mostrando as primeiras N". Com LIMIT exato o
+        // resultado nunca sobra e o aviso nunca apareceria.
+        const effective = explicit ? statement : applyPreviewLimit(statement, maxRows + 1)
+
         const started = Date.now()
         // `rowsAsArray` é obrigatório: no formato de objeto, `SELECT c.id, p.id`
         // de um JOIN colapsa as duas colunas homônimas em uma só, e a UI mostra
         // uma coluna a menos sem qualquer aviso.
-        const [data, fields] = await conn.query({ sql: statement, rowsAsArray: true })
+        const [data, fields] = await conn.query({ sql: effective, rowsAsArray: true })
         const durationMs = Date.now() - started
 
         if (Array.isArray(data)) {

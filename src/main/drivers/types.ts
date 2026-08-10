@@ -52,8 +52,59 @@ export interface DatabaseDriver {
   serverVersion(): Promise<string | undefined>
 }
 
-/** Teto padrão de linhas: acima disso o renderer começa a sofrer. */
+/**
+ * Quantas linhas voltam quando a query **não** diz quantas quer.
+ *
+ * `SELECT * FROM pedidos` numa tabela de milhões é sempre acidente, nunca
+ * intenção — quem quer mais escreve `LIMIT`. Cem linhas bastam para entender
+ * o formato dos dados, que é o motivo real de rodar um SELECT sem filtro.
+ */
+export const PREVIEW_ROWS = 100
+
+/**
+ * Teto de segurança quando a query **tem** LIMIT próprio.
+ * Respeitamos o que a pessoa pediu até aqui; acima disso o renderer sofre.
+ */
 export const DEFAULT_MAX_ROWS = 50_000
+
+/** A query já declara quantas linhas quer? */
+export function hasExplicitLimit(sql: string): boolean {
+  const code = sql
+    .replace(/--[^\n]*/g, ' ')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .toUpperCase()
+  return /\b(LIMIT|FETCH\s+FIRST|FETCH\s+NEXT|TOP)\b/.test(code)
+}
+
+/**
+ * Acrescenta `LIMIT` a um SELECT que não tem nenhum.
+ *
+ * Cortar as linhas depois de recebê-las não resolve o problema: o banco já
+ * varreu a tabela e já mandou tudo pela rede. O limite precisa ir junto da
+ * query.
+ *
+ * A injeção é deliberadamente covarde — só mexe em statement que começa com
+ * SELECT ou WITH e não contém construções onde um LIMIT no fim mudaria o
+ * sentido. Em qualquer outro caso devolve o texto intacto, e o corte no
+ * cliente continua valendo como rede de proteção.
+ */
+export function applyPreviewLimit(sql: string, rows: number): string {
+  const code = sql
+    .replace(/--[^\n]*/g, ' ')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .trim()
+    .toUpperCase()
+
+  if (!/^(SELECT|WITH)\b/.test(code)) return sql
+  if (hasExplicitLimit(sql)) return sql
+  // `INTO OUTFILE`, `FOR UPDATE` e afins não combinam com um LIMIT anexado.
+  if (/\b(INTO\s+(OUTFILE|DUMPFILE|@)|FOR\s+UPDATE|FOR\s+SHARE|PROCEDURE\s+ANALYSE)\b/.test(code)) {
+    return sql
+  }
+
+  // Nova linha porque o statement pode terminar em comentário de linha.
+  return `${sql.replace(/;\s*$/, '')}\nLIMIT ${rows}`
+}
 
 /** Divide um lote em statements, respeitando strings, comentários e $$ do Postgres. */
 export function splitStatements(sql: string): string[] {

@@ -52,11 +52,18 @@ export class ConnectionStore {
     }
   }
 
-  /** Lista para a UI: senha omitida, sempre. */
+  /**
+   * Lista para a UI.
+   *
+   * O texto cifrado nunca sai daqui: o renderer não tem o que fazer com ele e
+   * mandá-lo para um processo que renderiza dado de terceiros é risco de graça.
+   * No lugar vai `hasPassword`, que é a única coisa que a interface precisa
+   * saber para decidir se pergunta a senha antes de conectar.
+   */
   list(): StoredConnection[] {
-    return [...this.connections].sort(
-      (a, b) => (b.lastUsedAt ?? b.createdAt ?? 0) - (a.lastUsedAt ?? a.createdAt ?? 0)
-    )
+    return [...this.connections]
+      .sort((a, b) => (b.lastUsedAt ?? b.createdAt ?? 0) - (a.lastUsedAt ?? a.createdAt ?? 0))
+      .map(({ encryptedPassword, ...rest }) => ({ ...rest, hasPassword: !!encryptedPassword }))
   }
 
   /** Config completa, com senha, só para o main abrir a conexão. */

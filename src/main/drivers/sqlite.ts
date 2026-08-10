@@ -12,6 +12,9 @@ import type {
 } from '../../shared/types'
 import {
   DEFAULT_MAX_ROWS,
+  PREVIEW_ROWS,
+  applyPreviewLimit,
+  hasExplicitLimit,
   isMutation,
   splitStatements,
   type DatabaseDriver,
@@ -175,15 +178,21 @@ export class SQLiteDriver implements DatabaseDriver {
 
   async query(sql: string, options: QueryOptions): Promise<QueryResult[]> {
     const db = this.require()
-    const maxRows = options.maxRows ?? DEFAULT_MAX_ROWS
     const results: QueryResult[] = []
 
     for (const statement of splitStatements(sql)) {
       if (this.config?.readOnly && isMutation(statement)) {
         throw new Error('Conexão em modo somente-leitura: comandos de escrita estão bloqueados.')
       }
+      const explicit = hasExplicitLimit(statement)
+      const maxRows = options.maxRows ?? (explicit ? DEFAULT_MAX_ROWS : PREVIEW_ROWS)
+      // Uma linha a mais que o teto: é assim que sabemos que havia mais e
+      // conseguimos avisar "mostrando as primeiras N". Com LIMIT exato o
+      // resultado nunca sobra e o aviso nunca apareceria.
+      const effective = explicit ? statement : applyPreviewLimit(statement, maxRows + 1)
+
       const started = Date.now()
-      const stmt = db.prepare(statement)
+      const stmt = db.prepare(effective)
       if (stmt.reader) {
         // `.raw()` devolve arrays em vez de objetos: no formato de objeto,
         // `SELECT c.id, p.id` de um JOIN colapsaria as duas colunas em uma.

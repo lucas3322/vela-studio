@@ -48,6 +48,16 @@ const rules: Rule[] = [
     })
   },
   {
+    // `using password: NO` é literal do MySQL: nenhuma senha foi enviada.
+    // Quase sempre significa conexão salva sem senha, não senha errada —
+    // e dizer "usuário ou senha incorretos" manda a pessoa para o lado errado.
+    match: (e) => /using password:\s*NO/i.test(e.message),
+    translate: () => ({
+      friendly: 'Nenhuma senha foi enviada para o banco.',
+      hint: 'Esta conexão foi salva sem senha. Abra a conexão, informe a senha e marque "Salvar senha".'
+    })
+  },
+  {
     match: (e) => e.code === 'ER_ACCESS_DENIED_ERROR' || /password authentication failed|authentication failed/i.test(e.message),
     translate: () => ({
       friendly: 'Usuário ou senha incorretos.',

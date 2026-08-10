@@ -7,7 +7,13 @@
  */
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { splitStatements, isMutation, isUnboundedMutation } from '../main/drivers/types.ts'
+import {
+  splitStatements,
+  isMutation,
+  isUnboundedMutation,
+  hasExplicitLimit,
+  applyPreviewLimit
+} from '../main/drivers/types.ts'
 import { translateError, nearest } from '../main/error-translator.ts'
 import { parseMongoCommand, splitMongoCommands } from '../main/drivers/mongo-parser.ts'
 import { analyze, extractTables, resolveQualifier } from '../renderer/src/editor/sql-context.ts'
@@ -218,4 +224,64 @@ test('quebra cláusulas em linhas e normaliza para maiúscula', () => {
 test('não reformata o conteúdo de strings', () => {
   const formatted = formatSql("SELECT * FROM t WHERE nome = 'from where select'")
   assert.ok(formatted.includes("'from where select'"))
+})
+
+// ── limite de prévia ─────────────────────────────────────────────────
+
+test('detecta LIMIT explícito', () => {
+  assert.equal(hasExplicitLimit('SELECT * FROM t LIMIT 10'), true)
+  assert.equal(hasExplicitLimit('select * from t limit 10'), true)
+  assert.equal(hasExplicitLimit('SELECT * FROM t FETCH FIRST 5 ROWS ONLY'), true)
+  assert.equal(hasExplicitLimit('SELECT TOP 10 * FROM t'), true)
+  assert.equal(hasExplicitLimit('SELECT * FROM t'), false)
+})
+
+test('não confunde a palavra limit dentro de comentário', () => {
+  assert.equal(hasExplicitLimit('SELECT * FROM t -- sem limit aqui'), false)
+  assert.equal(hasExplicitLimit('SELECT * FROM t /* limit */'), false)
+})
+
+test('acrescenta LIMIT a SELECT que não tem', () => {
+  assert.equal(applyPreviewLimit('SELECT * FROM pedidos', 100), 'SELECT * FROM pedidos\nLIMIT 100')
+})
+
+test('respeita LIMIT já existente', () => {
+  const sql = 'SELECT * FROM pedidos LIMIT 5000'
+  assert.equal(applyPreviewLimit(sql, 100), sql)
+})
+
+test('remove o ponto e vírgula final antes de anexar', () => {
+  assert.equal(applyPreviewLimit('SELECT 1;', 100), 'SELECT 1\nLIMIT 100')
+})
+
+test('anexa em nova linha para não ser engolido por comentário', () => {
+  const out = applyPreviewLimit('SELECT * FROM t -- nota', 100)
+  assert.ok(out.endsWith('\nLIMIT 100'), out)
+})
+
+test('não mexe em comando que não é leitura', () => {
+  for (const sql of [
+    'UPDATE t SET a = 1',
+    'DELETE FROM t',
+    'INSERT INTO t VALUES (1)',
+    'SHOW FULL PROCESSLIST',
+    'CREATE TABLE x (id INT)'
+  ]) {
+    assert.equal(applyPreviewLimit(sql, 100), sql, sql)
+  }
+})
+
+test('não mexe onde um LIMIT no fim mudaria o sentido', () => {
+  for (const sql of [
+    "SELECT * FROM t INTO OUTFILE '/tmp/x'",
+    'SELECT * FROM t FOR UPDATE',
+    'SELECT * FROM t FOR SHARE'
+  ]) {
+    assert.equal(applyPreviewLimit(sql, 100), sql, sql)
+  }
+})
+
+test('aceita CTE começando com WITH', () => {
+  const out = applyPreviewLimit('WITH a AS (SELECT 1) SELECT * FROM a', 100)
+  assert.ok(out.endsWith('\nLIMIT 100'), out)
 })

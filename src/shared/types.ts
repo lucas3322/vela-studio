@@ -34,6 +34,12 @@ export interface ConnectionConfig {
 /** O que fica salvo em disco: igual ao config, mas com a senha já cifrada. */
 export interface StoredConnection extends Omit<ConnectionConfig, 'password'> {
   encryptedPassword?: string
+  /**
+   * Só na listagem enviada ao renderer. Diz se existe senha guardada sem
+   * expor o texto cifrado — a UI precisa saber para pedir a senha antes de
+   * tentar conectar, em vez de falhar com "Access denied" do banco.
+   */
+  hasPassword?: boolean
 }
 
 export interface TableInfo {

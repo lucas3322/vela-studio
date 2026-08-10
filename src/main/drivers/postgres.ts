@@ -11,6 +11,9 @@ import type {
 } from '../../shared/types'
 import {
   DEFAULT_MAX_ROWS,
+  PREVIEW_ROWS,
+  applyPreviewLimit,
+  hasExplicitLimit,
   isMutation,
   splitStatements,
   type DatabaseDriver,
@@ -306,7 +309,6 @@ export class PostgresDriver implements DatabaseDriver {
 
   async query(sql: string, options: QueryOptions): Promise<QueryResult[]> {
     const pool = this.require()
-    const maxRows = options.maxRows ?? DEFAULT_MAX_ROWS
     const statements = splitStatements(sql)
     const results: QueryResult[] = []
 
@@ -323,8 +325,16 @@ export class PostgresDriver implements DatabaseDriver {
         if (this.config?.readOnly && isMutation(statement)) {
           throw new Error('Conexão em modo somente-leitura: comandos de escrita estão bloqueados.')
         }
+        // Ver comentário em applyPreviewLimit: o limite precisa ir na query.
+        const explicit = hasExplicitLimit(statement)
+        const maxRows = options.maxRows ?? (explicit ? DEFAULT_MAX_ROWS : PREVIEW_ROWS)
+        // Uma linha a mais que o teto: é assim que sabemos que havia mais e
+        // conseguimos avisar "mostrando as primeiras N". Com LIMIT exato o
+        // resultado nunca sobra e o aviso nunca apareceria.
+        const effective = explicit ? statement : applyPreviewLimit(statement, maxRows + 1)
+
         const started = Date.now()
-        const res = await client.query({ text: statement, rowMode: 'array' })
+        const res = await client.query({ text: effective, rowMode: 'array' })
         const durationMs = Date.now() - started
 
         const fields = res.fields ?? []
