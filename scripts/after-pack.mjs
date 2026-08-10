@@ -35,6 +35,15 @@ export default async function afterPack(context) {
   if (context.electronPlatformName === 'darwin') return assinarAdHoc(context)
   if (context.electronPlatformName !== 'win32') return
 
+  // Empacotando Windows **no** Windows (é o que o CI faz), o
+  // `@electron/rebuild` já compilou o módulo nativo para a plataforma certa.
+  // Trocar por um binário baixado seria desnecessário — e pior: uma falha de
+  // rede derrubaria um build que estava correto.
+  if (process.platform === 'win32') {
+    console.log('  • build nativo do Windows: mantendo o better-sqlite3 compilado localmente')
+    return
+  }
+
   const arch = context.arch === 1 ? 'x64' : context.arch === 3 ? 'arm64' : 'x64'
   const version = require('better-sqlite3/package.json').version
   const electronVersion = context.packager.info.framework.version

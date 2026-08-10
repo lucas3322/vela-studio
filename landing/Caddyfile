@@ -1,0 +1,28 @@
+# Servidor da landing page no Railway.
+#
+# O Railway injeta a porta na variável PORT — escutar em outra faz o deploy
+# ficar "sem resposta" e o healthcheck falhar. O :8080 é só o padrão local.
+:{$PORT:8080} {
+	root * /srv
+	encode zstd gzip
+	file_server
+
+	# O HTML muda a cada deploy; os assets são poucos e versionados pelo build.
+	@html path *.html /
+	header @html Cache-Control "public, max-age=0, must-revalidate"
+	header /icon.svg Cache-Control "public, max-age=86400"
+
+	# Cabeçalhos de segurança básicos. A página é estática e só busca fontes do
+	# Google e a API do GitHub — nada mais precisa passar.
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "SAMEORIGIN"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
