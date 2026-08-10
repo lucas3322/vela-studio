@@ -3,6 +3,13 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.1.3 — 2026-08-10
+
+### Outras mudanças
+
+- adiciona suporte a limite de prévia nas consultas SQL e melhorias na interface de conexão (976585a)
+- Refactor code structure for improved readability and maintainability (30bd68f)
+
 ## 0.1.2 — 2026-08-10
 
 ### Outras mudanças
