@@ -1,0 +1,178 @@
+/**
+ * Importamos o núcleo do Monaco e apenas as duas gramáticas que usamos.
+ * O pacote completo traz ~90 linguagens e 6 MB de JS: tudo isso seria
+ * carregado no start só para termos SQL e JavaScript.
+ */
+import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
+
+// Contribuições do editor: cada import liga um recurso da UI.
+import 'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController'
+import 'monaco-editor/esm/vs/editor/contrib/hover/browser/hoverContribution'
+import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController'
+import 'monaco-editor/esm/vs/editor/contrib/folding/browser/folding'
+import 'monaco-editor/esm/vs/editor/contrib/comment/browser/comment'
+import 'monaco-editor/esm/vs/editor/contrib/bracketMatching/browser/bracketMatching'
+import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighlighter'
+import 'monaco-editor/esm/vs/editor/contrib/multicursor/browser/multicursor'
+import 'monaco-editor/esm/vs/editor/contrib/contextmenu/browser/contextmenu'
+import 'monaco-editor/esm/vs/editor/contrib/links/browser/links'
+import 'monaco-editor/esm/vs/editor/contrib/clipboard/browser/clipboard'
+import 'monaco-editor/esm/vs/editor/contrib/snippet/browser/snippetController2'
+import 'monaco-editor/esm/vs/editor/contrib/inlineCompletions/browser/inlineCompletions.contribution'
+import 'monaco-editor/esm/vs/editor/contrib/indentation/browser/indentation'
+import 'monaco-editor/esm/vs/editor/contrib/linesOperations/browser/linesOperations'
+import 'monaco-editor/esm/vs/editor/contrib/cursorUndo/browser/cursorUndo'
+
+// Gramáticas: SQL para os bancos relacionais, JavaScript para o shell do Mongo.
+import 'monaco-editor/esm/vs/basic-languages/sql/sql.contribution'
+import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution'
+import 'monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution'
+
+import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
+
+/**
+ * Monaco em Electron não pode buscar worker por URL remota.
+ * O `?worker` do Vite empacota o worker como módulo local.
+ * Só o worker base é necessário: não usamos análise semântica de TS/JSON.
+ */
+self.MonacoEnvironment = {
+  getWorker() {
+    return new EditorWorker()
+  }
+}
+
+/**
+ * Temas próprios em vez de vs-dark/vs.
+ * Os padrões do Monaco não conversam com nossa paleta: o fundo destoa
+ * e a cor de comentário some no tema claro.
+ */
+export function defineThemes(): void {
+  monaco.editor.defineTheme('vela-dark', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [
+      { token: '', foreground: 'e8eaed', background: '1f232a' },
+      { token: 'keyword', foreground: 'ff9d4d', fontStyle: 'bold' },
+      { token: 'keyword.sql', foreground: 'ff9d4d', fontStyle: 'bold' },
+      { token: 'operator.sql', foreground: 'a2a9b5' },
+      { token: 'string', foreground: '86efac' },
+      { token: 'string.sql', foreground: '86efac' },
+      { token: 'number', foreground: '7dd3fc' },
+      { token: 'comment', foreground: '5b636e', fontStyle: 'italic' },
+      { token: 'predefined', foreground: 'c4b5fd' },
+      { token: 'identifier', foreground: 'e8eaed' },
+      { token: 'delimiter', foreground: '8a939f' },
+      { token: 'type', foreground: '7dd3fc' }
+    ],
+    colors: {
+      'editor.background': '#1f232a',
+      'editor.foreground': '#e8eaed',
+      'editorLineNumber.foreground': '#4d545e',
+      'editorLineNumber.activeForeground': '#a2a9b5',
+      'editor.selectionBackground': '#3a4150',
+      'editor.inactiveSelectionBackground': '#2c323c',
+      'editor.lineHighlightBackground': '#00000028',
+      'editorCursor.foreground': '#f5a623',
+      'editorIndentGuide.background1': '#2b3038',
+      'editorIndentGuide.activeBackground1': '#3d434d',
+      'editorWidget.background': '#262b33',
+      'editorWidget.border': '#343a44',
+      'editorSuggestWidget.background': '#262b33',
+      'editorSuggestWidget.border': '#343a44',
+      'editorSuggestWidget.selectedBackground': '#343b46',
+      'editorSuggestWidget.highlightForeground': '#f5a623',
+      'editorHoverWidget.background': '#262b33',
+      'editorHoverWidget.border': '#343a44',
+      'scrollbarSlider.background': '#ffffff18',
+      'scrollbarSlider.hoverBackground': '#ffffff28',
+      'scrollbarSlider.activeBackground': '#ffffff38'
+    }
+  })
+
+  monaco.editor.defineTheme('vela-light', {
+    base: 'vs',
+    inherit: true,
+    rules: [
+      { token: '', foreground: '1a1d23', background: 'ffffff' },
+      { token: 'keyword', foreground: 'b45309', fontStyle: 'bold' },
+      { token: 'keyword.sql', foreground: 'b45309', fontStyle: 'bold' },
+      { token: 'operator.sql', foreground: '5a6472' },
+      { token: 'string', foreground: '15803d' },
+      { token: 'string.sql', foreground: '15803d' },
+      { token: 'number', foreground: '0369a1' },
+      { token: 'comment', foreground: '94a3b8', fontStyle: 'italic' },
+      { token: 'predefined', foreground: '6d28d9' },
+      { token: 'identifier', foreground: '1a1d23' },
+      { token: 'delimiter', foreground: '64748b' },
+      { token: 'type', foreground: '0369a1' }
+    ],
+    colors: {
+      'editor.background': '#ffffff',
+      'editor.foreground': '#1a1d23',
+      'editorLineNumber.foreground': '#c2c8d0',
+      'editorLineNumber.activeForeground': '#5a6472',
+      'editor.selectionBackground': '#fde68a80',
+      'editor.lineHighlightBackground': '#00000008',
+      'editorCursor.foreground': '#b45309',
+      'editorIndentGuide.background1': '#eef0f3',
+      'editorWidget.background': '#ffffff',
+      'editorWidget.border': '#e2e5ea',
+      'editorSuggestWidget.background': '#ffffff',
+      'editorSuggestWidget.border': '#e2e5ea',
+      'editorSuggestWidget.selectedBackground': '#f1f3f6',
+      'editorSuggestWidget.highlightForeground': '#b45309',
+      'editorHoverWidget.background': '#ffffff',
+      'editorHoverWidget.border': '#e2e5ea'
+    }
+  })
+}
+
+/** Opções compartilhadas: densidade e comportamento iguais em toda aba. */
+export const editorOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
+  fontSize: 13,
+  fontFamily: "'SF Mono', 'JetBrains Mono', Menlo, Monaco, monospace",
+  lineHeight: 21,
+  fontLigatures: true,
+  minimap: { enabled: false },
+  scrollBeyondLastLine: false,
+  renderLineHighlight: 'line',
+  lineNumbersMinChars: 3,
+  glyphMargin: false,
+  folding: true,
+  padding: { top: 14, bottom: 14 },
+  automaticLayout: true,
+  tabSize: 2,
+  wordWrap: 'on',
+  // Sugestão aparece sozinha: quem está aprendendo não sabe que existe Ctrl+Space.
+  quickSuggestions: { other: true, comments: false, strings: false },
+  suggestOnTriggerCharacters: true,
+  // Enter aceita a sugestão — é o gesto que todo mundo já tem na mão.
+  // Tab também aceita; Esc fecha a lista e devolve o Enter para nova linha.
+  acceptSuggestionOnEnter: 'on',
+  tabCompletion: 'on',
+  suggestSelection: 'first',
+  snippetSuggestions: 'top',
+  // Mostra o nome da tabela/coluna e o tipo sem precisar abrir o painel lateral.
+  suggest: {
+    showWords: false,
+    insertMode: 'replace',
+    filterGraceful: true,
+    localityBonus: true,
+    shareSuggestSelections: true
+  },
+  scrollbar: {
+    verticalScrollbarSize: 10,
+    horizontalScrollbarSize: 10,
+    useShadows: false
+  },
+  overviewRulerLanes: 0,
+  hideCursorInOverviewRuler: true,
+  overviewRulerBorder: false,
+  renderWhitespace: 'none',
+  smoothScrolling: true,
+  cursorBlinking: 'smooth',
+  contextmenu: true,
+  bracketPairColorization: { enabled: true }
+}
+
+export { monaco }

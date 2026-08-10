@@ -1,0 +1,49 @@
+{
+  "name": "vela-studio",
+  "version": "0.1.0",
+  "description": "IDE de banco de dados SQL e NoSQL — limpa, rápida e didática",
+  "main": "./out/main/index.js",
+  "author": "Lucas Pardinho",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "start": "electron-vite preview",
+    "build": "npm run typecheck && electron-vite build",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
+    "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "test": "node --experimental-strip-types --test src/tests/*.test.ts",
+    "test:mysql": "esbuild src/main/drivers/mysql.ts --bundle --format=esm --platform=node --target=node20 --external:mysql2 --external:electron --outfile=src/tests/.mysql-bundle.mjs --log-level=error && node --test src/tests/mysql-e2e.mjs",
+    "test:postgres": "esbuild src/main/drivers/postgres.ts --bundle --format=esm --platform=node --target=node20 --external:pg --external:electron --outfile=src/tests/.postgres-bundle.mjs --log-level=error && node --test src/tests/postgres-e2e.mjs",
+    "test:mongo": "esbuild src/main/drivers/mongodb.ts --bundle --format=esm --platform=node --target=node20 --external:mongodb --external:electron --outfile=src/tests/.mongo-bundle.mjs --log-level=error && node --test src/tests/mongo-e2e.mjs",
+    "test:sqlite": "esbuild src/main/drivers/sqlite.ts --bundle --format=esm --platform=node --target=node20 --external:better-sqlite3 --external:electron --outfile=src/tests/.sqlite-bundle.mjs --log-level=error && npm rebuild better-sqlite3 --silent && node --test src/tests/sqlite-e2e.mjs; electron-builder install-app-deps",
+    "test:db": "docker compose -f src/tests/docker-compose.yml up -d --wait && npm run test:mysql && npm run test:postgres && npm run test:mongo && npm run test:sqlite",
+    "mac": "npm run build && electron-builder --mac --config electron-builder.yml",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "mongodb": "^6.12.0",
+    "mysql2": "^3.12.0",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.5",
+    "@types/pg": "^8.11.10",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.3.1",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "monaco-editor": "^0.52.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.7.2",
+    "vite": "^5.4.11",
+    "zustand": "^5.0.2"
+  }
+}

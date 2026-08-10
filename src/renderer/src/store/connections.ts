@@ -1,0 +1,121 @@
+import { create } from 'zustand'
+import type { ColumnInfo, ConnectionConfig, StoredConnection, TableInfo } from '@shared/types'
+
+export interface SchemaCache {
+  tables: TableInfo[]
+  columns: Record<string, ColumnInfo[]>
+  loadedAt: number
+}
+
+interface ConnectionState {
+  saved: StoredConnection[]
+  /** Conexão em uso agora. Só uma fica ativa por vez na UI. */
+  activeId: string | null
+  activeDatabase: string | null
+  databases: string[]
+  serverVersion?: string
+  connecting: boolean
+  /** Schema por `${connectionId}::${database}` — é a base do autocomplete. */
+  schemas: Record<string, SchemaCache>
+  loadingSchema: boolean
+
+  refreshSaved: () => Promise<void>
+  connect: (config: ConnectionConfig) => Promise<void>
+  disconnect: () => Promise<void>
+  selectDatabase: (database: string) => Promise<void>
+  reloadSchema: () => Promise<void>
+  removeConnection: (id: string) => Promise<void>
+
+  activeConnection: () => StoredConnection | undefined
+  currentSchema: () => SchemaCache | undefined
+}
+
+const schemaKey = (connectionId: string, database?: string | null): string =>
+  `${connectionId}::${database ?? ''}`
+
+export const useConnectionStore = create<ConnectionState>((set, get) => ({
+  saved: [],
+  activeId: null,
+  activeDatabase: null,
+  databases: [],
+  connecting: false,
+  schemas: {},
+  loadingSchema: false,
+
+  refreshSaved: async () => {
+    set({ saved: await window.vela.connections.list() })
+  },
+
+  connect: async (config) => {
+    set({ connecting: true })
+    try {
+      const { serverVersion } = await window.vela.connections.open(config)
+      const databases = await window.vela.schema.databases(config.id).catch(() => [])
+      // Se a conexão não fixou um banco, começamos no primeiro disponível.
+      const database = config.database || databases[0] || null
+
+      set({
+        activeId: config.id,
+        activeDatabase: database,
+        databases,
+        serverVersion,
+        connecting: false
+      })
+      await get().refreshSaved()
+      await get().reloadSchema()
+    } catch (error) {
+      set({ connecting: false })
+      throw error
+    }
+  },
+
+  disconnect: async () => {
+    const { activeId } = get()
+    if (!activeId) return
+    await window.vela.connections.close(activeId)
+    set({ activeId: null, activeDatabase: null, databases: [], serverVersion: undefined })
+  },
+
+  selectDatabase: async (database) => {
+    set({ activeDatabase: database })
+    await get().reloadSchema()
+  },
+
+  reloadSchema: async () => {
+    const { activeId, activeDatabase } = get()
+    if (!activeId) return
+    set({ loadingSchema: true })
+    try {
+      const { tables, columns } = await window.vela.schema.loadAll(
+        activeId,
+        activeDatabase ?? undefined
+      )
+      set((state) => ({
+        schemas: {
+          ...state.schemas,
+          [schemaKey(activeId, activeDatabase)]: { tables, columns, loadedAt: Date.now() }
+        },
+        loadingSchema: false
+      }))
+    } catch {
+      set({ loadingSchema: false })
+    }
+  },
+
+  removeConnection: async (id) => {
+    await window.vela.connections.remove(id)
+    if (get().activeId === id) set({ activeId: null, activeDatabase: null, databases: [] })
+    await get().refreshSaved()
+  },
+
+  activeConnection: () => {
+    const { saved, activeId } = get()
+    return saved.find((c) => c.id === activeId)
+  },
+
+  currentSchema: () => {
+    const { schemas, activeId, activeDatabase } = get()
+    if (!activeId) return undefined
+    return schemas[schemaKey(activeId, activeDatabase)]
+  }
+}))

@@ -1,0 +1,64 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!--
+    Ícone do Vela Studio.
+
+    Duas leituras na mesma forma: a vela de um barco (o nome) e uma folha
+    (a marca dentro do app). Abaixo dela, três faixas que sugerem as linhas
+    de uma tabela sem virar um desenho literal de banco de dados.
+
+    Desenhado para 1024, mas legível a 32: uma forma sólida, um só acento,
+    nada de detalhe fino que vira ruído no Dock.
+  -->
+  <defs>
+    <linearGradient id="fundo" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#2A3039"/>
+      <stop offset="1" stop-color="#14171C"/>
+    </linearGradient>
+
+    <linearGradient id="marca" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#FFC661"/>
+      <stop offset="0.55" stop-color="#F5A623"/>
+      <stop offset="1" stop-color="#E08706"/>
+    </linearGradient>
+
+    <linearGradient id="brilho" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.13"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+
+    <filter id="sombra" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="14" stdDeviation="26" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- Squircle no raio que a Apple usa desde o Big Sur: ~22,4% do lado. -->
+  <rect x="0" y="0" width="1024" height="1024" rx="229" fill="url(#fundo)"/>
+  <rect x="0" y="0" width="1024" height="1024" rx="229" fill="url(#brilho)"/>
+  <rect x="4" y="4" width="1016" height="1016" rx="227"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="8"/>
+
+  <g filter="url(#sombra)">
+    <!-- A vela: curva tensionada de um lado, reta do outro, como pano no vento. -->
+    <path d="M 606 196
+             C 606 196, 706 386, 700 546
+             C 695 686, 604 782, 470 806
+             L 470 806
+             C 470 806, 452 604, 500 448
+             C 540 318, 606 196, 606 196
+             Z"
+          fill="url(#marca)"/>
+
+    <!-- O mastro, que também é a nervura central da folha. -->
+    <path d="M 470 806 C 470 640, 512 470, 606 196"
+          fill="none" stroke="#14171C" stroke-opacity="0.30"
+          stroke-width="18" stroke-linecap="round"/>
+  </g>
+
+  <!-- As três linhas: a base sob a vela, e as linhas de uma tabela. -->
+  <g fill="#F5A623">
+    <rect x="326" y="846" width="372" height="26" rx="13"/>
+    <rect x="326" y="846" width="372" height="26" rx="13" fill="#FFC661" opacity="0.5"/>
+  </g>
+  <rect x="376" y="900" width="272" height="20" rx="10" fill="#F5A623" opacity="0.55"/>
+  <rect x="426" y="946" width="172" height="16" rx="8" fill="#F5A623" opacity="0.3"/>
+</svg>

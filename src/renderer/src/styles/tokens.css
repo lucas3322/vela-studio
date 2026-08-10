@@ -1,0 +1,168 @@
+/*
+ * Sistema de design do Vela Studio.
+ *
+ * Três regras que valem para tudo aqui:
+ * 1. Superfície é neutra. Cor só aparece no dado e no acento — nunca na moldura.
+ * 2. Escala de espaçamento em múltiplos de 4. Nada de 7px, 13px, 22px.
+ * 3. Todo par de cor texto/fundo passa em contraste AA nos dois temas.
+ */
+
+:root {
+  /* ── Escala de espaçamento ────────────────────────────────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* ── Raio ─────────────────────────────────────────────────────── */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+
+  /* ── Tipografia ───────────────────────────────────────────────── */
+  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif;
+  --font-mono: 'SF Mono', 'JetBrains Mono', 'Menlo', 'Monaco', ui-monospace, monospace;
+
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 26px;
+
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+
+  /* ── Dimensões estruturais ────────────────────────────────────── */
+  --titlebar-height: 38px;
+  --statusbar-height: 28px;
+  --tabbar-height: 36px;
+  --sidebar-width: 264px;
+  --row-height: 30px;
+
+  /* ── Movimento ────────────────────────────────────────────────── */
+  /* Curto o bastante para não atrasar a interação, longo o bastante para ser lido. */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+
+  /* ── Acento (igual nos dois temas, ajustado por luminância) ────── */
+  --accent-h: 38;
+  --accent-s: 92%;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   TEMA ESCURO — padrão
+   Fundo levemente azulado, não cinza puro: descansa a vista em sessão longa.
+   ══════════════════════════════════════════════════════════════════ */
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg-app: #16181d;
+  --bg-sidebar: #1b1e24;
+  --bg-surface: #1f232a;
+  --bg-elevated: #262b33;
+  --bg-input: #14161a;
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --bg-active: rgba(255, 255, 255, 0.08);
+  --bg-selected: hsl(var(--accent-h) var(--accent-s) 58% / 0.16);
+
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.18);
+
+  --text-primary: #e8eaed;
+  --text-secondary: #a2a9b5;
+  --text-tertiary: #6e7783;
+  --text-inverse: #16181d;
+
+  --accent: hsl(var(--accent-h) var(--accent-s) 60%);
+  --accent-hover: hsl(var(--accent-h) var(--accent-s) 66%);
+  --accent-subtle: hsl(var(--accent-h) var(--accent-s) 60% / 0.14);
+  --accent-text: hsl(var(--accent-h) var(--accent-s) 70%);
+
+  --success: #4ade80;
+  --success-subtle: rgba(74, 222, 128, 0.14);
+  --danger: #f87171;
+  --danger-subtle: rgba(248, 113, 113, 0.14);
+  --warning: #fbbf24;
+  --warning-subtle: rgba(251, 191, 36, 0.14);
+  --info: #60a5fa;
+  --info-subtle: rgba(96, 165, 250, 0.14);
+
+  /* Cores por tipo de dado no grid — sutis, para diferenciar sem gritar. */
+  --data-number: #7dd3fc;
+  --data-string: #e8eaed;
+  --data-date: #c4b5fd;
+  --data-boolean: #86efac;
+  --data-null: #5b636e;
+  --data-json: #fbbf24;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.55);
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.14);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.24);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   TEMA CLARO
+   Não é o escuro invertido: contraste e sombras são recalculados.
+   ══════════════════════════════════════════════════════════════════ */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg-app: #ffffff;
+  --bg-sidebar: #f6f7f9;
+  --bg-surface: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-input: #ffffff;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-active: rgba(0, 0, 0, 0.07);
+  --bg-selected: hsl(var(--accent-h) var(--accent-s) 45% / 0.14);
+
+  --border-subtle: rgba(0, 0, 0, 0.06);
+  --border-default: rgba(0, 0, 0, 0.11);
+  --border-strong: rgba(0, 0, 0, 0.2);
+
+  --text-primary: #1a1d23;
+  --text-secondary: #5a6472;
+  --text-tertiary: #8a939f;
+  --text-inverse: #ffffff;
+
+  --accent: hsl(var(--accent-h) 85% 44%);
+  --accent-hover: hsl(var(--accent-h) 85% 38%);
+  --accent-subtle: hsl(var(--accent-h) var(--accent-s) 50% / 0.14);
+  --accent-text: hsl(var(--accent-h) 90% 34%);
+
+  --success: #16a34a;
+  --success-subtle: rgba(22, 163, 74, 0.1);
+  --danger: #dc2626;
+  --danger-subtle: rgba(220, 38, 38, 0.09);
+  --warning: #d97706;
+  --warning-subtle: rgba(217, 119, 6, 0.11);
+  --info: #2563eb;
+  --info-subtle: rgba(37, 99, 235, 0.1);
+
+  --data-number: #0369a1;
+  --data-string: #1a1d23;
+  --data-date: #6d28d9;
+  --data-boolean: #15803d;
+  --data-null: #a8b0ba;
+  --data-json: #b45309;
+
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 4px 14px rgba(16, 24, 40, 0.1);
+  --shadow-lg: 0 18px 48px rgba(16, 24, 40, 0.16);
+
+  --scrollbar-thumb: rgba(0, 0, 0, 0.16);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.28);
+}

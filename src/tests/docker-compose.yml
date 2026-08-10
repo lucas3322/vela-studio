@@ -1,0 +1,46 @@
+# Bancos descartáveis para os testes de ponta a ponta dos drivers.
+# Portas propositalmente fora do padrão, para não colidir com bancos locais.
+#
+#   docker compose -f src/tests/docker-compose.yml up -d --wait
+#   npm run test:db
+#   docker compose -f src/tests/docker-compose.yml down
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: vela-mysql-test
+    environment:
+      MYSQL_ROOT_PASSWORD: vela123
+      MYSQL_DATABASE: lojinha
+    ports:
+      - '33061:3306'
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-uroot', '-pvela123']
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  postgres:
+    image: postgres:16
+    container_name: vela-pg-test
+    environment:
+      POSTGRES_PASSWORD: vela123
+      POSTGRES_DB: lojinha
+    ports:
+      - '54321:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  mongo:
+    image: mongo:7
+    container_name: vela-mongo-test
+    ports:
+      - '27018:27017'
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', 'db.adminCommand("ping")']
+      interval: 3s
+      timeout: 5s
+      retries: 20

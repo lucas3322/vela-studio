@@ -1,0 +1,99 @@
+import type {
+  ColumnInfo,
+  ConnectionConfig,
+  HistoryEntry,
+  IndexInfo,
+  QueryRunResult,
+  RelationInfo,
+  StoredConnection,
+  TableInfo,
+  TestResult
+} from './types'
+
+/**
+ * Nomes de canal em um só lugar. Se um canal existe aqui e não no main,
+ * o typecheck do preload quebra — que é exatamente o que queremos.
+ */
+export const IPC = {
+  connectionsList: 'connections:list',
+  connectionsSave: 'connections:save',
+  connectionsRemove: 'connections:remove',
+  connectionsTest: 'connections:test',
+  connectionsOpen: 'connections:open',
+  connectionsClose: 'connections:close',
+
+  schemaDatabases: 'schema:databases',
+  schemaTables: 'schema:tables',
+  schemaColumns: 'schema:columns',
+  schemaIndexes: 'schema:indexes',
+  schemaRelations: 'schema:relations',
+  schemaLoadAll: 'schema:loadAll',
+  schemaCreateStatement: 'schema:createStatement',
+  schemaDangerStatement: 'schema:dangerStatement',
+
+  queryRun: 'query:run',
+  queryCancel: 'query:cancel',
+
+  historyList: 'history:list',
+  historyClear: 'history:clear',
+
+  appTheme: 'app:theme',
+  appPickFile: 'app:pickFile',
+  appExport: 'app:export'
+} as const
+
+export interface VelaApi {
+  connections: {
+    list(): Promise<StoredConnection[]>
+    save(config: ConnectionConfig, savePassword: boolean): Promise<StoredConnection>
+    remove(id: string): Promise<void>
+    test(config: ConnectionConfig): Promise<TestResult>
+    open(config: ConnectionConfig): Promise<{ serverVersion?: string }>
+    close(id: string): Promise<void>
+  }
+  schema: {
+    databases(connectionId: string): Promise<string[]>
+    tables(connectionId: string, database?: string): Promise<TableInfo[]>
+    columns(connectionId: string, table: string, database?: string): Promise<ColumnInfo[]>
+    indexes(connectionId: string, table: string, database?: string): Promise<IndexInfo[]>
+    relations(connectionId: string, table: string, database?: string): Promise<RelationInfo[]>
+    /** Tabelas + colunas de uma vez: é o que alimenta o autocomplete. */
+    loadAll(
+      connectionId: string,
+      database?: string
+    ): Promise<{ tables: TableInfo[]; columns: Record<string, ColumnInfo[]> }>
+    /** DDL de criação da tabela, para o menu de contexto. */
+    createStatement(connectionId: string, table: string, database?: string): Promise<string>
+    /** Monta o SQL destrutivo sem executá-lo, para a UI mostrar antes de confirmar. */
+    dangerStatement(
+      connectionId: string,
+      kind: 'truncate' | 'drop',
+      table: string
+    ): Promise<string>
+  }
+  query: {
+    run(params: {
+      connectionId: string
+      sql: string
+      database?: string
+      queryId: string
+      maxRows?: number
+    }): Promise<QueryRunResult>
+    cancel(connectionId: string, queryId: string): Promise<void>
+  }
+  history: {
+    list(connectionId?: string): Promise<HistoryEntry[]>
+    clear(): Promise<void>
+  }
+  app: {
+    setTheme(theme: 'light' | 'dark' | 'system'): Promise<void>
+    pickFile(filters?: { name: string; extensions: string[] }[]): Promise<string | undefined>
+    exportResult(params: {
+      format: 'csv' | 'json'
+      columns: string[]
+      rows: unknown[][]
+      suggestedName: string
+    }): Promise<string | undefined>
+    platform: string
+  }
+}
