@@ -14,6 +14,10 @@ export function buildMenu(getWindow: () => BrowserWindow | null): Menu {
       label: 'Vela Studio',
       submenu: [
         { role: 'about', label: 'Sobre o Vela Studio' },
+        {
+          label: 'Verificar Atualizações…',
+          click: () => send('menu:checkUpdate')
+        },
         { type: 'separator' },
         {
           label: 'Preferências…',
@@ -78,12 +82,12 @@ export function buildMenu(getWindow: () => BrowserWindow | null): Menu {
       label: 'Query',
       submenu: [
         {
-          label: 'Executar statement sob o cursor',
+          label: 'Executar Seleção ou Statement sob o Cursor',
           accelerator: 'Cmd+Return',
           click: () => send('menu:run')
         },
         {
-          label: 'Executar tudo',
+          label: 'Executar Tudo',
           accelerator: 'Cmd+Shift+Return',
           click: () => send('menu:runAll')
         },
@@ -145,7 +149,7 @@ export function buildMenu(getWindow: () => BrowserWindow | null): Menu {
         },
         {
           label: 'Repositório do projeto',
-          click: () => shell.openExternal('https://github.com')
+          click: () => shell.openExternal('https://github.com/lucas3322/vela-studio')
         }
       ]
     }

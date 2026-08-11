@@ -16,9 +16,16 @@ import {
 } from '../main/drivers/types.ts'
 import { translateError, nearest } from '../main/error-translator.ts'
 import { parseMongoCommand, splitMongoCommands } from '../main/drivers/mongo-parser.ts'
-import { analyze, extractTables, resolveQualifier } from '../renderer/src/editor/sql-context.ts'
+import {
+  analyze,
+  extractTables,
+  resolveQualifier,
+  sqlParaExecutar,
+  statementAtOffset
+} from '../renderer/src/editor/sql-context.ts'
 import { formatSql } from '../renderer/src/editor/formatter.ts'
 import { identificarBinario } from '../../scripts/after-pack.mjs'
+import { compararVersoes, escolherAsset } from '../main/update-logic.ts'
 
 // ── splitStatements ──────────────────────────────────────────────────
 
@@ -382,4 +389,150 @@ test('distingue as plataformas entre si', () => {
 
 test('não confunde lixo com binário válido', () => {
   assert.equal(identificarBinario(cabecalho([0, 1, 2, 3])).plataforma, 'desconhecida')
+})
+
+// ── Atualização pelo app ─────────────────────────────────────────────
+
+const asset = (name: string): { name: string; browser_download_url: string; size: number } => ({
+  name,
+  browser_download_url: `https://exemplo/${name}`,
+  size: 1
+})
+
+// Copiado da resposta real da API do GitHub para a release v0.2.0.
+//
+// Repare no ponto onde o electron-builder põe espaço: o `artifactName` gera
+// "Vela Studio-0.2.0-arm64.dmg", e o GitHub troca o espaço por ponto no
+// upload. O código precisa casar com o nome de *lá*, não com o do disco —
+// testar com o nome local validaria uma ficção.
+const RELEASE = [
+  asset('vela-studio_0.2.0_amd64.deb'),
+  asset('Vela.Studio-0.2.0-arm64.dmg'),
+  asset('Vela.Studio-0.2.0-portable.exe'),
+  asset('Vela.Studio-0.2.0-setup.exe'),
+  asset('Vela.Studio-0.2.0-x64.dmg'),
+  asset('Vela.Studio-0.2.0.AppImage')
+]
+
+test('escolherAsset respeita a arquitetura do macOS', () => {
+  assert.equal(escolherAsset(RELEASE, 'darwin', 'arm64')?.name, 'Vela.Studio-0.2.0-arm64.dmg')
+  assert.equal(escolherAsset(RELEASE, 'darwin', 'x64')?.name, 'Vela.Studio-0.2.0-x64.dmg')
+})
+
+test('escolherAsset também casa com o nome local, antes do upload', () => {
+  const local = [asset('Vela Studio-0.2.0-arm64.dmg')]
+  assert.equal(escolherAsset(local, 'darwin', 'arm64')?.name, 'Vela Studio-0.2.0-arm64.dmg')
+})
+
+test('sem o DMG da arquitetura, escolherAsset devolve nada', () => {
+  // A regra que mais importa: um DMG arm64 com binário x86_64 dentro instala,
+  // abre e falha dizendo que o app está danificado. Melhor não oferecer nada.
+  const soIntel = [asset('Vela.Studio-0.2.0-x64.dmg')]
+  assert.equal(escolherAsset(soIntel, 'darwin', 'arm64'), undefined)
+})
+
+test('escolherAsset prefere o instalador ao portável no Windows', () => {
+  assert.equal(escolherAsset(RELEASE, 'win32', 'x64')?.name, 'Vela.Studio-0.2.0-setup.exe')
+  const soPortavel = [asset('Vela.Studio-0.2.0-portable.exe')]
+  assert.equal(escolherAsset(soPortavel, 'win32', 'x64')?.name, 'Vela.Studio-0.2.0-portable.exe')
+})
+
+test('escolherAsset não confunde o zip com o instalador do mac', () => {
+  // O zip existe só como insumo de atualização automática; abri-lo não instala nada.
+  const soZip = [asset('Vela.Studio-0.2.0-arm64.zip')]
+  assert.equal(escolherAsset(soZip, 'darwin', 'arm64'), undefined)
+})
+
+test('escolherAsset acha o AppImage no Linux', () => {
+  assert.equal(escolherAsset(RELEASE, 'linux', 'x64')?.name, 'Vela.Studio-0.2.0.AppImage')
+})
+
+test('compararVersoes ordena por major, minor e patch', () => {
+  assert.ok(compararVersoes('0.3.0', '0.2.9') > 0)
+  assert.ok(compararVersoes('1.0.0', '0.99.99') > 0)
+  assert.ok(compararVersoes('0.2.10', '0.2.9') > 0, 'comparação numérica, não alfabética')
+  assert.equal(compararVersoes('0.2.0', '0.2.0'), 0)
+})
+
+test('compararVersoes ignora o "v" da tag do GitHub', () => {
+  assert.equal(compararVersoes('v0.2.0', '0.2.0'), 0)
+})
+
+test('pré-lançamento perde da versão final', () => {
+  // Sem esta regra os dois empatariam nos números, e quem instalasse um beta
+  // nunca seria avisado da estável que veio depois.
+  assert.ok(compararVersoes('0.3.0', '0.3.0-beta.1') > 0)
+  assert.ok(compararVersoes('0.3.0-beta.1', '0.3.0') < 0)
+  assert.ok(compararVersoes('0.3.0-beta.2', '0.3.0-beta.1') > 0)
+})
+
+test('versão publicada igual à instalada não vira atualização', () => {
+  assert.ok(compararVersoes('v0.2.0', '0.2.0') <= 0)
+  assert.ok(compararVersoes('v0.1.9', '0.2.0') <= 0, 'release antiga não pode empurrar downgrade')
+})
+
+// ── O que o ⌘↵ executa ───────────────────────────────────────────────
+//
+// Esta regra já quebrou em produção: o ⌘↵ disparava a aba inteira, e um
+// usuário rodou tudo achando que rodava uma query. Os testes abaixo existem
+// para isso não voltar em silêncio.
+
+const CADERNO = [
+  "SELECT * FROM clientes;",
+  "UPDATE pedidos SET status = 'pago';",
+  "SELECT COUNT(*) FROM pedidos;"
+].join('\n')
+
+test('sem seleção, roda só o statement sob o cursor', () => {
+  const noPrimeiro = sqlParaExecutar({ texto: CADERNO, offset: 10 })
+  assert.equal(noPrimeiro, 'SELECT * FROM clientes')
+
+  const noTerceiro = sqlParaExecutar({ texto: CADERNO, offset: CADERNO.length - 5 })
+  assert.equal(noTerceiro, 'SELECT COUNT(*) FROM pedidos')
+})
+
+test('o cursor num SELECT não dispara o UPDATE vizinho', () => {
+  // O motivo de a regra existir. Rodar a aba toda aqui alteraria a tabela.
+  const executado = sqlParaExecutar({ texto: CADERNO, offset: 5 })
+  assert.ok(!/UPDATE/i.test(executado ?? ''), `não pode incluir o UPDATE: ${executado}`)
+})
+
+test('a seleção vence o cursor', () => {
+  // Cursor no primeiro statement, seleção apontando para outro trecho:
+  // quem selecionou mandou.
+  const executado = sqlParaExecutar({
+    texto: CADERNO,
+    offset: 5,
+    selecao: 'SELECT COUNT(*) FROM pedidos'
+  })
+  assert.equal(executado, 'SELECT COUNT(*) FROM pedidos')
+})
+
+test('seleção parcial roda exatamente o que foi selecionado', () => {
+  // Selecionar meia linha é uma intenção explícita — não completamos nada.
+  const executado = sqlParaExecutar({ texto: CADERNO, offset: 0, selecao: 'SELECT 1 + 1' })
+  assert.equal(executado, 'SELECT 1 + 1')
+})
+
+test('seleção só de espaço em branco cai para o statement do cursor', () => {
+  const executado = sqlParaExecutar({ texto: CADERNO, offset: 10, selecao: '   \n  ' })
+  assert.equal(executado, 'SELECT * FROM clientes')
+})
+
+test('nada executável devolve undefined em vez de string vazia', () => {
+  assert.equal(sqlParaExecutar({ texto: ';;', offset: 1 }), undefined)
+  assert.equal(sqlParaExecutar({ texto: '   ', offset: 1 }), undefined)
+})
+
+test('ponto e vírgula dentro de string não corta o statement', () => {
+  // Sem tratar aspas, o cursor depois do ';' literal executaria um pedaço solto.
+  const sql = "SELECT * FROM logs WHERE msg = 'erro; grave' AND id = 7"
+  const executado = sqlParaExecutar({ texto: sql, offset: sql.length - 1 })
+  assert.equal(executado, sql)
+})
+
+test('statementAtOffset devolve o início do statement', () => {
+  const { start } = statementAtOffset(CADERNO, CADERNO.length - 5)
+  assert.ok(start > 0)
+  assert.equal(CADERNO.slice(start).trim(), 'SELECT COUNT(*) FROM pedidos;')
 })

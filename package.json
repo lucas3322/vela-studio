@@ -4,8 +4,8 @@
   "description": "IDE de banco de dados SQL e NoSQL — limpa, rápida e didática",
   "main": "./out/main/index.js",
   "author": {
-    "name": "Lucas Pardinho",
-    "email": "lucass706@hotmail.com"
+    "name": "Vela Studio",
+    "email": "lucas3322@users.noreply.github.com"
   },
   "license": "MIT",
   "repository": {

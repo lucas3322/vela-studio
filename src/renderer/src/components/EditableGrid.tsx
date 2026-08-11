@@ -24,6 +24,23 @@ interface Props {
   }) => Promise<void>
   onDeleteRow?: (keys: Record<string, unknown>) => Promise<void>
   onNotify?: (mensagem: string, tom?: 'info' | 'success' | 'danger') => void
+  /** Ordenação vigente. Quem manda é quem monta a query, não a grade. */
+  sort?: OrdenacaoDaGrade | null
+  /**
+   * Pedido de reordenação. Quando existe, o cabeçalho vira clicável.
+   *
+   * Recebe a ordem nova (ou null para desligar) e é responsabilidade de quem
+   * passa **reconsultar o banco**. Ordenar aqui as linhas já carregadas daria
+   * a resposta errada: o resultado é um recorte de 500 linhas, então o "maior
+   * valor" da tela seria o maior daquele recorte, não o da tabela — e nada na
+   * interface denunciaria a diferença.
+   */
+  onSort?: (ordem: OrdenacaoDaGrade | null) => void
+}
+
+export interface OrdenacaoDaGrade {
+  column: string
+  direction: 'asc' | 'desc'
 }
 
 /**
@@ -44,7 +61,9 @@ export function EditableGrid({
   readOnly,
   onEditCell,
   onDeleteRow,
-  onNotify
+  onNotify,
+  sort,
+  onSort
 }: Props): React.JSX.Element {
   const scroller = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
@@ -341,17 +360,36 @@ export function EditableGrid({
             <div className="grid__gutter" style={{ background: 'var(--bg-sidebar)' }} />
             {result.columns.map((coluna, indice) => {
               const ehChave = chavesPrimarias.includes(coluna.name)
+              const ordenadaPor = sort?.column === coluna.name ? sort.direction : null
               return (
-                <div key={coluna.name + indice} className="grid__th" style={{ width: widths[indice] }}>
-                  <span
-                    style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}
-                    title={`${coluna.name} (${coluna.type})${ehChave ? ' · chave primária' : ''}`}
-                  >
+                <div
+                  key={coluna.name + indice}
+                  className={`grid__th ${onSort ? 'grid__th--ordenavel' : ''} ${
+                    ordenadaPor ? 'grid__th--ordenada' : ''
+                  }`}
+                  style={{ width: widths[indice] }}
+                  onClick={() => onSort?.(proximaOrdem(coluna.name, sort ?? null))}
+                  title={
+                    onSort
+                      ? `${coluna.name} (${coluna.type})${ehChave ? ' · chave primária' : ''}\nClique para ordenar pelo banco`
+                      : `${coluna.name} (${coluna.type})${ehChave ? ' · chave primária' : ''}`
+                  }
+                >
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {ehChave && <span style={{ color: 'var(--warning)' }}>🔑 </span>}
                     {coluna.name}
                   </span>
+                  {ordenadaPor && (
+                    <span className="grid__th-ordem">{ordenadaPor === 'asc' ? '↑' : '↓'}</span>
+                  )}
                   <span className="grid__th-type">{coluna.type}</span>
-                  <span className="grid__th-resize" onMouseDown={iniciarRedimensionamento(indice)} />
+                  <span
+                    className="grid__th-resize"
+                    onMouseDown={iniciarRedimensionamento(indice)}
+                    // Sem isto, soltar o mouse depois de redimensionar contaria
+                    // como clique no cabeçalho e reordenaria a tabela inteira.
+                    onClick={(evento) => evento.stopPropagation()}
+                  />
                 </div>
               )
             })}
@@ -459,6 +497,21 @@ export function EditableGrid({
       )}
     </>
   )
+}
+
+/**
+ * Ciclo do clique no cabeçalho: crescente → decrescente → sem ordenação.
+ *
+ * O terceiro clique volta à ordem natural do banco em vez de ficar alternando
+ * entre asc e desc — sem ele não há como desfazer a ordenação.
+ */
+export function proximaOrdem(
+  coluna: string,
+  atual: OrdenacaoDaGrade | null
+): OrdenacaoDaGrade | null {
+  if (!atual || atual.column !== coluna) return { column: coluna, direction: 'asc' }
+  if (atual.direction === 'asc') return { column: coluna, direction: 'desc' }
+  return null
 }
 
 /**

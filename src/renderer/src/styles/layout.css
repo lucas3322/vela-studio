@@ -1388,3 +1388,128 @@
   opacity: 0.35;
   text-decoration: line-through;
 }
+
+/* ── Cabeçalho ordenável ───────────────────────────────────────────── */
+
+.grid__th--ordenavel {
+  cursor: pointer;
+  user-select: none;
+}
+
+.grid__th--ordenavel:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.grid__th--ordenada {
+  color: var(--accent);
+}
+
+.grid__th-ordem {
+  font-size: 11px;
+  line-height: 1;
+  color: var(--accent);
+}
+
+/* ── Versão na barra de status ─────────────────────────────────────── */
+
+.statusbar__item--acao {
+  background: none;
+  border: none;
+  padding: 0 var(--space-1);
+  font: inherit;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.statusbar__item--acao:hover {
+  color: var(--accent);
+  background: var(--bg-hover);
+}
+
+/* ── Modal de atualização ──────────────────────────────────────────── */
+
+.update__estado {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.update__estado--ok {
+  color: var(--success);
+}
+
+.update__estado--aviso {
+  color: var(--warning);
+}
+
+.update__nota {
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.update__versao {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.update__versao-num {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.update__versao-meta {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* As notas vêm em markdown cru da release; `pre` preserva as quebras sem
+   arrastar um parser de markdown para dentro do app. */
+.update__notas {
+  max-height: 220px;
+  overflow: auto;
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.update__progresso {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.update__barra {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+
+.update__barra-preenchida {
+  height: 100%;
+  background: var(--accent);
+  transition: width 120ms linear;
+}

@@ -44,6 +44,11 @@ const api: VelaApi = {
     pickFile: (filters) => ipcRenderer.invoke(IPC.appPickFile, filters),
     exportResult: (params) => ipcRenderer.invoke(IPC.appExport, params),
     platform: process.platform
+  },
+  update: {
+    check: () => ipcRenderer.invoke(IPC.updateCheck),
+    download: () => ipcRenderer.invoke(IPC.updateDownload),
+    openPage: () => ipcRenderer.invoke(IPC.updateOpenPage)
   }
 }
 

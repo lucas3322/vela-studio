@@ -8,7 +8,7 @@ import {
   type SchemaProvider
 } from '../editor/completion'
 import { formatSql } from '../editor/formatter'
-import { statementAtOffset } from '../editor/sql-context'
+import { sqlParaExecutar } from '../editor/sql-context'
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
 import { useTabStore } from '../store/tabs'
@@ -77,22 +77,20 @@ export function QueryEditor({ tabId }: { tabId: string }): React.JSX.Element {
      */
     editor.addAction({
       id: 'vela.run',
-      label: 'Executar statement sob o cursor',
+      label: 'Executar seleção ou statement sob o cursor',
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
       run: () => {
         const model = editor.getModel()
-        const selection = editor.getSelection()
-        if (!model) return
-
-        if (selection && !selection.isEmpty()) {
-          void run(model.getValueInRange(selection))
-          return
-        }
-
         const position = editor.getPosition()
-        if (!position) return
-        const { text } = statementAtOffset(model.getValue(), model.getOffsetAt(position))
-        void run(text.trim() || undefined)
+        if (!model || !position) return
+
+        const selection = editor.getSelection()
+        const sql = sqlParaExecutar({
+          texto: model.getValue(),
+          offset: model.getOffsetAt(position),
+          selecao: selection && !selection.isEmpty() ? model.getValueInRange(selection) : undefined
+        })
+        if (sql) void run(sql)
       }
     })
 
@@ -137,7 +135,8 @@ export function QueryEditor({ tabId }: { tabId: string }): React.JSX.Element {
  *
  * O botão "Executar" e o menu nativo passam por aqui em vez de chamar `run()`
  * direto: assim existe um único lugar que decide o que "executar" significa —
- * o statement sob o cursor — e os três caminhos nunca divergem.
+ * a seleção, ou o statement sob o cursor — e os três caminhos nunca divergem.
+ * A decisão em si mora em `sqlParaExecutar`, que tem teste.
  */
 export function triggerEditorAction(id: 'vela.run' | 'vela.runAll' | 'vela.format'): boolean {
   const editors = monaco.editor.getEditors()

@@ -235,3 +235,32 @@ export interface HistoryEntry {
   durationMs?: number
   executedAt: number
 }
+
+/**
+ * Resultado da checagem de atualização.
+ *
+ * `sem-arquivo` é um estado próprio de propósito: existe versão nova, mas
+ * nenhum instalador para esta plataforma/arquitetura. Oferecer o arquivo
+ * errado já custou caro neste projeto — um DMG arm64 com binário x86_64
+ * dentro abre como "app danificado". Melhor dizer que falta o arquivo.
+ */
+export interface UpdateInfo {
+  status: 'atual' | 'disponivel' | 'sem-arquivo' | 'erro'
+  versaoAtual: string
+  versaoNova?: string
+  /** Corpo da release no GitHub, em markdown cru. */
+  notas?: string
+  publicadoEm?: string
+  /** URL do instalador certo para esta plataforma. Ausente em `sem-arquivo`. */
+  downloadUrl?: string
+  nomeArquivo?: string
+  tamanhoBytes?: number
+  /** Página da release — o caminho de saída quando o download automático não serve. */
+  paginaUrl?: string
+  mensagem?: string
+}
+
+export interface UpdateProgress {
+  recebidoBytes: number
+  totalBytes: number
+}

@@ -8,7 +8,7 @@ interface AppState {
   resolvedTheme: 'light' | 'dark'
   sidebarVisible: boolean
   helpPanelVisible: boolean
-  modal: 'connection' | 'history' | 'cheatsheet' | 'preferences' | null
+  modal: 'connection' | 'history' | 'cheatsheet' | 'preferences' | 'update' | null
   /** Conexão sendo editada no modal, se houver. */
   editingConnectionId: string | null
   toast: { message: string; tone: 'info' | 'success' | 'danger' } | null

@@ -3,7 +3,7 @@ import { DRIVERS, type ColumnInfo, type IndexInfo, type RelationInfo } from '@sh
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
 import { useTabStore, type Tab } from '../store/tabs'
-import { EditableGrid } from './EditableGrid'
+import { EditableGrid, type OrdenacaoDaGrade } from './EditableGrid'
 import { ErrorPanel } from './ErrorPanel'
 import { IconKey, IconLink } from './Icons'
 
@@ -20,6 +20,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
   const [indexes, setIndexes] = useState<IndexInfo[]>([])
   const [relations, setRelations] = useState<RelationInfo[]>([])
   const [loading, setLoading] = useState(false)
+  const [ordem, setOrdem] = useState<OrdenacaoDaGrade | null>(null)
 
   const connectionId = useConnectionStore((s) => s.activeId)
   const database = useConnectionStore((s) => s.activeDatabase)
@@ -37,10 +38,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
 
     const load = async (): Promise<void> => {
       const queryId = `table_${tab.id}`
-      const sql =
-        dialect === 'mongodb'
-          ? `db.${table}.find({}).limit(500)`
-          : `SELECT * FROM ${quote(table, dialect)} LIMIT 500`
+      const sql = dialect === 'mongodb' ? montarFind(table, ordem) : montarSelect(table, dialect, ordem)
 
       try {
         const [outcome, cols, idx, rels] = await Promise.all([
@@ -55,12 +53,21 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
         setIndexes(idx)
         setRelations(rels)
         updateTab(tab.id, { results: outcome.results, error: outcome.error, activeResultIndex: 0 })
+
+        // Ordenação que o banco recusou (coluna de tipo não ordenável, por
+        // exemplo) volta atrás sozinha. Sem isso a aba trava: o erro esconde a
+        // grade, e sem grade não sobra cabeçalho para clicar e desfazer.
+        if (outcome.error && ordem) {
+          setOrdem(null)
+          notify(`Não dá para ordenar por ${ordem.column}. Voltei à ordem original.`, 'danger')
+        }
       } catch (error) {
         if (cancelled) return
         updateTab(tab.id, {
           results: [],
           error: { raw: (error as Error).message, friendly: (error as Error).message }
         })
+        if (ordem) setOrdem(null)
       } finally {
         // Sem o finally, qualquer rejeição deixava a aba presa em "Carregando…".
         if (!cancelled) setLoading(false)
@@ -71,7 +78,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
     return () => {
       cancelled = true
     }
-  }, [connectionId, database, table, dialect, tab.id, updateTab])
+  }, [connectionId, database, table, dialect, ordem, tab.id, updateTab, notify])
 
   const result = tab.results[tab.activeResultIndex]
 
@@ -109,6 +116,10 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
               schemaColumns={columns}
               readOnly={!!connection?.readOnly}
               onNotify={notify}
+              sort={ordem}
+              // Trocar a ordem reexecuta a consulta: o ORDER BY vai para o
+              // banco, que ordena a tabela inteira antes de cortar em 500.
+              onSort={setOrdem}
               onEditCell={async ({ column, value, keys }) => {
                 if (!connectionId) return
                 await window.vela.data.updateCell({
@@ -248,6 +259,29 @@ const LABELS: Record<Panel, string> = {
   colunas: 'Colunas',
   indices: 'Índices',
   relacoes: 'Relações'
+}
+
+/**
+ * O ORDER BY vai para o banco, nunca para as linhas já carregadas.
+ *
+ * A aba mostra no máximo 500 linhas. Ordenar esse recorte no navegador
+ * responderia "o maior valor entre as 500 primeiras" quando a pergunta era "o
+ * maior valor da tabela" — e a tela ficaria idêntica nos dois casos. O LIMIT
+ * fica depois do ORDER BY justamente para o corte acontecer sobre a tabela
+ * ordenada.
+ */
+function montarSelect(table: string, dialect: string, ordem: OrdenacaoDaGrade | null): string {
+  const clausula = ordem
+    ? ` ORDER BY ${quote(ordem.column, dialect)} ${ordem.direction === 'asc' ? 'ASC' : 'DESC'}`
+    : ''
+  return `SELECT * FROM ${quote(table, dialect)}${clausula} LIMIT 500`
+}
+
+function montarFind(table: string, ordem: OrdenacaoDaGrade | null): string {
+  const clausula = ordem
+    ? `.sort({ ${JSON.stringify(ordem.column)}: ${ordem.direction === 'asc' ? 1 : -1} })`
+    : ''
+  return `db.${table}.find({})${clausula}.limit(500)`
 }
 
 /** Cada banco cita identificador de um jeito; errar isso quebra nomes com espaço. */

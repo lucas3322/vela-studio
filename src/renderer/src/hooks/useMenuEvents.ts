@@ -34,6 +34,7 @@ export function useMenuEvents(): void {
       window.velaEvents.on('menu:cancel', () => void cancel()),
       window.velaEvents.on('menu:history', () => useAppStore.getState().openModal('history')),
       window.velaEvents.on('menu:cheatsheet', () => useAppStore.getState().openModal('cheatsheet')),
+      window.velaEvents.on('menu:checkUpdate', () => useAppStore.getState().openModal('update')),
       window.velaEvents.on('menu:toggleSidebar', () => useAppStore.getState().toggleSidebar()),
       window.velaEvents.on('menu:toggleHelp', () => useAppStore.getState().toggleHelpPanel()),
       window.velaEvents.on('menu:theme', ((theme: ThemeMode) =>

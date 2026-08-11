@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
 import { ipcMain, dialog, nativeTheme, BrowserWindow } from 'electron'
-import { IPC } from '../shared/ipc'
+import { IPC, UPDATE_PROGRESS_EVENT } from '../shared/ipc'
 import type {
   ColumnInfo,
   ConnectionConfig,
@@ -12,6 +12,7 @@ import { ConnectionManager } from './connection-manager'
 import { ConnectionStore } from './connection-store'
 import { translateError } from './error-translator'
 import { isUnboundedMutation, splitStatements } from './drivers/types'
+import { abrirArquivo, abrirPaginaDaRelease, baixarAtualizacao, verificarAtualizacao } from './updater'
 
 export function registerIpcHandlers(manager: ConnectionManager, store: ConnectionStore): void {
   // ── Conexões ──────────────────────────────────────────────────────────
@@ -296,6 +297,22 @@ export function registerIpcHandlers(manager: ConnectionManager, store: Connectio
       return result.filePath
     }
   )
+
+  // ── Atualização ───────────────────────────────────────────────────────
+
+  ipcMain.handle(IPC.updateCheck, () => verificarAtualizacao())
+
+  ipcMain.handle(IPC.updateDownload, async (evento) => {
+    const caminho = await baixarAtualizacao((progresso) => {
+      // Manda para a janela que pediu, não para todas: com duas janelas abertas
+      // um broadcast faria as duas mostrarem a mesma barra.
+      if (!evento.sender.isDestroyed()) evento.sender.send(UPDATE_PROGRESS_EVENT, progresso)
+    })
+    await abrirArquivo(caminho)
+    return { caminho }
+  })
+
+  ipcMain.handle(IPC.updateOpenPage, () => abrirPaginaDaRelease())
 }
 
 function toCsv(columns: string[], rows: unknown[][]): string {

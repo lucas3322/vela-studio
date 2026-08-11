@@ -164,7 +164,7 @@ function QueryPane({ tabId }: { tabId: string }): React.JSX.Element | null {
             className="btn btn--primary btn--sm"
             onClick={() => triggerEditorAction('vela.run')}
             disabled={!tab.sql.trim()}
-            title="Executa o statement onde o cursor está (⌘↵)"
+            title="⌘↵ — executa o texto selecionado; sem seleção, o statement onde o cursor está. ⌘⇧↵ executa tudo."
           >
             <IconPlay size={12} />
             Executar

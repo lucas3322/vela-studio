@@ -88,6 +88,16 @@ Cada uma tem teste que a trava.
    parser para `name[]`; o cast `::text` resolve.
 6. **Monaco completo custa 6 MB e ~90 gramáticas.** Importamos `editor.api`
    mais as contribuições necessárias, e só SQL + JavaScript.
+7. **Ordenar no cliente responde outra pergunta.** A aba de tabela carrega 500
+   linhas; ordenar esse recorte no navegador entrega "o maior valor entre as
+   500 primeiras" quando perguntaram "o maior valor da tabela" — e a tela fica
+   idêntica nos dois casos. O clique no cabeçalho **reexecuta a query** com
+   `ORDER BY`, e o `LIMIT` vem depois, para o corte cair sobre a tabela já
+   ordenada.
+8. **Instalador de outra arquitetura instala e depois falha.** Um DMG arm64 com
+   binário x86_64 dentro abre como "app danificado". O `escolherAsset` do
+   atualizador não tem fallback: sem o arquivo da arquitetura exata, ele
+   devolve nada e a UI manda o usuário para a página da release.
 
 O padrão comum: **falha silenciosa**. Toda mudança em driver ou em leitura de
 schema precisa de teste contra banco real — o typecheck não vê nenhuma delas.

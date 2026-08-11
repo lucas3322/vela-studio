@@ -107,6 +107,34 @@ export function statementAtOffset(sql: string, offset: number): { text: string; 
   return { text: sql.slice(start, end), start }
 }
 
+/**
+ * Decide o que o ⌘↵ executa.
+ *
+ * A regra, na ordem: **seleção vence sempre** — selecionar é uma intenção
+ * explícita, e quem selecionou meia linha quer rodar meia linha. Sem seleção,
+ * roda o statement onde o cursor está, não o editor inteiro.
+ *
+ * Mora aqui, fora do componente, porque é a regra que já falhou uma vez em
+ * produção (o ⌘↵ executava o arquivo todo) e dentro do `QueryEditor` nenhum
+ * teste alcança: seria preciso instanciar o Monaco.
+ *
+ * Devolve `undefined` quando não há nada executável — seleção só de espaço em
+ * branco, ou cursor num trecho vazio entre dois `;`. Melhor não fazer nada do
+ * que mandar string vazia para o banco.
+ */
+export function sqlParaExecutar(entrada: {
+  texto: string
+  /** Posição do cursor no texto completo. */
+  offset: number
+  /** Texto selecionado, se houver. */
+  selecao?: string
+}): string | undefined {
+  if (entrada.selecao && entrada.selecao.trim()) return entrada.selecao.trim()
+
+  const { text } = statementAtOffset(entrada.texto, entrada.offset)
+  return text.trim() || undefined
+}
+
 /** Remove comentários e conteúdo de string, preservando o comprimento (offsets continuam válidos). */
 function maskNonCode(text: string): string {
   let masked = ''

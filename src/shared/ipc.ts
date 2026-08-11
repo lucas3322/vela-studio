@@ -10,7 +10,8 @@ import type {
   RelationInfo,
   StoredConnection,
   TableInfo,
-  TestResult
+  TestResult,
+  UpdateInfo
 } from './types'
 
 /**
@@ -45,8 +46,15 @@ export const IPC = {
 
   appTheme: 'app:theme',
   appPickFile: 'app:pickFile',
-  appExport: 'app:export'
+  appExport: 'app:export',
+
+  updateCheck: 'update:check',
+  updateDownload: 'update:download',
+  updateOpenPage: 'update:openPage'
 } as const
+
+/** Evento de progresso do download, emitido pelo main. */
+export const UPDATE_PROGRESS_EVENT = 'app:updateProgress'
 
 export interface VelaApi {
   connections: {
@@ -106,5 +114,15 @@ export interface VelaApi {
       suggestedName: string
     }): Promise<string | undefined>
     platform: string
+  }
+  /** Atualização do próprio app. Ver src/main/updater.ts para o porquê do fluxo. */
+  update: {
+    check(): Promise<UpdateInfo>
+    /**
+     * Baixa o instalador da última checagem e o abre.
+     * Sem parâmetro de propósito: a URL vem do que o main guardou, não do renderer.
+     */
+    download(): Promise<{ caminho: string }>
+    openPage(): Promise<void>
   }
 }

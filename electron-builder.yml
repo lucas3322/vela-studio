@@ -1,6 +1,14 @@
-appId: com.pardinho.vela
+# O appId vira o bundle identifier, e o macOS usa ele para nomear as pastas
+# que cria por conta própria para cada app: $TMPDIR/<appId>/ e
+# ~/Library/Caches/<appId>/. Ou seja, esta string aparece como nome de pasta na
+# máquina de todo usuário — não é lugar para nome de pessoa.
+#
+# Trocar é seguro para quem já usa: as conexões salvas ficam em
+# app.getPath('userData') e as senhas no item de Chaves, ambos derivados do
+# productName ("Vela Studio"), não do appId. Ninguém perde dado na troca.
+appId: com.velastudio.app
 productName: Vela Studio
-copyright: Copyright © 2026 Lucas Pardinho
+copyright: Copyright © 2026 Vela Studio
 
 directories:
   buildResources: build
@@ -53,7 +61,7 @@ mac:
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
-    NSHumanReadableCopyright: Copyright © 2026 Lucas Pardinho
+    NSHumanReadableCopyright: Copyright © 2026 Vela Studio
 
 dmg:
   # O título vira o nome do volume montado em /Volumes. Incluir a arquitetura

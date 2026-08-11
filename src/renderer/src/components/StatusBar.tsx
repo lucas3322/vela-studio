@@ -1,10 +1,12 @@
 import { DRIVERS } from '@shared/types'
+import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
 import { useTabStore } from '../store/tabs'
 
 const numberFormat = new Intl.NumberFormat('pt-BR')
 
 export function StatusBar(): React.JSX.Element {
+  const openModal = useAppStore((s) => s.openModal)
   const connection = useConnectionStore((s) => s.saved.find((c) => c.id === s.activeId))
   const activeId = useConnectionStore((s) => s.activeId)
   const database = useConnectionStore((s) => s.activeDatabase)
@@ -58,6 +60,14 @@ export function StatusBar(): React.JSX.Element {
           <div className="statusbar__item">{numberFormat.format(result.durationMs)} ms</div>
         </>
       )}
+
+      <button
+        className="statusbar__item statusbar__item--acao"
+        onClick={() => openModal('update')}
+        title="Verificar se há atualização"
+      >
+        v{__APP_VERSION__}
+      </button>
     </footer>
   )
 }
