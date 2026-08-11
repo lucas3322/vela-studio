@@ -3,6 +3,13 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.1.10 — 2026-08-11
+
+### Outras mudanças
+
+- melhora o autocomplete SQL para não sugerir colunas sem tabela em escopo e desativa sugestões de palavras do editor (92bfea1)
+- atualiza seção sobre erro 502 no README.md com informações sobre configuração de porta no Railway (5681818)
+
 ## 0.1.9 — 2026-08-10
 
 ### Outras mudanças
