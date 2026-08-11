@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.5.0 — 2026-08-11
+
+### Novidades
+
+- implementar funcionalidade de alteração de tipo de coluna, incluindo lógica de confirmação e UI (ac3b038)
+
 ## 0.4.0 — 2026-08-11
 
 ### Novidades
