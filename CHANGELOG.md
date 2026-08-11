@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.9.0 — 2026-08-11
+
+### Novidades
+
+- fixar versão do Python para evitar falhas na compilação do better-sqlite3 (b26c98a)
+
 ## 0.8.0 — 2026-08-11
 
 ### Novidades
