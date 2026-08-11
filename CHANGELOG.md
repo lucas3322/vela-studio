@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.8.0 — 2026-08-11
+
+### Novidades
+
+- atualizar documentação sobre permissões de chave e adicionar testes para garantir a integridade da chave (0d73643)
+
 ## 0.7.0 — 2026-08-11
 
 ### Novidades
