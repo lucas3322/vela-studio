@@ -43,7 +43,15 @@ export class ConnectionStore {
 
   private encrypt(password?: string): string | undefined {
     if (!password) return undefined
-    if (!safeStorage.isEncryptionAvailable()) return undefined
+    if (!safeStorage.isEncryptionAvailable()) {
+      // Antes isto devolvia `undefined` em silêncio: o usuário marcava
+      // "Salvar senha", o app dizia que salvou e na próxima vez pedia de novo,
+      // sem nunca explicar por quê. Falhar alto é melhor que mentir baixo.
+      throw new Error(
+        'O sistema não disponibilizou a criptografia (Chaves do macOS). A senha não foi salva — ' +
+          'guardá-la em texto puro no disco não é uma opção. Desmarque "Salvar senha" para seguir sem ela.'
+      )
+    }
     return safeStorage.encryptString(password).toString('base64')
   }
 
@@ -67,7 +75,7 @@ export class ConnectionStore {
   list(): StoredConnection[] {
     return [...this.connections]
       .sort((a, b) => (b.lastUsedAt ?? b.createdAt ?? 0) - (a.lastUsedAt ?? a.createdAt ?? 0))
-      .map(({ encryptedPassword, ...rest }) => ({ ...rest, hasPassword: !!encryptedPassword }))
+      .map((registro) => this.paraUI(registro))
   }
 
   /** Config completa, com senha, só para o main abrir a conexão. */
@@ -79,7 +87,12 @@ export class ConnectionStore {
   }
 
   save(config: ConnectionConfig, savePassword = true): StoredConnection {
-    const { password, ...rest } = config
+    // `hasPassword` é derivado, e a UI devolve o objeto que recebeu do `list()`
+    // com ele dentro. Sem descartar aqui, o valor obsoleto era gravado no JSON
+    // e passava a divergir do que existe de fato.
+    const { password, hasPassword: _derivado, ...rest } = config as ConnectionConfig & {
+      hasPassword?: boolean
+    }
     const existing = this.connections.find((c) => c.id === config.id)
     const stored: StoredConnection = {
       ...rest,
@@ -92,7 +105,16 @@ export class ConnectionStore {
     if (index >= 0) this.connections[index] = stored
     else this.connections.push(stored)
     this.write(this.connectionsPath, this.connections)
-    return stored
+
+    // Mesma regra do `list()`: o texto cifrado não atravessa o IPC. O retorno
+    // estava devolvendo `stored` cru, com `encryptedPassword` dentro —
+    // contrariando em silêncio o que este arquivo promete logo acima.
+    return this.paraUI(stored)
+  }
+
+  /** Versão segura de um registro: sem o cifrado, com o sinal que a UI usa. */
+  private paraUI({ encryptedPassword, ...rest }: StoredConnection): StoredConnection {
+    return { ...rest, hasPassword: !!encryptedPassword }
   }
 
   remove(id: string): void {
