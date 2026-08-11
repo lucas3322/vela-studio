@@ -52,13 +52,25 @@ test('duas cifragens da mesma senha são diferentes', () => {
   })
 })
 
-test('a chave nasce com permissão só do dono', () => {
+test('a chave é de 256 bits e fica só na pasta do app', () => {
   comChaveNova((chave) => {
     cifrarSenha('x', chave)
     assert.ok(existsSync(chave))
+    assert.equal(readFileSync(chave).length, 32, 'chave de 256 bits')
+  })
+})
+
+test('no POSIX a chave nasce com permissão só do dono', { skip: process.platform === 'win32' }, () => {
+  // `chmod` não existe no Windows: lá `mode & 0o777` volta 0o666 e a asserção
+  // falharia sem que nada estivesse errado. Foi assim que este teste quebrou o
+  // build do Windows enquanto passava no mac.
+  //
+  // A proteção no Windows vem da ACL do perfil do usuário, que o próprio
+  // sistema aplica a %APPDATA% — não de nada que este código faça.
+  comChaveNova((chave) => {
+    cifrarSenha('x', chave)
     const modo = statSync(chave).mode & 0o777
     assert.equal(modo, 0o600, `esperado 0600, veio ${modo.toString(8)}`)
-    assert.equal(readFileSync(chave).length, 32, 'chave de 256 bits')
   })
 })
 

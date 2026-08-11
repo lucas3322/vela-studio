@@ -36,9 +36,14 @@ let chaveEmMemoria: Buffer | undefined
 /**
  * Devolve a chave, criando-a na primeira vez.
  *
- * O arquivo nasce com permissão 0600 — leitura e escrita só do dono. Não
- * impede quem já está na conta, mas evita que outro usuário da mesma máquina
- * leia, que é o cenário realista num Mac compartilhado.
+ * No macOS e no Linux o arquivo nasce com permissão 0600 — leitura e escrita
+ * só do dono. Não impede quem já está na conta, mas evita que outro usuário da
+ * mesma máquina leia.
+ *
+ * No Windows o `chmod` é ignorado pelo sistema: quem protege ali é a ACL que o
+ * próprio Windows aplica ao perfil do usuário em %APPDATA%. O efeito prático é
+ * parecido, mas a garantia não vem deste código — vale saber disso antes de
+ * prometer qualquer coisa ao usuário.
  */
 function obterChave(caminhoDaChave: string): Buffer {
   if (chaveEmMemoria) return chaveEmMemoria
