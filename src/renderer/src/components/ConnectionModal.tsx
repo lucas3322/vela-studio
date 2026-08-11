@@ -87,8 +87,8 @@ export function ConnectionModal(): React.JSX.Element {
       await connect(finalConfig)
       await refreshSaved()
 
-      if (!conferirSenhaGuardada(salva)) return
       notify(`Conectado a ${name}`, 'success')
+      conferirSenhaGuardada(salva)
       closeModal()
     } catch (error) {
       notify((error as Error).message, 'danger')
@@ -112,8 +112,8 @@ export function ConnectionModal(): React.JSX.Element {
       const salva = await window.vela.connections.save({ ...config, name }, savePassword)
       await refreshSaved()
 
-      if (!conferirSenhaGuardada(salva)) return
       notify(`Conexão "${name}" salva.`, 'success')
+      conferirSenhaGuardada(salva)
       setShowList(true)
     } catch (error) {
       notify((error as Error).message, 'danger')
@@ -130,18 +130,19 @@ export function ConnectionModal(): React.JSX.Element {
    * salvar, havia senha digitada e ela não persistiu, o modal fica aberto
    * dizendo isso — em vez de fechar comemorando.
    */
-  const conferirSenhaGuardada = (salva: { hasPassword?: boolean }): boolean => {
+  const conferirSenhaGuardada = (salva: {
+    hasPassword?: boolean
+    passwordWarning?: string
+  }): void => {
     const pediuParaSalvar = savePassword && !!config.password?.trim()
-    if (!pediuParaSalvar || salva.hasPassword) return true
+    if (!pediuParaSalvar || salva.hasPassword) return
 
-    notify('Conectou, mas a senha não foi guardada. Veja o aviso no formulário.', 'danger')
-    setTestResult({
-      ok: false,
-      message:
-        'A senha não ficou guardada. O sistema pode ter recusado o acesso às Chaves; ' +
-        'tente salvar de novo e autorize se o macOS pedir.'
-    })
-    return false
+    // Avisa, mas não interrompe: a conexão em si funcionou, e travar o fluxo
+    // por causa do chaveiro deixaria a pessoa sem acesso ao banco.
+    notify(
+      salva.passwordWarning ?? 'A senha não foi guardada; você precisará digitá-la de novo.',
+      'info'
+    )
   }
 
   const handleConnectSaved = async (id: string): Promise<void> => {
@@ -181,7 +182,7 @@ export function ConnectionModal(): React.JSX.Element {
             <div className="modal__subtitle">
               {showList
                 ? `${saved.length} conexão(ões) salva(s)`
-                : 'Os dados ficam no seu Mac; a senha vai criptografada no Keychain.'}
+                : 'Tudo fica só no seu Mac. A senha é cifrada, mas a chave mora no mesmo computador — protege de leitura casual, não de quem tem acesso aos seus arquivos.'}
             </div>
           </div>
           <button className="icon-btn" onClick={closeModal}>

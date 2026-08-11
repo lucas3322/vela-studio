@@ -41,7 +41,7 @@ Você quis dizer `nome`?".
 - **Histórico** das últimas 500 queries, com busca
 - **Modo somente-leitura** por conexão, que bloqueia escrita no driver
 - **Temas claro e escuro**, desenhados separadamente, seguindo o macOS
-- **Senhas no Keychain** via `safeStorage` — nunca em texto no disco
+- **Senhas cifradas em disco** (AES-256-GCM, chave em arquivo 0600) — nunca em texto
 
 ## Começando
 

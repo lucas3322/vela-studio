@@ -40,6 +40,14 @@ export interface StoredConnection extends Omit<ConnectionConfig, 'password'> {
    * tentar conectar, em vez de falhar com "Access denied" do banco.
    */
   hasPassword?: boolean
+  /**
+   * Explicação de por que a senha não foi guardada, quando não foi.
+   *
+   * Só aparece na resposta do `save` — nunca é persistido. Guardar a senha
+   * pode falhar (chaveiro bloqueado, acesso negado) sem que isso impeça de
+   * conectar, e o usuário precisa saber disso sem virar um erro que trava.
+   */
+  passwordWarning?: string
 }
 
 export interface TableInfo {
