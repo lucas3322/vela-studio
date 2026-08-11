@@ -35,6 +35,16 @@ jobs:
           node-version: 22
           cache: npm
 
+      # O node-gyp 9.x (que o @electron/rebuild traz) ainda faz
+      # `from distutils.version import StrictVersion`, e o distutils foi
+      # removido no Python 3.12 pela PEP 632. Sem fixar a versão, o runner usa
+      # o Python que a imagem trouxer — e o dia em que o GitHub atualizou essa
+      # imagem, a compilação do better-sqlite3 quebrou sem nenhuma mudança
+      # nossa. Fixar aqui tira o build da mão do calendário de terceiros.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - run: npm ci
 
       - name: Verificar tipos e testes

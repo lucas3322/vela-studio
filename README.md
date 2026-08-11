@@ -116,6 +116,19 @@ que build nenhum.
 Para builds de release, prefira o CI (`.github/workflows/build.yml`): cada
 sistema compila nativamente e nada depende de prebuild publicado.
 
+**Python.** O `node-gyp` que o `@electron/rebuild` traz ainda importa
+`distutils`, removido no Python 3.12 (PEP 632). O CI fixa o Python em 3.11 por
+isso. Se você compilar o `better-sqlite3` a partir do fonte numa máquina com
+Python 3.12 ou mais novo, vai ver `ModuleNotFoundError: No module named
+'distutils'` — aponte para um Python mais antigo:
+
+```bash
+npm_config_python=/usr/bin/python3 npm rebuild better-sqlite3 --build-from-source
+```
+
+No uso normal isso não aparece: o `better-sqlite3` baixa binário pronto e o
+`node-gyp` nem é chamado.
+
 **Assinatura.** Sem conta Apple Developer o `.app` recebe assinatura ad-hoc e
 não é notarizado. Ele funciona, mas o Gatekeeper barra a primeira abertura com
 "a Apple não pôde verificar se o item está livre de malware".
