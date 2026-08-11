@@ -1666,3 +1666,47 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* ── Barra de alterações pendentes ─────────────────────────────────── */
+
+.pendencias {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--warning);
+  background: var(--bg-elevated);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.pendencias strong {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.pendencias__ponto {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warning);
+  flex-shrink: 0;
+}
+
+/* O ponto mais importante da barra: sem esta frase, a marca verde na célula
+   pode ser lida como "já gravou". */
+.pendencias__nota {
+  color: var(--warning);
+}
+
+.pendencias__espaco {
+  flex: 1;
+}
+
+/* Linha marcada para exclusão: riscada, mas ainda recuperável. */
+.grid__row--marcada {
+  text-decoration: line-through;
+  opacity: 0.62;
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}

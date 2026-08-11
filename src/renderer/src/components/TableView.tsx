@@ -33,6 +33,8 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
    * re-renderiza.
    */
   const [chaveDeOrdem, setChaveDeOrdem] = useState<string | null>(null)
+  /** Alterações na grade esperando confirmação. Trava a navegação enquanto houver. */
+  const [pendencias, setPendencias] = useState(0)
 
   const connectionId = useConnectionStore((s) => s.activeId)
   const database = useConnectionStore((s) => s.activeDatabase)
@@ -172,7 +174,13 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
               // banco, que ordena a tabela inteira antes de cortar a página.
               // E volta para a primeira página — a linha 250 de outra ordenação
               // não é a mesma linha, então continuar na página 3 não faria sentido.
+              onPendingChange={setPendencias}
               onSort={(nova) => {
+                // Reordenar remonta o resultado e levaria as pendências junto.
+                if (pendencias > 0) {
+                  notify('Confirme ou descarte as alterações antes de reordenar.', 'danger')
+                  return
+                }
                 setOrdem(nova)
                 setPagina(0)
               }}
@@ -204,8 +212,12 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
               <button
                 className="btn btn--secondary btn--sm"
                 onClick={() => setPagina((p) => Math.max(0, p - 1))}
-                disabled={pagina === 0}
-                title="Página anterior"
+                disabled={pagina === 0 || pendencias > 0}
+                title={
+                  pendencias > 0
+                    ? 'Confirme ou descarte as alterações antes de mudar de página'
+                    : 'Página anterior'
+                }
               >
                 ‹ Anterior
               </button>
@@ -221,8 +233,14 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
               <button
                 className="btn btn--secondary btn--sm"
                 onClick={() => setPagina((p) => p + 1)}
-                disabled={!temProxima}
-                title={temProxima ? 'Próxima página' : 'Esta é a última página'}
+                disabled={!temProxima || pendencias > 0}
+                title={
+                  pendencias > 0
+                    ? 'Confirme ou descarte as alterações antes de mudar de página'
+                    : temProxima
+                      ? 'Próxima página'
+                      : 'Esta é a última página'
+                }
               >
                 Próxima ›
               </button>
@@ -239,6 +257,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
                 por página
                 <select
                   value={tamanhoPagina}
+                  disabled={pendencias > 0}
                   onChange={(evento) => {
                     setTamanhoPagina(Number(evento.target.value))
                     // A página 3 de 100 em 100 não é a página 3 de 1000 em 1000.

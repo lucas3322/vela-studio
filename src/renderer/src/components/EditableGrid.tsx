@@ -36,11 +36,28 @@ interface Props {
    * interface denunciaria a diferença.
    */
   onSort?: (ordem: OrdenacaoDaGrade | null) => void
+  /**
+   * Avisa quantas alterações estão esperando confirmação.
+   *
+   * Quem controla paginação e ordenação precisa saber: trocar de página
+   * remonta o resultado e apagaria as pendências em silêncio — o usuário
+   * voltaria achando que gravou.
+   */
+  onPendingChange?: (quantidade: number) => void
 }
 
 export interface OrdenacaoDaGrade {
   column: string
   direction: 'asc' | 'desc'
+}
+
+interface ValorPendente {
+  linha: number
+  coluna: number
+  nomeDaColuna: string
+  valor: unknown
+  /** Guardado para o "Descartar" e para reverter uma aplicação que falhar. */
+  anterior: unknown
 }
 
 /**
@@ -63,7 +80,8 @@ export function EditableGrid({
   onDeleteRow,
   onNotify,
   sort,
-  onSort
+  onSort,
+  onPendingChange
 }: Props): React.JSX.Element {
   const scroller = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
@@ -71,18 +89,29 @@ export function EditableGrid({
   const [widths, setWidths] = useState<number[]>([])
   const [selected, setSelected] = useState<{ row: number; col: number } | null>(null)
   const [editing, setEditing] = useState<{ row: number; col: number; valor: string } | null>(null)
-  const [salvando, setSalvando] = useState<string | null>(null)
+  const [aplicando, setAplicando] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; row: number; col: number } | null>(null)
 
   /**
-   * Sobrescritas locais aplicadas por cima do resultado.
+   * Alterações que ainda **não** foram para o banco.
    *
-   * O resultado vem do banco e não é remontado a cada edição — reconsultar a
-   * tabela inteira depois de trocar uma célula seria lento e faria a rolagem
-   * saltar. A chave é `linha:coluna`.
+   * Antes cada Enter gravava direto, sem volta: um clique errado numa coluna e
+   * o dado já era. Agora a edição fica pendente até você confirmar, e a barra
+   * inferior mostra quantas são. A chave é `linha:coluna`.
+   *
+   * O resultado do banco não é remontado a cada edição — reconsultar a tabela
+   * inteira seria lento e faria a rolagem saltar —, então o valor pendente é
+   * exibido por cima do original.
    */
-  const [overrides, setOverrides] = useState<Record<string, unknown>>({})
+  const [pendentes, setPendentes] = useState<Record<string, ValorPendente>>({})
+  /** Linhas marcadas para exclusão, também só aplicadas na confirmação. */
+  const [exclusoesPendentes, setExclusoesPendentes] = useState<Set<number>>(new Set())
+  /** Linhas que o banco já removeu — ficam riscadas até a próxima consulta. */
   const [excluidas, setExcluidas] = useState<Set<number>>(new Set())
+
+  useEffect(() => {
+    onPendingChange?.(Object.keys(pendentes).length + exclusoesPendentes.size)
+  }, [pendentes, exclusoesPendentes, onPendingChange])
 
   const chavesPrimarias = useMemo(
     () => (schemaColumns ?? []).filter((c) => c.isPrimaryKey).map((c) => c.name),
@@ -127,10 +156,10 @@ export function EditableGrid({
 
   const valorDe = useCallback(
     (linha: number, coluna: number): unknown => {
-      const chave = `${linha}:${coluna}`
-      return chave in overrides ? overrides[chave] : result.rows[linha]?.[coluna]
+      const marca = `${linha}:${coluna}`
+      return marca in pendentes ? pendentes[marca].valor : result.rows[linha]?.[coluna]
     },
-    [overrides, result.rows]
+    [pendentes, result.rows]
   )
 
   // Larguras derivadas do conteúdo: uma amostra basta e é barata.
@@ -149,7 +178,8 @@ export function EditableGrid({
     setScrollTop(0)
     setSelected(null)
     setEditing(null)
-    setOverrides({})
+    setPendentes({})
+    setExclusoesPendentes(new Set())
     setExcluidas(new Set())
     scroller.current?.scrollTo({ top: 0, left: 0 })
   }, [result])
@@ -188,54 +218,119 @@ export function EditableGrid({
     [podeEditar, motivoSemEdicao, onNotify, valorDe]
   )
 
-  const gravar = useCallback(
-    async (linha: number, coluna: number, bruto: string | null) => {
-      const nomeColuna = result.columns[coluna].name
-      const anterior = valorDe(linha, coluna)
+  /**
+   * Registra a alteração como pendente. Nada vai para o banco aqui.
+   *
+   * O valor original fica guardado: é o que o "Descartar" devolve e o que
+   * restauramos quando o banco recusa a gravação na hora de aplicar.
+   */
+  const encaixar = useCallback(
+    (linha: number, coluna: number, bruto: string | null) => {
+      const marca = `${linha}:${coluna}`
+      const nomeDaColuna = result.columns[coluna].name
       const novo = bruto === null ? null : converter(bruto, result.columns[coluna].type)
 
       setEditing(null)
-      if (novo === anterior) return
 
-      const chaves = chaveDaLinha(linha)
-      if (!chaves || !onEditCell) return
-
-      const marca = `${linha}:${coluna}`
-      setSalvando(marca)
-      // Otimista: o valor aparece na hora e volta atrás se o banco recusar.
-      setOverrides((atuais) => ({ ...atuais, [marca]: novo }))
-
-      try {
-        await onEditCell({ column: nomeColuna, value: novo, keys: chaves })
-        onNotify?.(`${nomeColuna} atualizado.`, 'success')
-      } catch (error) {
-        setOverrides((atuais) => {
+      setPendentes((atuais) => {
+        // O "anterior" é sempre o valor que veio do banco, não o pendente
+        // anterior: editar a mesma célula duas vezes e descartar precisa voltar
+        // ao original, não ao passo intermediário.
+        const original = atuais[marca]?.anterior ?? result.rows[linha]?.[coluna]
+        if (novo === original) {
+          // Voltou ao valor de origem: deixa de ser alteração.
           const copia = { ...atuais }
-          copia[marca] = anterior
+          delete copia[marca]
           return copia
-        })
-        onNotify?.((error as Error).message, 'danger')
-      } finally {
-        setSalvando(null)
-      }
+        }
+        return {
+          ...atuais,
+          [marca]: { linha, coluna, nomeDaColuna, valor: novo, anterior: original }
+        }
+      })
     },
-    [result.columns, valorDe, chaveDaLinha, onEditCell, onNotify]
+    [result.columns, result.rows]
   )
 
-  const excluir = useCallback(
-    async (linha: number) => {
-      const chaves = chaveDaLinha(linha)
-      if (!chaves || !onDeleteRow) return
-      try {
-        await onDeleteRow(chaves)
-        setExcluidas((atuais) => new Set(atuais).add(linha))
-        onNotify?.('Linha excluída.', 'success')
-      } catch (error) {
-        onNotify?.((error as Error).message, 'danger')
+  const marcarParaExcluir = useCallback((linha: number) => {
+    setExclusoesPendentes((atuais) => {
+      const copia = new Set(atuais)
+      if (copia.has(linha)) copia.delete(linha)
+      else copia.add(linha)
+      return copia
+    })
+  }, [])
+
+  const descartar = useCallback(() => {
+    setPendentes({})
+    setExclusoesPendentes(new Set())
+    onNotify?.('Alterações descartadas.', 'info')
+  }, [onNotify])
+
+  /**
+   * Grava tudo que está pendente.
+   *
+   * Cada célula é um UPDATE próprio, então uma falha no meio não desfaz as
+   * anteriores. Por isso relatamos o número exato de sucessos e mantemos as
+   * que falharam ainda pendentes — dizer "aplicado" quando metade não foi
+   * seria a pior das saídas.
+   *
+   * As exclusões vão por último: apagar a linha antes de gravar a célula dela
+   * faria o UPDATE não encontrar nada.
+   */
+  const aplicar = useCallback(async () => {
+    if (aplicando) return
+    setAplicando(true)
+
+    const falhas: string[] = []
+    let gravadas = 0
+
+    try {
+      for (const item of Object.values(pendentes)) {
+        const chaves = chaveDaLinha(item.linha)
+        if (!chaves || !onEditCell) continue
+        try {
+          await onEditCell({ column: item.nomeDaColuna, value: item.valor, keys: chaves })
+          gravadas++
+          setPendentes((atuais) => {
+            const copia = { ...atuais }
+            delete copia[`${item.linha}:${item.coluna}`]
+            return copia
+          })
+        } catch (error) {
+          falhas.push(`${item.nomeDaColuna}: ${(error as Error).message}`)
+        }
       }
-    },
-    [chaveDaLinha, onDeleteRow, onNotify]
-  )
+
+      for (const linha of exclusoesPendentes) {
+        const chaves = chaveDaLinha(linha)
+        if (!chaves || !onDeleteRow) continue
+        try {
+          await onDeleteRow(chaves)
+          gravadas++
+          setExcluidas((atuais) => new Set(atuais).add(linha))
+          setExclusoesPendentes((atuais) => {
+            const copia = new Set(atuais)
+            copia.delete(linha)
+            return copia
+          })
+        } catch (error) {
+          falhas.push(`linha ${linha + 1}: ${(error as Error).message}`)
+        }
+      }
+
+      if (falhas.length === 0) {
+        onNotify?.(`${gravadas} alteração(ões) gravada(s).`, 'success')
+      } else {
+        onNotify?.(
+          `${gravadas} gravada(s), ${falhas.length} falhou(ram). ${falhas[0]}`,
+          'danger'
+        )
+      }
+    } finally {
+      setAplicando(false)
+    }
+  }, [aplicando, pendentes, exclusoesPendentes, chaveDaLinha, onEditCell, onDeleteRow, onNotify])
 
   // ── Teclado ────────────────────────────────────────────────────────
 
@@ -301,7 +396,7 @@ export function EditableGrid({
       {
         label: 'Definir como NULL',
         disabled: !podeEditar,
-        onSelect: () => void gravar(linha, coluna, null)
+        onSelect: () => encaixar(linha, coluna, null)
       },
       'separator',
       { label: 'Copiar valor', hint: '⌘C', icon: <IconCopy size={14} />, onSelect: copiar(formatarCelula(valor), 'Valor') },
@@ -322,12 +417,12 @@ export function EditableGrid({
       },
       'separator',
       {
-        label: 'Excluir linha',
+        label: exclusoesPendentes.has(linha) ? 'Não excluir esta linha' : 'Marcar linha para exclusão',
         icon: <IconTrash size={14} />,
         danger: true,
         disabled: !podeEditar || !onDeleteRow,
         hint: motivoSemEdicao,
-        onSelect: () => void excluir(linha)
+        onSelect: () => marcarParaExcluir(linha)
       }
     ]
   }
@@ -350,6 +445,7 @@ export function EditableGrid({
     )
   }
 
+  const totalPendente = Object.keys(pendentes).length + exclusoesPendentes.size
   const linhas = result.rows.slice(start, end)
 
   return (
@@ -400,12 +496,13 @@ export function EditableGrid({
               {linhas.map((_, deslocamento) => {
                 const indiceLinha = start + deslocamento
                 const excluida = excluidas.has(indiceLinha)
+                const marcadaParaExcluir = exclusoesPendentes.has(indiceLinha)
                 return (
                   <div
                     key={indiceLinha}
                     className={`grid__row ${indiceLinha % 2 ? 'grid__row--odd' : ''} ${
                       excluida ? 'grid__row--excluida' : ''
-                    }`}
+                    } ${marcadaParaExcluir ? 'grid__row--marcada' : ''}`}
                     style={{ width: larguraTotal }}
                   >
                     <div className="grid__gutter">{indiceLinha + 1}</div>
@@ -428,11 +525,11 @@ export function EditableGrid({
                               className="grid__input"
                               autoFocus
                               defaultValue={editing.valor}
-                              onBlur={(e) => void gravar(indiceLinha, indiceColuna, e.target.value)}
+                              onBlur={(e) => encaixar(indiceLinha, indiceColuna, e.target.value)}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
                                   e.preventDefault()
-                                  void gravar(indiceLinha, indiceColuna, e.currentTarget.value)
+                                  encaixar(indiceLinha, indiceColuna, e.currentTarget.value)
                                 }
                                 if (e.key === 'Escape') {
                                   e.preventDefault()
@@ -449,8 +546,8 @@ export function EditableGrid({
                           key={indiceColuna}
                           className={`grid__cell grid__cell--${valor === null ? 'null' : coluna.type} ${
                             selecionada ? 'grid__cell--selected' : ''
-                          } ${salvando === marca ? 'grid__cell--salvando' : ''} ${
-                            marca in overrides ? 'grid__cell--alterada' : ''
+                          } ${aplicando && marca in pendentes ? 'grid__cell--salvando' : ''} ${
+                            marca in pendentes ? 'grid__cell--alterada' : ''
                           }`}
                           style={{ width: widths[indiceColuna] }}
                           title={valor === null ? 'NULL' : formatarCelula(valor)}
@@ -478,6 +575,40 @@ export function EditableGrid({
           </div>
         </div>
       </div>
+
+      {(totalPendente > 0 || aplicando) && (
+        <div className="pendencias">
+          <span className="pendencias__ponto" />
+          <span>
+            {Object.keys(pendentes).length > 0 && (
+              <>
+                <strong>{Object.keys(pendentes).length}</strong> célula(s) alterada(s)
+              </>
+            )}
+            {Object.keys(pendentes).length > 0 && exclusoesPendentes.size > 0 && ' · '}
+            {exclusoesPendentes.size > 0 && (
+              <>
+                <strong>{exclusoesPendentes.size}</strong> linha(s) para excluir
+              </>
+            )}
+          </span>
+
+          <span className="pendencias__nota">nada foi gravado ainda</span>
+
+          <span className="pendencias__espaco" />
+
+          <button
+            className="btn btn--secondary btn--sm"
+            onClick={descartar}
+            disabled={aplicando}
+          >
+            Descartar
+          </button>
+          <button className="btn btn--primary btn--sm" onClick={() => void aplicar()} disabled={aplicando}>
+            {aplicando ? 'Gravando…' : 'Confirmar alterações'}
+          </button>
+        </div>
+      )}
 
       {result.truncatedAt && (
         <div className="grid__truncated">
