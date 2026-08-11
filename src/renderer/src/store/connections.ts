@@ -50,9 +50,19 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
     set({ connecting: true })
     try {
       const { serverVersion } = await window.vela.connections.open(config)
-      const databases = await window.vela.schema.databases(config.id).catch(() => [])
-      // Se a conexão não fixou um banco, começamos no primeiro disponível.
-      const database = config.database || databases[0] || null
+      const databases = await window.vela.schema
+        .databases(config.id)
+        .catch((): string[] => [])
+
+      // O `database` da conexão só vale se o driver de fato o listar. No
+      // Postgres a lista é de schemas, e o campo guarda o nome do database —
+      // usá-lo às cegas fazia o schema virar "lojinha", que não existe, e a
+      // barra lateral aparecia vazia.
+      const configurado = config.database?.trim()
+      const database =
+        configurado && databases.includes(configurado)
+          ? configurado
+          : databases[0] ?? configurado ?? null
 
       set({
         activeId: config.id,

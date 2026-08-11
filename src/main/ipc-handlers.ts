@@ -27,13 +27,29 @@ export function registerIpcHandlers(manager: ConnectionManager, store: Connectio
     store.remove(id)
   })
 
-  ipcMain.handle(IPC.connectionsTest, (_e, config: ConnectionConfig) => manager.test(config))
+  ipcMain.handle(IPC.connectionsTest, async (_e, config: ConnectionConfig) => {
+    const resultado = await manager.test(config)
+    if (resultado.ok) return resultado
+    // O driver devolve a mensagem crua; traduzimos aqui, onde sabemos o driver.
+    const traduzido = translateError(new Error(resultado.message), { driver: config.driver })
+    return {
+      ...resultado,
+      message: traduzido.hint ? `${traduzido.friendly} ${traduzido.hint}` : traduzido.friendly
+    }
+  })
 
   ipcMain.handle(IPC.connectionsOpen, async (_e, config: ConnectionConfig) => {
     // Conexão salva sem senha no payload: buscamos a cifrada no store.
     const resolved =
       config.password === undefined ? store.resolve(config.id) ?? config : config
-    await manager.open(resolved)
+    try {
+      await manager.open(resolved)
+    } catch (error) {
+      // Sem isto o renderer recebe "Error invoking remote method
+      // 'connections:open': Error: …" com a mensagem crua do driver dentro.
+      const traduzido = translateError(error, { driver: config.driver })
+      throw new Error(traduzido.hint ? `${traduzido.friendly} ${traduzido.hint}` : traduzido.friendly)
+    }
     store.touch(config.id)
     const serverVersion = await manager.get(config.id).driver.serverVersion().catch(() => undefined)
     return { serverVersion }

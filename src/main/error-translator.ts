@@ -165,10 +165,35 @@ const rules: Rule[] = [
   }
 ]
 
+/**
+ * Extrai mensagem e código de um erro, inclusive quando ele vem agregado.
+ *
+ * Ao conectar em `localhost`, o Node tenta IPv6 e IPv4 e, falhando nos dois,
+ * lança um `AggregateError` cuja `message` é **string vazia** — os erros de
+ * verdade ficam em `.errors`. Lendo só `.message`, a interface mostrava uma
+ * caixa de erro em branco: o usuário via que algo falhou, sem saber o quê.
+ */
+function achatarErro(error: unknown): { message: string; code?: string } {
+  const e = error as { message?: string; code?: string; errors?: unknown[] }
+  const agregados = Array.isArray(e?.errors) ? (e.errors as Array<{ message?: string; code?: string }>) : []
+
+  if (agregados.length > 0 && !e?.message) {
+    // Mensagens iguais (mesmo erro em ::1 e 127.0.0.1) viram uma só.
+    const mensagens = [...new Set(agregados.map((x) => x?.message).filter(Boolean))] as string[]
+    return {
+      message: mensagens.join(' · ') || String(error),
+      code: e?.code ?? agregados.find((x) => x?.code)?.code
+    }
+  }
+
+  return { message: e?.message || String(error), code: e?.code }
+}
+
 export function translateError(error: unknown, context: TranslationContext): QueryError {
+  const achatado = achatarErro(error)
   const driverError: DriverError = {
-    message: (error as Error)?.message ?? String(error),
-    code: (error as { code?: string }).code,
+    message: achatado.message,
+    code: achatado.code,
     errno: (error as { errno?: number }).errno,
     position: (error as { position?: string }).position
   }

@@ -74,9 +74,23 @@ test('testConnection reporta senha errada', async () => {
   await probe.disconnect()
 })
 
-test('listDatabases devolve nomes preenchidos', async () => {
-  const databases = await driver.listDatabases()
-  assert.ok(databases.includes('lojinha'), JSON.stringify(databases))
+test('listDatabases devolve SCHEMAS, não databases', async () => {
+  // O seletor da barra lateral troca de contexto sem reconectar — no Postgres
+  // quem tem essa propriedade é o schema. Devolver o nome do database aqui
+  // fazia ele chegar em listTables() como schema, e a barra lateral aparecia
+  // vazia enquanto as queries funcionavam.
+  const schemas = await driver.listDatabases()
+  assert.ok(schemas.includes('public'), JSON.stringify(schemas))
+  assert.ok(!schemas.includes('lojinha'), 'não pode devolver nome de database')
+})
+
+test('o valor de listDatabases serve para listTables', async () => {
+  // O round-trip que estava quebrado: o que a UI recebe do seletor precisa
+  // ser aceito por listTables e devolver as tabelas de verdade.
+  const [primeiro] = await driver.listDatabases()
+  const tabelas = await driver.listTables(primeiro)
+  assert.ok(tabelas.length > 0, `listTables("${primeiro}") devolveu vazio`)
+  assert.ok(tabelas.some((t) => t.name === 'clientes'), JSON.stringify(tabelas.map((t) => t.name)))
 })
 
 test('listTables devolve nomes preenchidos e distingue view', async () => {

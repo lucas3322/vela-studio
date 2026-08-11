@@ -3,7 +3,7 @@ import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
 import { useTabStore } from '../store/tabs'
 import { useRunQuery } from '../hooks/useRunQuery'
-import { QueryEditor } from './QueryEditor'
+import { QueryEditor, triggerEditorAction } from './QueryEditor'
 import { ResultsGrid } from './ResultsGrid'
 import { ErrorPanel } from './ErrorPanel'
 import { HelpPanel } from './HelpPanel'
@@ -102,7 +102,7 @@ function QueryPane({ tabId }: { tabId: string }): React.JSX.Element | null {
   const tab = useTabStore((s) => s.tabs.find((t) => t.id === tabId))
   const updateTab = useTabStore((s) => s.updateTab)
   const notify = useAppStore((s) => s.notify)
-  const { run, cancel } = useRunQuery()
+  const { cancel } = useRunQuery()
   const [editorHeight, setEditorHeight] = useState(260)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -162,15 +162,16 @@ function QueryPane({ tabId }: { tabId: string }): React.JSX.Element | null {
         ) : (
           <button
             className="btn btn--primary btn--sm"
-            onClick={() => void run()}
+            onClick={() => triggerEditorAction('vela.run')}
             disabled={!tab.sql.trim()}
+            title="Executa o statement onde o cursor está (⌘↵)"
           >
             <IconPlay size={12} />
             Executar
           </button>
         )}
 
-        <span className="editor-toolbar__hint">⌘↵ executa · ⌘⇧↵ executa a seleção</span>
+        <span className="editor-toolbar__hint">⌘↵ executa o statement do cursor · ⌘⇧↵ executa tudo</span>
 
         <div className="editor-toolbar__spacer" />
 

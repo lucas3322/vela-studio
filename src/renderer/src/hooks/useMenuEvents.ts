@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useAppStore, type ThemeMode } from '../store/app'
 import { useConnectionStore } from '../store/connections'
 import { useTabStore } from '../store/tabs'
+import { triggerEditorAction } from '../components/QueryEditor'
 import { useRunQuery } from './useRunQuery'
 
 /**
@@ -9,7 +10,7 @@ import { useRunQuery } from './useRunQuery'
  * O main dispara eventos; aqui traduzimos cada um em ação de store.
  */
 export function useMenuEvents(): void {
-  const { run, cancel } = useRunQuery()
+  const { cancel } = useRunQuery()
 
   useEffect(() => {
     // Sempre lemos o estado na hora do evento (getState), nunca capturamos —
@@ -26,8 +27,10 @@ export function useMenuEvents(): void {
         const tab = useTabStore.getState().activeTabFor(connectionId)
         if (tab) useTabStore.getState().closeTab(tab.id)
       }),
-      window.velaEvents.on('menu:run', () => void run()),
-      window.velaEvents.on('menu:runSelection', () => void run()),
+      // Passam pela ação do editor para manter a mesma semântica do atalho.
+      window.velaEvents.on('menu:run', () => triggerEditorAction('vela.run')),
+      window.velaEvents.on('menu:runAll', () => triggerEditorAction('vela.runAll')),
+      window.velaEvents.on('menu:format', () => triggerEditorAction('vela.format')),
       window.velaEvents.on('menu:cancel', () => void cancel()),
       window.velaEvents.on('menu:history', () => useAppStore.getState().openModal('history')),
       window.velaEvents.on('menu:cheatsheet', () => useAppStore.getState().openModal('cheatsheet')),
@@ -40,5 +43,5 @@ export function useMenuEvents(): void {
     ]
 
     return () => unsubscribers.forEach((off) => off())
-  }, [run, cancel])
+  }, [cancel])
 }

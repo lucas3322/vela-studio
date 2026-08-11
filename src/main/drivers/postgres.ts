@@ -94,11 +94,20 @@ export class PostgresDriver implements DatabaseDriver {
     return this.pool
   }
 
+  /**
+   * Devolve SCHEMAS, não databases — e isso é deliberado.
+   *
+   * O seletor da barra lateral troca de contexto sem reconectar. No Postgres
+   * quem tem essa propriedade é o schema: mudar de database exige uma conexão
+   * nova. Devolver `datname` aqui fazia o nome do banco chegar em
+   * `listTables()`, que o usa como schema — nenhum schema se chama "lojinha",
+   * então a barra lateral mostrava "este banco não tem tabelas" enquanto as
+   * queries funcionavam normalmente.
+   *
+   * Para abrir outro database, crie outra conexão.
+   */
   async listDatabases(): Promise<string[]> {
-    const res = await this.require().query(
-      `SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname`
-    )
-    return res.rows.map((r) => r.datname as string)
+    return this.listSchemas()
   }
 
   /**

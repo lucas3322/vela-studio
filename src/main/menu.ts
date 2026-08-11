@@ -78,14 +78,14 @@ export function buildMenu(getWindow: () => BrowserWindow | null): Menu {
       label: 'Query',
       submenu: [
         {
-          label: 'Executar',
+          label: 'Executar statement sob o cursor',
           accelerator: 'Cmd+Return',
           click: () => send('menu:run')
         },
         {
-          label: 'Executar Seleção',
+          label: 'Executar tudo',
           accelerator: 'Cmd+Shift+Return',
-          click: () => send('menu:runSelection')
+          click: () => send('menu:runAll')
         },
         {
           label: 'Cancelar Execução',

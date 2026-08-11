@@ -8,6 +8,7 @@ import {
   type SchemaProvider
 } from '../editor/completion'
 import { formatSql } from '../editor/formatter'
+import { statementAtOffset } from '../editor/sql-context'
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
 import { useTabStore } from '../store/tabs'
@@ -64,29 +65,42 @@ export function QueryEditor({ tabId }: { tabId: string }): React.JSX.Element {
       updateTab(tabId, { sql: editor.getValue(), dirty: true })
     })
 
-    // ⌘↵ executa tudo; ⌘⇧↵ executa só a seleção. O segundo é o que se usa
-    // quando o arquivo tem várias queries e você quer rodar uma.
+    /**
+     * ⌘↵ executa **o statement sob o cursor**, não a aba inteira.
+     *
+     * É o comportamento de todo editor de SQL sério, e por um bom motivo: uma
+     * aba costuma ser um caderno com várias queries, incluindo UPDATEs que
+     * ninguém quer disparar sem querer ao rodar um SELECT três linhas acima.
+     *
+     * Havendo seleção, ela vence — selecionar é uma intenção explícita.
+     * Para rodar tudo existe ⌘⇧↵.
+     */
     editor.addAction({
       id: 'vela.run',
-      label: 'Executar query',
+      label: 'Executar statement sob o cursor',
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
       run: () => {
+        const model = editor.getModel()
         const selection = editor.getSelection()
-        const selected =
-          selection && !selection.isEmpty() ? editor.getModel()?.getValueInRange(selection) : undefined
-        void run(selected || undefined)
+        if (!model) return
+
+        if (selection && !selection.isEmpty()) {
+          void run(model.getValueInRange(selection))
+          return
+        }
+
+        const position = editor.getPosition()
+        if (!position) return
+        const { text } = statementAtOffset(model.getValue(), model.getOffsetAt(position))
+        void run(text.trim() || undefined)
       }
     })
 
     editor.addAction({
-      id: 'vela.runSelection',
-      label: 'Executar seleção',
+      id: 'vela.runAll',
+      label: 'Executar tudo',
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter],
-      run: () => {
-        const selection = editor.getSelection()
-        if (!selection || selection.isEmpty()) return
-        void run(editor.getModel()?.getValueInRange(selection))
-      }
+      run: () => void run(editor.getValue())
     })
 
     editor.addAction({
@@ -116,6 +130,21 @@ export function QueryEditor({ tabId }: { tabId: string }): React.JSX.Element {
   }, [resolvedTheme])
 
   return <div className="editor-pane__monaco" ref={container} />
+}
+
+/**
+ * Dispara uma ação do editor ativo.
+ *
+ * O botão "Executar" e o menu nativo passam por aqui em vez de chamar `run()`
+ * direto: assim existe um único lugar que decide o que "executar" significa —
+ * o statement sob o cursor — e os três caminhos nunca divergem.
+ */
+export function triggerEditorAction(id: 'vela.run' | 'vela.runAll' | 'vela.format'): boolean {
+  const editors = monaco.editor.getEditors()
+  const editor = editors[editors.length - 1]
+  if (!editor) return false
+  editor.trigger('vela', id, null)
+  return true
 }
 
 /** Insere texto na posição do cursor — usado pelas receitas do painel de ajuda. */
