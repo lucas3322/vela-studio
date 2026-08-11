@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.2.0 — 2026-08-11
+
+### Novidades
+
+- add export functionality for tables and enhance data editing capabilities (403aa23)
+
 ## 0.1.11 — 2026-08-11
 
 ### Outras mudanças
