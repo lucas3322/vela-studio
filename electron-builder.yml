@@ -54,8 +54,21 @@ mac:
     # O zip existe só para atualização automática (electron-updater).
     # Para instalar na mão, o arquivo é o .dmg.
     - zip
-  # Só vale com Developer ID + notarização. Com assinatura ad-hoc ele apenas
-  # restringe o app sem nenhum ganho de confiança.
+  # ── Quando houver Apple Developer ID (US$ 99/ano) ──────────────────
+  #
+  # Enquanto não houver, o app sai com assinatura ad-hoc e o Gatekeeper barra a
+  # primeira abertura com "a Apple não pôde verificar se o item está livre de
+  # malware". Isso NÃO é defeito do pacote — é o comportamento padrão para
+  # qualquer app não notarizado. Não confundir com "o app está danificado",
+  # que era binário de arquitetura errada dentro do bundle.
+  #
+  # Para eliminar o aviso, com o certificado em mãos:
+  #   1. hardenedRuntime: true          (a notarização exige)
+  #   2. notarize: { teamId: "XXXXXXXXXX" }
+  #   3. exportar APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD e APPLE_TEAM_ID
+  #
+  # Ligar `hardenedRuntime` ANTES de ter o certificado só restringe o app sem
+  # nenhum ganho de confiança — por isso fica desligado aqui.
   hardenedRuntime: false
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist

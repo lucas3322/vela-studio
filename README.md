@@ -116,17 +116,30 @@ que build nenhum.
 Para builds de release, prefira o CI (`.github/workflows/build.yml`): cada
 sistema compila nativamente e nada depende de prebuild publicado.
 
-**Assinatura.** Sem conta Apple Developer o `.app` não é assinado nem
-notarizado: funciona, mas o Gatekeeper avisa na primeira abertura (botão direito
-→ Abrir). No Windows, sem certificado de code signing o SmartScreen mostra o
-aviso de editor desconhecido.
+**Assinatura.** Sem conta Apple Developer o `.app` recebe assinatura ad-hoc e
+não é notarizado. Ele funciona, mas o Gatekeeper barra a primeira abertura com
+"a Apple não pôde verificar se o item está livre de malware".
+
+A saída **não** é mais clicar com o botão direito → Abrir: a Apple removeu esse
+atalho no macOS 15. O caminho atual é tentar abrir uma vez e depois autorizar em
+*Ajustes do Sistema → Privacidade e Segurança → Abrir Mesmo Assim*. Pelo
+terminal, `xattr -d com.apple.quarantine "/Applications/Vela Studio.app"` remove
+a marca de quarentena e resolve de uma vez.
+
+Isso é distinto de "o app está danificado", que era um **bug de build** (binário
+de outra arquitetura dentro do pacote) e já foi corrigido. Se essa mensagem
+voltar, o problema é o pacote, não o Gatekeeper — confira com
+`codesign --verify --strict` e `file Contents/MacOS/"Vela Studio"`.
+
+No Windows, sem certificado de code signing o SmartScreen mostra o aviso de
+editor desconhecido.
 
 ## Atalhos
 
 | | |
 |---|---|
-| `⌘↵` | Executar |
-| `⌘⇧↵` | Executar só a seleção |
+| `⌘↵` | Executar **a seleção**; sem seleção, o statement sob o cursor |
+| `⌘⇧↵` | Executar a aba inteira |
 | `⌘.` | Cancelar execução |
 | `⌘⇧F` | Formatar SQL |
 | `⌘T` | Nova aba de query |

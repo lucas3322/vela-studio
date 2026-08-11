@@ -422,6 +422,16 @@ h1, h2, h3 { font-family: var(--display); font-weight: 400; line-height: 1.02; l
   font-size: 13.5px; line-height: 1.6; color: #D9C79A;
 }
 .notice svg { flex-shrink: 0; margin-top: 2px; color: #FBBF24; }
+.notice__passos { display: block; margin-top: 11px; }
+.notice__passos b { color: #F0DFAE; }
+.notice__alt { display: block; margin-top: 5px; font-size: 12.5px; opacity: .82; }
+/* O comando precisa poder ser copiado inteiro; em tela estreita ele rola
+   dentro da própria caixa em vez de esticar a página. */
+.notice__alt code {
+  display: inline-block; max-width: 100%; overflow-x: auto; vertical-align: bottom;
+  padding: 2px 6px; border-radius: 4px;
+  background: rgba(0,0,0,.28); font-size: 12px; white-space: nowrap;
+}
 
 /* ── Rodapé ──────────────────────────────────────────────────────── */
 
@@ -797,10 +807,21 @@ LEFT JOIN pedidos p ON p.cliente_id = c.id</div>
     <div class="notice reveal">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="6.2"/><path d="M8 5.2v3.4"/><circle cx="8" cy="11" r=".7" fill="currentColor" stroke="none"/></svg>
       <span>
-        <strong>Primeira abertura.</strong> O app ainda não tem assinatura de
-        desenvolvedor. No macOS, clique com o botão direito no app e escolha
-        <em>Abrir</em>; no Windows, clique em <em>Mais informações → Executar assim mesmo</em>.
-        É o aviso padrão para software sem certificado pago — o código está aberto para auditoria.
+        <strong>Primeira abertura.</strong> O macOS vai dizer que
+        <em>&ldquo;a Apple não pôde verificar se o item está livre de malware&rdquo;</em>.
+        É o aviso padrão para todo app sem certificado de desenvolvedor pago — não indica
+        problema no arquivo. O código está aberto para auditoria.
+
+        <span class="notice__passos">
+          <b>No macOS:</b> tente abrir o app uma vez e deixe o aviso aparecer. Depois vá em
+          <em>Ajustes do Sistema → Privacidade e Segurança</em>, role até o fim e clique em
+          <em>Abrir Mesmo Assim</em>.
+          <span class="notice__alt">Prefere o terminal? <code>xattr -d com.apple.quarantine "/Applications/Vela Studio.app"</code></span>
+        </span>
+
+        <span class="notice__passos">
+          <b>No Windows:</b> clique em <em>Mais informações → Executar assim mesmo</em>.
+        </span>
       </span>
     </div>
   </div>
