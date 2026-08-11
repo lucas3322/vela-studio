@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { DRIVERS, type ColumnInfo, type IndexInfo, type RelationInfo } from '@shared/types'
+import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
 import { useTabStore, type Tab } from '../store/tabs'
-import { ResultsGrid } from './ResultsGrid'
+import { EditableGrid } from './EditableGrid'
 import { ErrorPanel } from './ErrorPanel'
 import { IconKey, IconLink } from './Icons'
 
@@ -14,7 +15,7 @@ type Panel = 'dados' | 'colunas' | 'indices' | 'relacoes'
  * que todo mundo faz manualmente ao clicar numa tabela.
  */
 export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
-  const [panel, setPanel] = useState<Panel>('dados')
+  const [panel, setPanel] = useState<Panel>(tab.initialPanel ?? 'dados')
   const [columns, setColumns] = useState<ColumnInfo[]>([])
   const [indexes, setIndexes] = useState<IndexInfo[]>([])
   const [relations, setRelations] = useState<RelationInfo[]>([])
@@ -24,6 +25,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
   const database = useConnectionStore((s) => s.activeDatabase)
   const connection = useConnectionStore((s) => s.saved.find((c) => c.id === s.activeId))
   const updateTab = useTabStore((s) => s.updateTab)
+  const notify = useAppStore((s) => s.notify)
 
   const table = tab.table!
   const dialect = connection ? DRIVERS[connection.driver].dialect : 'mysql'
@@ -100,7 +102,35 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
       {!loading && panel === 'dados' && (
         <div className="results">
           {tab.error && <ErrorPanel error={tab.error} />}
-          {result && <ResultsGrid result={result} />}
+          {result && (
+            <EditableGrid
+              result={result}
+              table={table}
+              schemaColumns={columns}
+              readOnly={!!connection?.readOnly}
+              onNotify={notify}
+              onEditCell={async ({ column, value, keys }) => {
+                if (!connectionId) return
+                await window.vela.data.updateCell({
+                  connectionId,
+                  table,
+                  database: database ?? undefined,
+                  column,
+                  value,
+                  keys
+                })
+              }}
+              onDeleteRow={async (keys) => {
+                if (!connectionId) return
+                await window.vela.data.deleteRow({
+                  connectionId,
+                  table,
+                  database: database ?? undefined,
+                  keys
+                })
+              }}
+            />
+          )}
         </div>
       )}
 

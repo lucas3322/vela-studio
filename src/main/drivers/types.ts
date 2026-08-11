@@ -44,6 +44,32 @@ export interface DatabaseDriver {
    */
   buildDangerStatement(kind: 'truncate' | 'drop', table: string): string
 
+  /**
+   * Altera o valor de uma célula, identificando a linha pela chave primária.
+   *
+   * Implementações DEVEM:
+   *  - recusar `keys` vazio;
+   *  - usar consulta parametrizada, nunca concatenar o valor no SQL;
+   *  - rodar dentro de transação e desfazer se afetar mais de uma linha.
+   *
+   * O último item é o que impede o pior caso: uma chave mal formada que
+   * casaria com metade da tabela.
+   */
+  updateCell(params: {
+    table: string
+    database?: string
+    column: string
+    value: unknown
+    keys: Record<string, unknown>
+  }): Promise<{ affectedRows: number; statement: string }>
+
+  /** Remove uma linha pela chave primária, com as mesmas garantias. */
+  deleteRow(params: {
+    table: string
+    database?: string
+    keys: Record<string, unknown>
+  }): Promise<{ affectedRows: number; statement: string }>
+
   /** Executa um ou mais statements e devolve um resultado por statement. */
   query(sql: string, options: QueryOptions): Promise<QueryResult[]>
   cancel(queryId: string): Promise<void>
@@ -236,4 +262,25 @@ export function isUnboundedMutation(sql: string): boolean {
     .toUpperCase()
   if (!/^(UPDATE|DELETE)\b/.test(stripped)) return false
   return !/\bWHERE\b/.test(stripped)
+}
+
+
+/**
+ * Valida a chave antes de qualquer escrita.
+ *
+ * Chamado por todos os drivers: é a rede que garante que nenhuma edição saia
+ * sem uma condição que isole a linha.
+ */
+export function exigirChave(keys: Record<string, unknown>): Array<[string, unknown]> {
+  const entradas = Object.entries(keys)
+  if (entradas.length === 0) {
+    throw new Error(
+      'Esta tabela não tem chave primária, então não é possível identificar a linha com segurança. ' +
+        'Edite pelo editor de SQL, com um WHERE que você controle.'
+    )
+  }
+  if (entradas.some(([, valor]) => valor === null || valor === undefined)) {
+    throw new Error('A chave primária desta linha está nula — não dá para identificá-la com segurança.')
+  }
+  return entradas
 }

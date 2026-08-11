@@ -2,7 +2,16 @@ import { useEffect, useState } from 'react'
 import { DRIVERS, type ConnectionConfig, type DriverId, type TestResult } from '@shared/types'
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
-import { IconCheck, IconClose, IconDatabase, IconTrash, IconWarning } from './Icons'
+import {
+  IconCheck,
+  IconClose,
+  IconDatabase,
+  IconEdit,
+  IconTrash,
+  IconView,
+  IconViewOff,
+  IconWarning
+} from './Icons'
 import { needsPassword } from './WelcomeScreen'
 
 function emptyConfig(driver: DriverId = 'mysql'): ConnectionConfig {
@@ -32,6 +41,8 @@ export function ConnectionModal(): React.JSX.Element {
   const [testResult, setTestResult] = useState<TestResult | null>(null)
   const [connecting, setConnecting] = useState(false)
   const [showList, setShowList] = useState(!editingConnectionId && saved.length > 0)
+  const [senhaVisivel, setSenhaVisivel] = useState(false)
+  const [salvando, setSalvando] = useState(false)
 
   const meta = DRIVERS[config.driver]
 
@@ -82,6 +93,28 @@ export function ConnectionModal(): React.JSX.Element {
       setTestResult({ ok: false, message: (error as Error).message })
     } finally {
       setConnecting(false)
+    }
+  }
+
+  /**
+   * Grava as alterações sem abrir a conexão.
+   *
+   * Faltava por completo: dava para editar o formulário, mas o único caminho
+   * de saída era "Conectar". Quem queria só corrigir uma porta ou renomear
+   * era obrigado a conectar no banco.
+   */
+  const handleSave = async (): Promise<void> => {
+    setSalvando(true)
+    try {
+      const name = config.name.trim() || suggestName(config)
+      await window.vela.connections.save({ ...config, name }, savePassword)
+      await refreshSaved()
+      notify(`Conexão "${name}" salva.`, 'success')
+      setShowList(true)
+    } catch (error) {
+      notify((error as Error).message, 'danger')
+    } finally {
+      setSalvando(false)
     }
   }
 
@@ -152,6 +185,20 @@ export function ConnectionModal(): React.JSX.Element {
                       </div>
                     </span>
                     <span className="badge">{DRIVERS[connection.driver].label.split(' ')[0]}</span>
+                  </button>
+                  <button
+                    className="icon-btn"
+                    title="Editar conexão"
+                    onClick={() => {
+                      // A senha não vem do store para o renderer; o campo abre
+                      // vazio e, se não for digitada, a salva é preservada.
+                      setConfig({ ...connection, password: '' })
+                      setSenhaVisivel(false)
+                      setTestResult(null)
+                      setShowList(false)
+                    }}
+                  >
+                    <IconEdit size={14} />
                   </button>
                   <button
                     className="icon-btn"
@@ -288,13 +335,26 @@ export function ConnectionModal(): React.JSX.Element {
                   </div>
                   <div className="field">
                     <span className="field__label">Senha</span>
-                    <input
-                      className="input"
-                      type="password"
-                      placeholder={existing ? '••••••••  (salva)' : ''}
-                      value={config.password ?? ''}
-                      onChange={(e) => update({ password: e.target.value })}
-                    />
+                    <div className="campo-senha">
+                      <input
+                        className="input"
+                        type={senhaVisivel ? 'text' : 'password'}
+                        placeholder={existing ? '••••••••  (salva)' : ''}
+                        value={config.password ?? ''}
+                        onChange={(e) => update({ password: e.target.value })}
+                        autoComplete="off"
+                        spellCheck={false}
+                      />
+                      <button
+                        type="button"
+                        className="campo-senha__olho"
+                        onClick={() => setSenhaVisivel((v) => !v)}
+                        title={senhaVisivel ? 'Ocultar senha' : 'Mostrar senha'}
+                        aria-label={senhaVisivel ? 'Ocultar senha' : 'Mostrar senha'}
+                      >
+                        {senhaVisivel ? <IconViewOff size={15} /> : <IconView size={15} />}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -389,10 +449,19 @@ export function ConnectionModal(): React.JSX.Element {
               <button
                 className="btn btn--secondary"
                 onClick={() => void handleTest()}
-                disabled={testing || connecting}
+                disabled={testing || connecting || salvando}
               >
                 {testing ? <span className="spinner" /> : null}
                 {testing ? 'Testando…' : 'Testar'}
+              </button>
+              <button
+                className="btn btn--secondary"
+                onClick={() => void handleSave()}
+                disabled={testing || connecting || salvando}
+                title="Grava as alterações sem abrir a conexão"
+              >
+                {salvando ? <span className="spinner" /> : null}
+                {salvando ? 'Salvando…' : 'Salvar'}
               </button>
               <button
                 className="btn btn--primary"

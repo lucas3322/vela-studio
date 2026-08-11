@@ -224,3 +224,102 @@ test('erro de coluna inexistente sobe com mensagem do Postgres', async () => {
     /does not exist/
   )
 })
+
+// ── edição de dados ──────────────────────────────────────────────────
+
+test('updateCell altera uma linha pela chave primária', async () => {
+  const antes = await driver.query("SELECT nome FROM clientes WHERE id = 1", { queryId: 'e0' })
+  const r = await driver.updateCell({
+    table: 'clientes', column: 'nome', value: 'Ana Editada', keys: { id: 1 }
+  })
+  assert.equal(r.affectedRows, 1)
+  const [depois] = await driver.query('SELECT nome FROM clientes WHERE id = 1', { queryId: 'e1' })
+  assert.equal(depois.rows[0][0], 'Ana Editada')
+  // devolve ao valor original
+  await driver.updateCell({ table: 'clientes', column: 'nome', value: antes[0].rows[0][0], keys: { id: 1 } })
+})
+
+test('updateCell grava NULL', async () => {
+  await driver.updateCell({ table: 'clientes', column: 'email', value: null, keys: { id: 1 } })
+  const [r] = await driver.query('SELECT email FROM clientes WHERE id = 1', { queryId: 'e2' })
+  assert.equal(r.rows[0][0], null)
+  await driver.updateCell({ table: 'clientes', column: 'email', value: 'ana@x.com', keys: { id: 1 } })
+})
+
+test('updateCell recusa chave vazia', async () => {
+  await assert.rejects(
+    () => driver.updateCell({ table: 'clientes', column: 'nome', value: 'x', keys: {} }),
+    /chave prim/i
+  )
+})
+
+test('updateCell recusa chave nula', async () => {
+  await assert.rejects(
+    () => driver.updateCell({ table: 'clientes', column: 'nome', value: 'x', keys: { id: null } }),
+    /nula/i
+  )
+})
+
+test('o valor é parametrizado, não concatenado no SQL', async () => {
+  // Se houvesse concatenação, esta string fecharia a aspa e viraria comando.
+  const veneno = "'; DROP TABLE clientes; --"
+  await driver.updateCell({ table: 'clientes', column: 'nome', value: veneno, keys: { id: 2 } })
+  const [r] = await driver.query('SELECT nome FROM clientes WHERE id = 2', { queryId: 'e3' })
+  assert.equal(r.rows[0][0], veneno, 'o valor precisa ter sido gravado literalmente')
+  const [ainda] = await driver.query('SELECT COUNT(*) FROM clientes', { queryId: 'e4' })
+  assert.ok(Number(ainda.rows[0][0]) >= 3, 'a tabela precisa continuar existindo')
+  await driver.updateCell({ table: 'clientes', column: 'nome', value: 'Bruno', keys: { id: 2 } })
+})
+
+test('modo somente-leitura bloqueia a edição em grade', async () => {
+  const ro = new PostgresDriver()
+  await ro.connect({ ...config, readOnly: true })
+  await assert.rejects(
+    () => ro.updateCell({ table: 'clientes', column: 'nome', value: 'x', keys: { id: 1 } }),
+    /somente-leitura/
+  )
+  await assert.rejects(() => ro.deleteRow({ table: 'clientes', keys: { id: 1 } }), /somente-leitura/)
+  await ro.disconnect()
+})
+
+test('deleteRow remove exatamente uma linha', async () => {
+  await driver.query("INSERT INTO clientes (nome, cidade) VALUES ('Descartavel','X')", { queryId: 'e5' })
+  const [novo] = await driver.query("SELECT id FROM clientes WHERE nome = 'Descartavel'", { queryId: 'e6' })
+  const id = novo.rows[0][0]
+
+  const r = await driver.deleteRow({ table: 'clientes', keys: { id } })
+  assert.equal(r.affectedRows, 1)
+
+  const [sumiu] = await driver.query(`SELECT COUNT(*) FROM clientes WHERE id = ${id}`, { queryId: 'e7' })
+  assert.equal(Number(sumiu.rows[0][0]), 0)
+})
+
+test('operação que pegaria mais de uma linha é desfeita', async () => {
+  // A garantia central da edição em grade: se a "chave" não identificar uma
+  // linha só, nada é gravado. Sem isso, editar uma célula numa tabela sem PK
+  // real reescreveria a coluna inteira em silêncio.
+  await driver.query(
+    "UPDATE clientes SET cidade = 'Duplicada' WHERE id IN (1,2)",
+    { queryId: 'rb0' }
+  )
+  await assert.rejects(
+    () => driver.updateCell({
+      table: 'clientes', column: 'cidade', value: 'Nao Deve Gravar',
+      keys: { cidade: 'Duplicada' }
+    }),
+    /afetaria 2 linhas/
+  )
+  const [conf] = await driver.query(
+    "SELECT COUNT(*) FROM clientes WHERE cidade = 'Duplicada'", { queryId: 'rb1' }
+  )
+  assert.equal(Number(conf.rows[0][0]), 2, 'o UPDATE precisa ter sido desfeito')
+
+  await assert.rejects(
+    () => driver.deleteRow({ table: 'clientes', keys: { cidade: 'Duplicada' } }),
+    /afetaria 2 linhas/
+  )
+  const [aindaLa] = await driver.query(
+    "SELECT COUNT(*) FROM clientes WHERE cidade = 'Duplicada'", { queryId: 'rb2' }
+  )
+  assert.equal(Number(aindaLa.rows[0][0]), 2, 'o DELETE precisa ter sido desfeito')
+})

@@ -15,6 +15,7 @@ import {
   PREVIEW_ROWS,
   applyPreviewLimit,
   hasExplicitLimit,
+  exigirChave,
   isMutation,
   splitStatements,
   type DatabaseDriver,
@@ -174,6 +175,57 @@ export class SQLiteDriver implements DatabaseDriver {
     return kind === 'truncate'
       ? `DELETE FROM ${quoteIdent(table)};`
       : `DROP TABLE ${quoteIdent(table)};`
+  }
+
+  async updateCell(params: {
+    table: string
+    column: string
+    value: unknown
+    keys: Record<string, unknown>
+  }): Promise<{ affectedRows: number; statement: string }> {
+    if (this.config?.readOnly) {
+      throw new Error('Conexão em modo somente-leitura: comandos de escrita estão bloqueados.')
+    }
+    const chave = exigirChave(params.keys)
+    const onde = chave.map(([col]) => `${quoteIdent(col)} = ?`).join(' AND ')
+    const sql = `UPDATE ${quoteIdent(params.table)} SET ${quoteIdent(params.column)} = ? WHERE ${onde}`
+
+    return this.escreverComTransacao(sql, [params.value, ...chave.map(([, v]) => v)])
+  }
+
+  async deleteRow(params: {
+    table: string
+    keys: Record<string, unknown>
+  }): Promise<{ affectedRows: number; statement: string }> {
+    if (this.config?.readOnly) {
+      throw new Error('Conexão em modo somente-leitura: comandos de escrita estão bloqueados.')
+    }
+    const chave = exigirChave(params.keys)
+    const onde = chave.map(([col]) => `${quoteIdent(col)} = ?`).join(' AND ')
+    const sql = `DELETE FROM ${quoteIdent(params.table)} WHERE ${onde}`
+
+    return this.escreverComTransacao(sql, chave.map(([, v]) => v))
+  }
+
+  /** Ver o comentário equivalente no driver do MySQL: a transação é a rede. */
+  private escreverComTransacao(
+    sql: string,
+    valores: unknown[]
+  ): { affectedRows: number; statement: string } {
+    const db = this.require()
+    // `better-sqlite3` é síncrono, então a transação é literalmente este bloco.
+    const executar = db.transaction((args: unknown[]) => {
+      const info = db.prepare(sql).run(...(args as never[]))
+      if (info.changes > 1) {
+        // Lançar dentro de `transaction()` desfaz tudo automaticamente.
+        throw new Error(
+          `A operação afetaria ${info.changes} linhas, não uma. Foi desfeita por segurança.`
+        )
+      }
+      return info.changes
+    })
+
+    return { affectedRows: executar(valores) as number, statement: sql }
   }
 
   async query(sql: string, options: QueryOptions): Promise<QueryResult[]> {

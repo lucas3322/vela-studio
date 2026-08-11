@@ -44,18 +44,32 @@ export function ContextMenu({ x, y, items, onClose }: Props): React.JSX.Element 
   }, [x, y, items])
 
   useEffect(() => {
-    const close = (): void => onClose()
-    const onKey = (event: KeyboardEvent): void => {
+    /**
+     * Fecha só quando o clique cai FORA do menu — verificando o alvo, e não
+     * confiando em `stopPropagation`.
+     *
+     * O React registra `onMouseDown` na raiz da aplicação, não no elemento.
+     * Um listener nativo em fase de captura roda antes disso, então o
+     * `stopPropagation()` do menu chegava tarde: o menu fechava no `mousedown`,
+     * o botão desmontava, e o `click` nunca acontecia. Na prática nenhum item
+     * do menu funcionava.
+     */
+    const aoApontarFora = (event: MouseEvent): void => {
+      if (ref.current?.contains(event.target as Node)) return
+      onClose()
+    }
+    const fechar = (): void => onClose()
+    const aoTeclar = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') onClose()
     }
-    // `capture` fecha antes de qualquer outro clique ser processado.
-    window.addEventListener('mousedown', close, { capture: true })
-    window.addEventListener('resize', close)
-    window.addEventListener('keydown', onKey)
+
+    window.addEventListener('mousedown', aoApontarFora, { capture: true })
+    window.addEventListener('resize', fechar)
+    window.addEventListener('keydown', aoTeclar)
     return () => {
-      window.removeEventListener('mousedown', close, { capture: true })
-      window.removeEventListener('resize', close)
-      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('mousedown', aoApontarFora, { capture: true })
+      window.removeEventListener('resize', fechar)
+      window.removeEventListener('keydown', aoTeclar)
     }
   }, [onClose])
 

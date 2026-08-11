@@ -236,3 +236,13 @@ export const IconSail = (p: IconProps): React.JSX.Element => (
     <path d="M2.6 11.2h10.8c-.8 1.9-2.4 2.9-5.4 2.9s-4.6-1-5.4-2.9Z" />
   </Icon>
 )
+
+/** Olho fechado — par do IconView, para revelar/ocultar senha. */
+export const IconViewOff = (p: IconProps): React.JSX.Element => (
+  <Icon {...p}>
+    <path d="M2.5 2.5l11 11" />
+    <path d="M6.4 6.5a1.8 1.8 0 0 0 2.5 2.5" />
+    <path d="M4.3 4.4C2.7 5.5 1.5 8 1.5 8s2.5 4.5 6.5 4.5c1.2 0 2.2-.3 3.1-.8" />
+    <path d="M13.1 10c.9-1 1.4-2 1.4-2S12 3.5 8 3.5c-.6 0-1.1.1-1.6.2" />
+  </Icon>
+)

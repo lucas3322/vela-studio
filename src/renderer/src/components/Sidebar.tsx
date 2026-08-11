@@ -156,6 +156,63 @@ export function Sidebar(): React.JSX.Element {
     }
   }
 
+  /**
+   * Exporta a tabela inteira para arquivo.
+   *
+   * Antes este item do menu só abria a aba da tabela — não exportava nada.
+   *
+   * O `maxRows` explícito é obrigatório: sem ele o driver aplica a prévia de
+   * 100 linhas e o arquivo sairia truncado sem avisar. Exportação é justamente
+   * o caso em que se quer tudo.
+   */
+  const TETO_EXPORTACAO = 100_000
+
+  const exportar = async (table: string, formato: 'csv' | 'json'): Promise<void> => {
+    if (!activeId) return
+
+    const sql =
+      dialect === 'mongodb'
+        ? `db.${table}.find({})`
+        : `SELECT * FROM ${quote(table)}`
+
+    notify(`Lendo ${table}…`, 'info')
+
+    const outcome = await window.vela.query.run({
+      connectionId: activeId,
+      sql,
+      database: activeDatabase ?? undefined,
+      queryId: `export_${Date.now()}`,
+      maxRows: TETO_EXPORTACAO
+    })
+
+    if (outcome.error) {
+      notify(outcome.error.friendly, 'danger')
+      return
+    }
+
+    const resultado = outcome.results[0]
+    if (!resultado || resultado.columns.length === 0) {
+      notify('Nada para exportar.', 'danger')
+      return
+    }
+
+    const caminho = await window.vela.app.exportResult({
+      format: formato,
+      columns: resultado.columns.map((c) => c.name),
+      rows: resultado.rows,
+      suggestedName: table
+    })
+
+    if (!caminho) return // o usuário cancelou o diálogo de salvar
+
+    notify(
+      resultado.truncatedAt
+        ? `Salvo em ${caminho} — cortado em ${resultado.truncatedAt.toLocaleString('pt-BR')} linhas.`
+        : `${resultado.rowCount.toLocaleString('pt-BR')} linha(s) salva(s) em ${caminho}`,
+      resultado.truncatedAt ? 'info' : 'success'
+    )
+  }
+
   const askDanger = async (kind: 'truncate' | 'drop', table: string): Promise<void> => {
     if (!activeId) return
     const statement = await window.vela.schema.dangerStatement(activeId, kind, table)
@@ -193,14 +250,24 @@ export function Sidebar(): React.JSX.Element {
         icon: <IconTable size={14} />,
         onSelect: () =>
           activeId &&
-          openTableTab({ connectionId: activeId, database: activeDatabase, table: table.name })
+          openTableTab({
+            connectionId: activeId,
+            database: activeDatabase,
+            table: table.name,
+            initialPanel: 'dados'
+          })
       },
       {
         label: 'Ver estrutura',
         icon: <IconStructure size={14} />,
         onSelect: () =>
           activeId &&
-          openTableTab({ connectionId: activeId, database: activeDatabase, table: table.name })
+          openTableTab({
+            connectionId: activeId,
+            database: activeDatabase,
+            table: table.name,
+            initialPanel: 'colunas'
+          })
       },
       'separator',
       {
@@ -234,11 +301,15 @@ export function Sidebar(): React.JSX.Element {
         }
       },
       {
-        label: 'Exportar dados…',
+        label: 'Exportar para CSV…',
         icon: <IconDownload size={14} />,
-        onSelect: () =>
-          activeId &&
-          openTableTab({ connectionId: activeId, database: activeDatabase, table: table.name })
+        hint: 'abre no Excel',
+        onSelect: () => void exportar(table.name, 'csv')
+      },
+      {
+        label: 'Exportar para JSON…',
+        icon: <IconDownload size={14} />,
+        onSelect: () => void exportar(table.name, 'json')
       },
       'separator',
       {

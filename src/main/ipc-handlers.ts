@@ -114,6 +114,54 @@ export function registerIpcHandlers(manager: ConnectionManager, store: Connectio
       manager.get(id).driver.buildDangerStatement(kind, table)
   )
 
+  // ── Edição de dados ───────────────────────────────────────────────────
+  //
+  // Erros aqui chegam direto ao usuário no meio de uma edição, então são
+  // traduzidos como qualquer outro erro de banco.
+  ipcMain.handle(
+    IPC.dataUpdateCell,
+    async (
+      _e,
+      params: {
+        connectionId: string
+        table: string
+        database?: string
+        column: string
+        value: unknown
+        keys: Record<string, unknown>
+      }
+    ) => {
+      const { driver, config } = manager.get(params.connectionId)
+      try {
+        return await driver.updateCell(params)
+      } catch (error) {
+        const t = translateError(error, { driver: config.driver })
+        throw new Error(t.hint ? `${t.friendly} ${t.hint}` : t.friendly)
+      }
+    }
+  )
+
+  ipcMain.handle(
+    IPC.dataDeleteRow,
+    async (
+      _e,
+      params: {
+        connectionId: string
+        table: string
+        database?: string
+        keys: Record<string, unknown>
+      }
+    ) => {
+      const { driver, config } = manager.get(params.connectionId)
+      try {
+        return await driver.deleteRow(params)
+      } catch (error) {
+        const t = translateError(error, { driver: config.driver })
+        throw new Error(t.hint ? `${t.friendly} ${t.hint}` : t.friendly)
+      }
+    }
+  )
+
   // ── Query ─────────────────────────────────────────────────────────────
   ipcMain.handle(
     IPC.queryRun,

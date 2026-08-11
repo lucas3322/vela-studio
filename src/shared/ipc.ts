@@ -1,6 +1,9 @@
 import type {
   ColumnInfo,
   ConnectionConfig,
+  DeleteRowParams,
+  EditCellParams,
+  EditResult,
   HistoryEntry,
   IndexInfo,
   QueryRunResult,
@@ -30,6 +33,9 @@ export const IPC = {
   schemaLoadAll: 'schema:loadAll',
   schemaCreateStatement: 'schema:createStatement',
   schemaDangerStatement: 'schema:dangerStatement',
+
+  dataUpdateCell: 'data:updateCell',
+  dataDeleteRow: 'data:deleteRow',
 
   queryRun: 'query:run',
   queryCancel: 'query:cancel',
@@ -70,6 +76,11 @@ export interface VelaApi {
       kind: 'truncate' | 'drop',
       table: string
     ): Promise<string>
+  }
+  /** Edição direta na grade de dados. */
+  data: {
+    updateCell(params: EditCellParams): Promise<EditResult>
+    deleteRow(params: DeleteRowParams): Promise<EditResult>
   }
   query: {
     run(params: {

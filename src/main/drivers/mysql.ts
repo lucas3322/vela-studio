@@ -14,6 +14,7 @@ import {
   PREVIEW_ROWS,
   applyPreviewLimit,
   hasExplicitLimit,
+  exigirChave,
   isMutation,
   splitStatements,
   type DatabaseDriver,
@@ -213,6 +214,80 @@ export class MySQLDriver implements DatabaseDriver {
     return kind === 'truncate'
       ? `TRUNCATE TABLE ${quoteIdent(table)};`
       : `DROP TABLE ${quoteIdent(table)};`
+  }
+
+  async updateCell(params: {
+    table: string
+    database?: string
+    column: string
+    value: unknown
+    keys: Record<string, unknown>
+  }): Promise<{ affectedRows: number; statement: string }> {
+    if (this.config?.readOnly) {
+      throw new Error('Conexão em modo somente-leitura: comandos de escrita estão bloqueados.')
+    }
+    const chave = exigirChave(params.keys)
+    const alvo = params.database
+      ? `${quoteIdent(params.database)}.${quoteIdent(params.table)}`
+      : quoteIdent(params.table)
+
+    const onde = chave.map(([col]) => `${quoteIdent(col)} = ?`).join(' AND ')
+    const sql = `UPDATE ${alvo} SET ${quoteIdent(params.column)} = ? WHERE ${onde}`
+    const valores = [params.value, ...chave.map(([, v]) => v)]
+
+    return this.escreverComTransacao(sql, valores)
+  }
+
+  async deleteRow(params: {
+    table: string
+    database?: string
+    keys: Record<string, unknown>
+  }): Promise<{ affectedRows: number; statement: string }> {
+    if (this.config?.readOnly) {
+      throw new Error('Conexão em modo somente-leitura: comandos de escrita estão bloqueados.')
+    }
+    const chave = exigirChave(params.keys)
+    const alvo = params.database
+      ? `${quoteIdent(params.database)}.${quoteIdent(params.table)}`
+      : quoteIdent(params.table)
+
+    const onde = chave.map(([col]) => `${quoteIdent(col)} = ?`).join(' AND ')
+    const sql = `DELETE FROM ${alvo} WHERE ${onde}`
+
+    return this.escreverComTransacao(sql, chave.map(([, v]) => v))
+  }
+
+  /**
+   * Roda a escrita em transação e desfaz se ela tocar mais de uma linha.
+   *
+   * A edição em grade só existe porque essa rede existe: uma chave mal formada
+   * que casasse com muitas linhas reescreveria a tabela sem qualquer aviso, e
+   * não há desfazer depois do commit.
+   */
+  private async escreverComTransacao(
+    sql: string,
+    valores: unknown[]
+  ): Promise<{ affectedRows: number; statement: string }> {
+    const conn = await this.require().getConnection()
+    try {
+      await conn.beginTransaction()
+      const [resultado] = await conn.execute(sql, valores as never[])
+      const afetadas = (resultado as mysql.ResultSetHeader).affectedRows
+
+      if (afetadas > 1) {
+        await conn.rollback()
+        throw new Error(
+          `A operação afetaria ${afetadas} linhas, não uma. Foi desfeita por segurança.`
+        )
+      }
+      await conn.commit()
+      return { affectedRows: afetadas, statement: sql }
+    } catch (error) {
+      await conn.rollback().catch(() => undefined)
+      throw error
+    } finally {
+      conn.release()
+    }
   }
 
   async query(sql: string, options: QueryOptions): Promise<QueryResult[]> {

@@ -27,6 +27,10 @@ const api: VelaApi = {
     dangerStatement: (id, kind, table) =>
       ipcRenderer.invoke(IPC.schemaDangerStatement, id, kind, table)
   },
+  data: {
+    updateCell: (params) => ipcRenderer.invoke(IPC.dataUpdateCell, params),
+    deleteRow: (params) => ipcRenderer.invoke(IPC.dataDeleteRow, params)
+  },
   query: {
     run: (params) => ipcRenderer.invoke(IPC.queryRun, params),
     cancel: (connectionId, queryId) => ipcRenderer.invoke(IPC.queryCancel, connectionId, queryId)

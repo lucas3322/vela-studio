@@ -191,6 +191,39 @@ export const DRIVERS: Record<DriverId, DriverMeta> = {
   }
 }
 
+/**
+ * Identificação de uma linha para edição.
+ *
+ * `keys` são as colunas da chave primária com seus valores atuais. Sem chave
+ * primária a edição é recusada: um UPDATE cuja cláusula WHERE não isola uma
+ * linha pode reescrever a tabela inteira, e não há desfazer.
+ */
+export interface RowKeys {
+  [coluna: string]: unknown
+}
+
+export interface EditCellParams {
+  connectionId: string
+  table: string
+  database?: string
+  column: string
+  value: unknown
+  keys: RowKeys
+}
+
+export interface DeleteRowParams {
+  connectionId: string
+  table: string
+  database?: string
+  keys: RowKeys
+}
+
+export interface EditResult {
+  affectedRows: number
+  /** SQL efetivamente executado, para o histórico e para quem quiser conferir. */
+  statement: string
+}
+
 export interface HistoryEntry {
   id: string
   connectionId: string

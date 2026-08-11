@@ -12,6 +12,11 @@ export interface Tab {
   /** Nome da tabela — só em abas de tabela. */
   table?: string
   /**
+   * Painel em que a aba de tabela abre. "Ver dados" e "Ver estrutura" são
+   * itens diferentes no menu de contexto; sem isto os dois caíam em "dados".
+   */
+  initialPanel?: 'dados' | 'colunas'
+  /**
    * Conexão dona da aba. Definida na criação e nunca mais alterada:
    * é o que permite trocar de banco e reencontrar as abas de volta,
    * do jeito que estavam.
@@ -42,6 +47,7 @@ interface TabState {
     connectionId: string
     database?: string | null
     table: string
+    initialPanel?: 'dados' | 'colunas'
   }) => string
   closeTab: (id: string) => void
   setActive: (id: string) => void
@@ -97,7 +103,7 @@ export const useTabStore = create<TabState>((set, get) => ({
     return id
   },
 
-  openTableTab: ({ connectionId, database, table }) => {
+  openTableTab: ({ connectionId, database, table, initialPanel }) => {
     // Reaproveita a aba se a tabela já estiver aberta nesta conexão — abrir
     // cinco vezes a mesma tabela é sempre acidente, nunca intenção.
     const existing = get()
@@ -106,6 +112,9 @@ export const useTabStore = create<TabState>((set, get) => ({
 
     if (existing) {
       set((state) => ({
+        tabs: state.tabs.map((t) =>
+          t.id === existing.id ? { ...t, initialPanel: initialPanel ?? t.initialPanel } : t
+        ),
         activeByConnection: { ...state.activeByConnection, [connectionId]: existing.id }
       }))
       return existing.id
@@ -117,6 +126,7 @@ export const useTabStore = create<TabState>((set, get) => ({
       kind: 'table',
       title: table,
       table,
+      initialPanel,
       sql: '',
       connectionId,
       database: database ?? null,

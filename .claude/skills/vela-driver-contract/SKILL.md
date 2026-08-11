@@ -30,9 +30,31 @@ interface DatabaseDriver {
   query(sql: string, options: QueryOptions): Promise<QueryResult[]>
   cancel(queryId: string): Promise<void>
 
+  updateCell(params: EditCellParams): Promise<EditResult>
+  deleteRow(params: DeleteRowParams): Promise<EditResult>
+
   serverVersion(): Promise<string | undefined>
 }
 ```
+
+### `updateCell` / `deleteRow`: as três garantias
+
+A edição em grade escreve no banco do usuário a partir de um duplo clique. Quem
+implementar precisa cumprir, sem exceção:
+
+1. **Chave obrigatória.** Passe por `exigirChave()`: chave vazia ou com valor
+   nulo é erro, nunca um `WHERE` que sobra. Sem isso, editar uma célula numa
+   tabela sem PK reescreveria a coluna inteira em silêncio.
+2. **Sempre parametrizado.** O valor e os valores da chave vão como placeholder
+   (`?`, `$1`). Só o nome de tabela e de coluna é interpolado, e passando por
+   `quoteIdent`.
+3. **Transação com teto de uma linha.** Abra transação, execute, e se
+   `affectedRows > 1` **desfaça** e lance. Duas linhas afetadas significa que a
+   chave não identificava a linha — o usuário achava que editava uma célula.
+
+Os drivers SQL fazem isso em `escreverComTransacao`. Quem não suporta (Mongo)
+lança um erro que **explica o caminho alternativo**, não um erro genérico.
+Cada garantia tem teste e2e nas quatro suítes.
 
 ## Como bancos NoSQL entram no mesmo molde
 

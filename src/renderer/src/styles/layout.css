@@ -1322,3 +1322,69 @@
   color: var(--text-tertiary);
   opacity: 0.7;
 }
+
+/* ── Campo de senha com botão de revelar ─────────────────────────── */
+
+.campo-senha {
+  position: relative;
+}
+
+/* Espaço para o olho não cobrir o texto digitado. */
+.campo-senha .input {
+  padding-right: 36px;
+}
+
+.campo-senha__olho {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  transition: color var(--duration-fast) var(--ease),
+    background var(--duration-fast) var(--ease);
+}
+
+.campo-senha__olho:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+/* ── Grade editável ──────────────────────────────────────────────── */
+
+.grid__input {
+  width: 100%;
+  height: calc(var(--row-height) - 4px);
+  padding: 0 var(--space-1);
+  background: var(--bg-input);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.grid__cell--editando {
+  padding: 0 2px;
+}
+
+/* Alterada e confirmada pelo banco. */
+.grid__cell--alterada {
+  box-shadow: inset 2px 0 0 var(--success);
+}
+
+/* Enquanto o banco não confirma, a célula fica atenuada — nunca mostramos
+   como salvo algo que ainda pode ser recusado. */
+.grid__cell--salvando {
+  opacity: 0.5;
+}
+
+.grid__row--excluida {
+  opacity: 0.35;
+  text-decoration: line-through;
+}

@@ -210,3 +210,17 @@ test('operação não suportada dá mensagem útil', async () => {
     /não é suportada/
   )
 })
+
+test('edição em grade avisa que ainda não vale para o Mongo', async () => {
+  // Documento não tem coluna: editar "célula" exigiria decidir o que fazer com
+  // campos aninhados. Enquanto isso não existe, a mensagem tem que dizer o
+  // caminho — não estourar um erro genérico.
+  await assert.rejects(
+    () => driver.updateCell({ table: 'clientes', column: 'nome', value: 'x', keys: { _id: '1' } }),
+    /editor/i
+  )
+  await assert.rejects(
+    () => driver.deleteRow({ table: 'clientes', keys: { _id: '1' } }),
+    /editor/i
+  )
+})

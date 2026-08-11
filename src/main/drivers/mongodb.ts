@@ -184,6 +184,28 @@ export class MongoDriver implements DatabaseDriver {
       : `db.${collection}.drop()`
   }
 
+  /**
+   * Edição em grade ainda não vale para o MongoDB.
+   *
+   * O modelo é diferente: não há chave primária declarada além do `_id`, os
+   * documentos têm formatos distintos entre si, e um campo pode ser aninhado.
+   * Fazer isso direito pede uma interface própria — melhor recusar com clareza
+   * do que oferecer algo que edita a coisa errada.
+   */
+  async updateCell(): Promise<{ affectedRows: number; statement: string }> {
+    throw new Error(
+      'Edição direta na grade ainda não é suportada no MongoDB. ' +
+        'Use o editor: db.colecao.updateOne({ _id: ... }, { $set: { campo: valor } })'
+    )
+  }
+
+  async deleteRow(): Promise<{ affectedRows: number; statement: string }> {
+    throw new Error(
+      'Exclusão direta na grade ainda não é suportada no MongoDB. ' +
+        'Use o editor: db.colecao.deleteOne({ _id: ... })'
+    )
+  }
+
   async query(source: string, options: QueryOptions): Promise<QueryResult[]> {
     // Com `.limit()` explícito respeitamos o pedido até o teto de segurança;
     // sem ele, devolvemos só a prévia.

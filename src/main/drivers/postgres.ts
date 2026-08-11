@@ -14,6 +14,7 @@ import {
   PREVIEW_ROWS,
   applyPreviewLimit,
   hasExplicitLimit,
+  exigirChave,
   isMutation,
   splitStatements,
   type DatabaseDriver,
@@ -314,6 +315,69 @@ export class PostgresDriver implements DatabaseDriver {
     return kind === 'truncate'
       ? `TRUNCATE TABLE ${quoteIdent(table)};`
       : `DROP TABLE ${quoteIdent(table)};`
+  }
+
+  async updateCell(params: {
+    table: string
+    database?: string
+    column: string
+    value: unknown
+    keys: Record<string, unknown>
+  }): Promise<{ affectedRows: number; statement: string }> {
+    if (this.config?.readOnly) {
+      throw new Error('Conexão em modo somente-leitura: comandos de escrita estão bloqueados.')
+    }
+    const chave = exigirChave(params.keys)
+    const alvo = `${quoteIdent(params.database ?? 'public')}.${quoteIdent(params.table)}`
+
+    // $1 é o valor novo; a chave começa em $2.
+    const onde = chave.map(([col], i) => `${quoteIdent(col)} = $${i + 2}`).join(' AND ')
+    const sql = `UPDATE ${alvo} SET ${quoteIdent(params.column)} = $1 WHERE ${onde}`
+
+    return this.escreverComTransacao(sql, [params.value, ...chave.map(([, v]) => v)])
+  }
+
+  async deleteRow(params: {
+    table: string
+    database?: string
+    keys: Record<string, unknown>
+  }): Promise<{ affectedRows: number; statement: string }> {
+    if (this.config?.readOnly) {
+      throw new Error('Conexão em modo somente-leitura: comandos de escrita estão bloqueados.')
+    }
+    const chave = exigirChave(params.keys)
+    const alvo = `${quoteIdent(params.database ?? 'public')}.${quoteIdent(params.table)}`
+    const onde = chave.map(([col], i) => `${quoteIdent(col)} = $${i + 1}`).join(' AND ')
+    const sql = `DELETE FROM ${alvo} WHERE ${onde}`
+
+    return this.escreverComTransacao(sql, chave.map(([, v]) => v))
+  }
+
+  /** Ver o comentário equivalente no driver do MySQL: a transação é a rede. */
+  private async escreverComTransacao(
+    sql: string,
+    valores: unknown[]
+  ): Promise<{ affectedRows: number; statement: string }> {
+    const client = await this.require().connect()
+    try {
+      await client.query('BEGIN')
+      const resultado = await client.query(sql, valores)
+      const afetadas = resultado.rowCount ?? 0
+
+      if (afetadas > 1) {
+        await client.query('ROLLBACK')
+        throw new Error(
+          `A operação afetaria ${afetadas} linhas, não uma. Foi desfeita por segurança.`
+        )
+      }
+      await client.query('COMMIT')
+      return { affectedRows: afetadas, statement: sql }
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined)
+      throw error
+    } finally {
+      client.release()
+    }
   }
 
   async query(sql: string, options: QueryOptions): Promise<QueryResult[]> {
