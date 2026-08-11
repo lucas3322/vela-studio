@@ -1,0 +1,31 @@
+VELA STUDIO — COMO ABRIR NA PRIMEIRA VEZ
+========================================
+
+1. Arraste o Vela Studio para a pasta Aplicativos (o atalho está aqui do lado).
+
+2. Ao abrir pela primeira vez, o macOS vai dizer:
+
+     "A Apple não pôde verificar se o item Vela Studio está livre
+      de algum malware..."
+
+   Isso é esperado. É o aviso padrão para qualquer aplicativo cujo
+   desenvolvedor não paga a assinatura anual da Apple (US$ 99/ano).
+   Não indica problema no arquivo.
+
+3. Para autorizar:
+
+     Ajustes do Sistema  →  Privacidade e Segurança
+       →  role até o final da página
+       →  clique em "Abrir Mesmo Assim"
+       →  confirme
+
+   Observação: clicar com o botão direito e escolher "Abrir" NÃO funciona
+   mais a partir do macOS 15 (Sequoia). A Apple removeu esse atalho.
+
+   Alternativa pelo Terminal, resolve de uma vez:
+
+     xattr -d com.apple.quarantine "/Applications/Vela Studio.app"
+
+
+O código-fonte é aberto e pode ser auditado:
+https://github.com/lucas3322/vela-studio

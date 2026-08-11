@@ -77,19 +77,38 @@ mac:
     NSHumanReadableCopyright: Copyright © 2026 Vela Studio
 
 dmg:
-  # O título vira o nome do volume montado em /Volumes. Incluir a arquitetura
-  # impede que os builds arm64 e x64 disputem o mesmo ponto de montagem —
-  # era essa colisão que fazia o `hdiutil detach` falhar.
-  title: ${productName} ${arch}
+  # O título vira o nome do volume montado em /Volumes, e PRECISA diferir entre
+  # arquiteturas: com os dois DMGs disputando /Volumes/Vela Studio, o
+  # `hdiutil detach` falhava e o build quebrava.
+  #
+  # Quem define isso são os scripts do package.json, com
+  # `--config.dmg.title=...` em cada invocação. Não dá para resolver aqui:
+  # `${arch}` não é macro válida em `title` (resolvia vazio, sobrando o volume
+  # "Vela Studio -arm64"), e deixar só `${productName}` faz as duas
+  # arquiteturas colidirem de novo. O valor abaixo é só a rede de segurança de
+  # quem chamar o electron-builder na mão.
+  title: ${productName} (arquitetura não informada)
   artifactName: ${productName}-${version}-${arch}.${ext}
+  # A janela é maior que o padrão (540x380) para caber a terceira linha com o
+  # LEIA-ME sem cortar o rótulo do ícone.
+  window:
+    width: 600
+    height: 440
   contents:
-    - x: 140
-      y: 200
+    - x: 170
+      y: 180
       type: file
-    - x: 400
-      y: 200
+    - x: 430
+      y: 180
       type: link
       path: /Applications
+    # O aviso do Gatekeeper aparece no instante em que a pessoa abre o app.
+    # Deixar a instrução dentro do DMG a coloca onde ela é lida — o site é o
+    # lugar errado para quem já baixou e está com o disco montado na tela.
+    - x: 300
+      y: 330
+      type: file
+      path: build/LEIA-ME — Primeira abertura.txt
 
 # ── Windows ──────────────────────────────────────────────────────────
 win:

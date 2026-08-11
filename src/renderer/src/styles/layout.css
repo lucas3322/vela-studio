@@ -1513,3 +1513,49 @@
   background: var(--accent);
   transition: width 120ms linear;
 }
+
+/* ── Paginação da aba de tabela ────────────────────────────────────── */
+
+.paginacao {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-sidebar);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.paginacao__faixa {
+  min-width: 120px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.paginacao__espaco {
+  flex: 1;
+}
+
+.paginacao__aviso {
+  color: var(--warning);
+  cursor: help;
+}
+
+.paginacao__tamanho {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-tertiary);
+}
+
+.paginacao__tamanho select {
+  padding: 2px 4px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font: inherit;
+}
