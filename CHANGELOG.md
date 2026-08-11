@@ -3,6 +3,18 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.4.0 — 2026-08-11
+
+### Novidades
+
+- implementar sistema de edições pendentes na grade, incluindo lógica de confirmação e UI (a98558c)
+- implementar funcionalidade de salvar e listar queries salvas, incluindo UI e lógica de persistência (ac08208)
+- adicionar funcionalidade de paginação na aba de tabela e criar instruções de abertura no macOS (aba219c)
+
+### Outras mudanças
+
+- atualizar instruções sobre assinatura e abertura do app no macOS e Windows (7cd6975)
+
 ## 0.3.0 — 2026-08-11
 
 ### Novidades
