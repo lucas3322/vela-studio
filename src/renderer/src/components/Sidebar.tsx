@@ -4,6 +4,7 @@ import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
 import { useTabStore } from '../store/tabs'
 import { ContextMenu, type MenuEntry } from './ContextMenu'
+import { SavedQueries } from './SavedQueries'
 import { DangerDialog } from './DangerDialog'
 import {
   IconChevronDown,
@@ -32,6 +33,8 @@ interface DangerState {
 }
 
 export function Sidebar(): React.JSX.Element {
+  /** Árvore de tabelas ou lista de queries salvas — nunca as duas. */
+  const [modo, setModo] = useState<'tabelas' | 'salvas'>('tabelas')
   const openModal = useAppStore((s) => s.openModal)
   const notify = useAppStore((s) => s.notify)
   const {
@@ -385,6 +388,26 @@ export function Sidebar(): React.JSX.Element {
         </div>
       )}
 
+      <div className="sidebar__modos">
+        <button
+          className={`sidebar__modo ${modo === 'tabelas' ? 'sidebar__modo--ativo' : ''}`}
+          onClick={() => setModo('tabelas')}
+        >
+          {isMongo ? 'Coleções' : 'Tabelas'}
+        </button>
+        <button
+          className={`sidebar__modo ${modo === 'salvas' ? 'sidebar__modo--ativo' : ''}`}
+          onClick={() => setModo('salvas')}
+          title="Queries que você salvou (⌘S salva a aba atual)"
+        >
+          Salvas
+        </button>
+      </div>
+
+      {modo === 'salvas' && <SavedQueries />}
+
+      {modo === 'tabelas' && (
+      <>
       <div className="sidebar__search">
         <IconSearch size={13} />
         <input
@@ -463,6 +486,8 @@ export function Sidebar(): React.JSX.Element {
           />
         ))}
       </div>
+      </>
+      )}
 
       <div className="sidebar__resize" onMouseDown={startResize} />
 

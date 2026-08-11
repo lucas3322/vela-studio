@@ -264,3 +264,21 @@ export interface UpdateProgress {
   recebidoBytes: number
   totalBytes: number
 }
+
+/**
+ * Query guardada pelo usuário.
+ *
+ * Fica atrelada a uma conexão porque uma query escrita para o Postgres
+ * raramente roda no Mongo — mostrar todas juntas viraria uma lista de coisas
+ * que quebram ao clicar. A UI ainda permite ver as de outras conexões, mas o
+ * padrão é o contexto atual.
+ */
+export interface SavedQuery {
+  id: string
+  name: string
+  sql: string
+  connectionId: string
+  database?: string
+  createdAt: number
+  updatedAt: number
+}

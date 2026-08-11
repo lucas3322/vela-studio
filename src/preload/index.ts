@@ -39,6 +39,11 @@ const api: VelaApi = {
     list: (connectionId) => ipcRenderer.invoke(IPC.historyList, connectionId),
     clear: () => ipcRenderer.invoke(IPC.historyClear)
   },
+  saved: {
+    list: (connectionId) => ipcRenderer.invoke(IPC.savedList, connectionId),
+    save: (entrada) => ipcRenderer.invoke(IPC.savedSave, entrada),
+    remove: (id) => ipcRenderer.invoke(IPC.savedRemove, id)
+  },
   app: {
     setTheme: (theme) => ipcRenderer.invoke(IPC.appTheme, theme),
     pickFile: (filters) => ipcRenderer.invoke(IPC.appPickFile, filters),

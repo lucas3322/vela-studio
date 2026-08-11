@@ -35,6 +35,12 @@ export function useMenuEvents(): void {
       window.velaEvents.on('menu:history', () => useAppStore.getState().openModal('history')),
       window.velaEvents.on('menu:cheatsheet', () => useAppStore.getState().openModal('cheatsheet')),
       window.velaEvents.on('menu:checkUpdate', () => useAppStore.getState().openModal('update')),
+      window.velaEvents.on('menu:saveQuery', () => {
+        // Só faz sentido em aba de query: numa aba de tabela não há SQL do usuário.
+        const connectionId = useConnectionStore.getState().activeId
+        const tab = useTabStore.getState().activeTabFor(connectionId)
+        if (tab?.kind === 'query') useAppStore.getState().openModal('saveQuery')
+      }),
       window.velaEvents.on('menu:toggleSidebar', () => useAppStore.getState().toggleSidebar()),
       window.velaEvents.on('menu:toggleHelp', () => useAppStore.getState().toggleHelpPanel()),
       window.velaEvents.on('menu:theme', ((theme: ThemeMode) =>

@@ -47,6 +47,11 @@ export function buildMenu(getWindow: () => BrowserWindow | null): Menu {
           accelerator: 'Cmd+T',
           click: () => send('menu:newQueryTab')
         },
+        {
+          label: 'Salvar Query…',
+          accelerator: 'Cmd+S',
+          click: () => send('menu:saveQuery')
+        },
         { type: 'separator' },
         {
           label: 'Fechar Aba',

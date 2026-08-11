@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useRef } from 'react'
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
 import { useTabStore } from '../store/tabs'
@@ -102,8 +102,10 @@ function QueryPane({ tabId }: { tabId: string }): React.JSX.Element | null {
   const tab = useTabStore((s) => s.tabs.find((t) => t.id === tabId))
   const updateTab = useTabStore((s) => s.updateTab)
   const notify = useAppStore((s) => s.notify)
+  const openModal = useAppStore((s) => s.openModal)
   const { cancel } = useRunQuery()
-  const [editorHeight, setEditorHeight] = useState(260)
+  const editorHeight = useAppStore((s) => s.editorHeight)
+  const setEditorHeight = useAppStore((s) => s.setEditorHeight)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const startDrag = useCallback(
@@ -171,6 +173,15 @@ function QueryPane({ tabId }: { tabId: string }): React.JSX.Element | null {
           </button>
         )}
 
+        <button
+          className="btn btn--secondary btn--sm"
+          onClick={() => openModal('saveQuery')}
+          disabled={!tab.sql.trim()}
+          title="Salvar esta query na barra lateral (⌘S)"
+        >
+          {tab.savedQueryId ? 'Atualizar' : 'Salvar'}
+        </button>
+
         <span className="editor-toolbar__hint">⌘↵ executa o statement do cursor · ⌘⇧↵ executa tudo</span>
 
         <div className="editor-toolbar__spacer" />
@@ -206,7 +217,16 @@ function QueryPane({ tabId }: { tabId: string }): React.JSX.Element | null {
         )}
       </div>
 
-      <div className="splitter" onMouseDown={startDrag} />
+      {/* A alça precisa ser vista para ser descoberta: uma divisória
+          transparente de 5px existe, funciona e ninguém acha. */}
+      <div
+        className="splitter"
+        onMouseDown={startDrag}
+        onDoubleClick={() => setEditorHeight(260)}
+        title="Arraste para redimensionar · duplo clique volta ao padrão"
+      >
+        <span className="splitter__alca" />
+      </div>
 
       <div className="results">
         {tab.error && <ErrorPanel error={tab.error} />}

@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { app, safeStorage } from 'electron'
-import type { ConnectionConfig, HistoryEntry, StoredConnection } from '../shared/types'
+import type { ConnectionConfig, HistoryEntry, SavedQuery, StoredConnection } from '../shared/types'
 
 /**
  * Conexões e histórico em JSON no userData.
@@ -12,15 +12,19 @@ import type { ConnectionConfig, HistoryEntry, StoredConnection } from '../shared
 export class ConnectionStore {
   private readonly connectionsPath: string
   private readonly historyPath: string
+  private readonly savedQueriesPath: string
   private connections: StoredConnection[] = []
   private history: HistoryEntry[] = []
+  private savedQueries: SavedQuery[] = []
 
   constructor() {
     const dir = app.getPath('userData')
     this.connectionsPath = join(dir, 'connections.json')
     this.historyPath = join(dir, 'history.json')
+    this.savedQueriesPath = join(dir, 'saved-queries.json')
     this.connections = this.read(this.connectionsPath, [])
     this.history = this.read(this.historyPath, [])
+    this.savedQueries = this.read(this.savedQueriesPath, [])
   }
 
   private read<T>(path: string, fallback: T): T {
@@ -117,5 +121,43 @@ export class ConnectionStore {
   clearHistory(): void {
     this.history = []
     this.write(this.historyPath, this.history)
+  }
+
+  // ── Queries salvas ──────────────────────────────────────────────────
+
+  listSavedQueries(connectionId?: string): SavedQuery[] {
+    const lista = connectionId
+      ? this.savedQueries.filter((q) => q.connectionId === connectionId)
+      : this.savedQueries
+    // Mais recente primeiro: quem salva costuma querer o que acabou de mexer.
+    return [...lista].sort((a, b) => b.updatedAt - a.updatedAt)
+  }
+
+  /**
+   * Grava uma query. Com `id` existente, atualiza; sem, cria.
+   *
+   * `createdAt` é preservado na atualização — a lista mostra "há 2 meses" e
+   * sobrescrever a data de criação a cada save faria toda query parecer nova.
+   */
+  saveQuery(entrada: Omit<SavedQuery, 'createdAt' | 'updatedAt'>): SavedQuery {
+    const agora = Date.now()
+    const anterior = this.savedQueries.find((q) => q.id === entrada.id)
+    const registro: SavedQuery = {
+      ...entrada,
+      createdAt: anterior?.createdAt ?? agora,
+      updatedAt: agora
+    }
+
+    this.savedQueries = anterior
+      ? this.savedQueries.map((q) => (q.id === entrada.id ? registro : q))
+      : [...this.savedQueries, registro]
+
+    this.write(this.savedQueriesPath, this.savedQueries)
+    return registro
+  }
+
+  removeSavedQuery(id: string): void {
+    this.savedQueries = this.savedQueries.filter((q) => q.id !== id)
+    this.write(this.savedQueriesPath, this.savedQueries)
   }
 }

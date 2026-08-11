@@ -413,23 +413,35 @@
 
 /* Divisória arrastável entre editor e resultado. */
 .splitter {
-  height: 5px;
+  height: 9px;
   background: transparent;
   cursor: row-resize;
   flex-shrink: 0;
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-top: 1px solid var(--border-subtle);
 }
 
-.splitter::after {
-  content: '';
-  position: absolute;
-  inset: 2px 0;
-  background: transparent;
-  transition: background var(--duration-fast) var(--ease);
+/* A alça é a única pista de que dá para arrastar. Sem ela a divisória
+   funcionava, mas era invisível — ninguém descobria que existia. */
+.splitter__alca {
+  width: 34px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border-default);
+  transition: background var(--duration-fast) var(--ease),
+    width var(--duration-fast) var(--ease);
 }
 
-.splitter:hover::after {
-  background: var(--accent-subtle);
+.splitter:hover .splitter__alca {
+  width: 54px;
+  background: var(--accent);
+}
+
+.splitter:active .splitter__alca {
+  background: var(--accent);
 }
 
 /* ── Resultado ───────────────────────────────────────────────────── */
@@ -1558,4 +1570,99 @@
   background: var(--bg-input);
   color: var(--text-primary);
   font: inherit;
+}
+
+/* ── Alternador Tabelas / Salvas ───────────────────────────────────── */
+
+.sidebar__modos {
+  display: flex;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3) 0;
+}
+
+.sidebar__modo {
+  flex: 1;
+  padding: 5px 8px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--text-tertiary);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.sidebar__modo:hover {
+  color: var(--text-secondary);
+}
+
+.sidebar__modo--ativo {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+}
+
+/* ── Lista de queries salvas ───────────────────────────────────────── */
+
+.salvas__escopo {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.salvas__escopo:hover {
+  color: var(--accent);
+}
+
+.salvas__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 7px var(--space-3);
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.salvas__item:hover {
+  background: var(--bg-hover);
+}
+
+.salvas__nome {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.salvas__meta {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* Prévia do SQL no modal de salvar. */
+.salvar__previa {
+  max-height: 160px;
+  overflow: auto;
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
 }

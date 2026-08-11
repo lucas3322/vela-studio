@@ -10,6 +10,7 @@ import type {
   RelationInfo,
   StoredConnection,
   TableInfo,
+  SavedQuery,
   TestResult,
   UpdateInfo
 } from './types'
@@ -43,6 +44,10 @@ export const IPC = {
 
   historyList: 'history:list',
   historyClear: 'history:clear',
+
+  savedList: 'saved:list',
+  savedSave: 'saved:save',
+  savedRemove: 'saved:remove',
 
   appTheme: 'app:theme',
   appPickFile: 'app:pickFile',
@@ -103,6 +108,13 @@ export interface VelaApi {
   history: {
     list(connectionId?: string): Promise<HistoryEntry[]>
     clear(): Promise<void>
+  }
+  /** Queries que o usuário guardou pelo nome. */
+  saved: {
+    list(connectionId?: string): Promise<SavedQuery[]>
+    /** Com `id` de uma existente, atualiza; sem, cria. */
+    save(entrada: Omit<SavedQuery, 'createdAt' | 'updatedAt'>): Promise<SavedQuery>
+    remove(id: string): Promise<void>
   }
   app: {
     setTheme(theme: 'light' | 'dark' | 'system'): Promise<void>

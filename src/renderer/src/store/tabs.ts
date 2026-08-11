@@ -9,6 +9,14 @@ export interface Tab {
   title: string
   /** Conteúdo do editor — só em abas de query. */
   sql: string
+  /**
+   * Query salva de onde esta aba veio, se veio de uma.
+   *
+   * É o que faz o ⌘S atualizar em vez de criar uma cópia nova a cada save —
+   * sem isso, editar e salvar três vezes deixaria três entradas quase iguais
+   * na lista.
+   */
+  savedQueryId?: string
   /** Nome da tabela — só em abas de tabela. */
   table?: string
   /**
@@ -42,6 +50,7 @@ interface TabState {
     database?: string | null
     sql?: string
     title?: string
+    savedQueryId?: string
   }) => string
   openTableTab: (options: {
     connectionId: string
@@ -76,7 +85,7 @@ export const useTabStore = create<TabState>((set, get) => ({
     return tabs.find((t) => t.id === activeId) ?? tabs[0]
   },
 
-  openQueryTab: ({ connectionId, database, sql, title }) => {
+  openQueryTab: ({ connectionId, database, sql, title, savedQueryId }) => {
     const id = newId()
     const existing = get()
       .tabsFor(connectionId)
@@ -89,6 +98,7 @@ export const useTabStore = create<TabState>((set, get) => ({
       // A numeração é por conexão: cada banco tem sua própria Query #1.
       title: title ?? `Query #${Math.max(0, ...existing) + 1}`,
       sql: sql ?? '',
+      savedQueryId,
       connectionId,
       database: database ?? null,
       results: [],

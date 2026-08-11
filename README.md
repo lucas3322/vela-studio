@@ -141,6 +141,7 @@ editor desconhecido.
 | `⌘↵` | Executar **a seleção**; sem seleção, o statement sob o cursor |
 | `⌘⇧↵` | Executar a aba inteira |
 | `⌘.` | Cancelar execução |
+| `⌘S` | Salvar a query da aba |
 | `⌘⇧F` | Formatar SQL |
 | `⌘T` | Nova aba de query |
 | `⌘B` | Barra lateral |

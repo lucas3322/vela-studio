@@ -298,6 +298,16 @@ export function registerIpcHandlers(manager: ConnectionManager, store: Connectio
     }
   )
 
+  // ── Queries salvas ────────────────────────────────────────────────────
+
+  ipcMain.handle(IPC.savedList, (_e, connectionId?: string) =>
+    store.listSavedQueries(connectionId)
+  )
+  ipcMain.handle(IPC.savedSave, (_e, entrada: Parameters<typeof store.saveQuery>[0]) =>
+    store.saveQuery(entrada)
+  )
+  ipcMain.handle(IPC.savedRemove, (_e, id: string) => store.removeSavedQuery(id))
+
   // ── Atualização ───────────────────────────────────────────────────────
 
   ipcMain.handle(IPC.updateCheck, () => verificarAtualizacao())
