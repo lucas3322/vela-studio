@@ -3,6 +3,13 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.1.11 — 2026-08-11
+
+### Outras mudanças
+
+- refatora listDatabases para devolver SCHEMAS e não databases; melhora tratamento de erros e atualiza ações do editor (430493b)
+- adiciona verificação de módulo nativo e testes para identificação de binários (8fa6338)
+
 ## 0.1.10 — 2026-08-11
 
 ### Outras mudanças
