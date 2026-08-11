@@ -323,3 +323,76 @@ test('operação que pegaria mais de uma linha é desfeita', async () => {
   )
   assert.equal(Number(aindaLa.rows[0][0]), 2, 'o DELETE precisa ter sido desfeito')
 })
+
+// ── Alteração de tipo de coluna ──────────────────────────────────────
+
+test('o ALTER de tipo preserva NOT NULL, default e comentário', async () => {
+  // No Postgres o ALTER COLUMN ... TYPE mexe só no tipo — diferente do MySQL,
+  // onde a definição inteira é reescrita. Este teste é a prova disso.
+  //
+  // Usa `email`, não `cidade`: a view vw_resumo depende de cidade, e o
+  // Postgres recusa alterar coluna usada por view (ver o teste seguinte).
+  await driver.query(
+    `UPDATE clientes SET email = 'sem@email.com' WHERE email IS NULL;
+     ALTER TABLE clientes ALTER COLUMN email SET NOT NULL;
+     ALTER TABLE clientes ALTER COLUMN email SET DEFAULT 'sem@email.com';
+     COMMENT ON COLUMN clientes.email IS 'email de contato';`,
+    { queryId: 'ac0' }
+  )
+
+  const sql = await driver.buildAlterColumnTypeStatement({
+    table: 'clientes', column: 'email', newType: 'varchar(240)'
+  })
+  await driver.query(sql, { queryId: 'ac1' })
+
+  const email = (await driver.listColumns('clientes')).find((c) => c.name === 'email')
+  assert.equal(email.type, 'character varying(240)')
+  assert.equal(email.nullable, false, 'NOT NULL não pode ter sumido')
+  assert.match(String(email.defaultValue), /sem@email\.com/, 'o DEFAULT não pode ter sumido')
+  assert.equal(email.comment, 'email de contato', 'o COMMENT não pode ter sumido')
+})
+
+test('o banco recusa alterar coluna usada por uma view', async () => {
+  // vw_resumo agrupa por clientes.cidade. O Postgres barra, e o certo é o
+  // erro chegar ao usuário — não tentarmos derrubar a view por conta própria.
+  const sql = await driver.buildAlterColumnTypeStatement({
+    table: 'clientes', column: 'cidade', newType: 'varchar(140)'
+  })
+  await assert.rejects(() => driver.query(sql, { queryId: 'ac1b' }), /view or rule/i)
+
+  const cidade = (await driver.listColumns('clientes')).find((c) => c.name === 'cidade')
+  assert.equal(cidade.type, 'character varying(80)', 'a coluna não pode ter mudado')
+})
+
+test('o ALTER qualifica a tabela com o schema', async () => {
+  const sql = await driver.buildAlterColumnTypeStatement({
+    table: 'clientes', column: 'nome', newType: 'varchar(200)'
+  })
+  assert.match(sql, /"public"\."clientes"/, sql)
+})
+
+test('conversão impossível é recusada pelo banco, com mensagem', async () => {
+  // texto → inteiro precisa de USING. Não inventamos a expressão: escolher
+  // por conta própria seria adivinhar a intenção sobre dado real.
+  const sql = await driver.buildAlterColumnTypeStatement({
+    table: 'clientes', column: 'nome', newType: 'integer'
+  })
+  await assert.rejects(() => driver.query(sql, { queryId: 'ac2' }), /USING|cannot be cast|não pode/i)
+
+  const nome = (await driver.listColumns('clientes')).find((c) => c.name === 'nome')
+  assert.match(nome.type, /character varying/, 'a coluna não pode ter mudado')
+})
+
+test('tipo com formato inválido é recusado antes de virar SQL', async () => {
+  for (const veneno of ['varchar(20); DROP TABLE clientes; --', "varchar(20)'", '', '  ']) {
+    await assert.rejects(
+      () => driver.buildAlterColumnTypeStatement({
+        table: 'clientes', column: 'cidade', newType: veneno
+      }),
+      /tipo/i,
+      `deveria recusar: ${JSON.stringify(veneno)}`
+    )
+  }
+  const [ainda] = await driver.query('SELECT COUNT(*) FROM clientes', { queryId: 'ac3' })
+  assert.ok(Number(ainda.rows[0][0]) >= 3)
+})

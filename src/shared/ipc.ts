@@ -35,6 +35,7 @@ export const IPC = {
   schemaLoadAll: 'schema:loadAll',
   schemaCreateStatement: 'schema:createStatement',
   schemaDangerStatement: 'schema:dangerStatement',
+  schemaAlterColumnStatement: 'schema:alterColumnStatement',
 
   dataUpdateCell: 'data:updateCell',
   dataDeleteRow: 'data:deleteRow',
@@ -89,6 +90,17 @@ export interface VelaApi {
       kind: 'truncate' | 'drop',
       table: string
     ): Promise<string>
+    /**
+     * Monta o ALTER que troca o tipo de uma coluna, sem executar.
+     * Quem executa é `query.run`, depois de a UI mostrar o comando.
+     */
+    alterColumnStatement(params: {
+      connectionId: string
+      table: string
+      column: string
+      newType: string
+      database?: string
+    }): Promise<string>
   }
   /** Edição direta na grade de dados. */
   data: {

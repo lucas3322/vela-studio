@@ -25,7 +25,8 @@ const api: VelaApi = {
     createStatement: (id, table, database) =>
       ipcRenderer.invoke(IPC.schemaCreateStatement, id, table, database),
     dangerStatement: (id, kind, table) =>
-      ipcRenderer.invoke(IPC.schemaDangerStatement, id, kind, table)
+      ipcRenderer.invoke(IPC.schemaDangerStatement, id, kind, table),
+    alterColumnStatement: (params) => ipcRenderer.invoke(IPC.schemaAlterColumnStatement, params)
   },
   data: {
     updateCell: (params) => ipcRenderer.invoke(IPC.dataUpdateCell, params),

@@ -11,6 +11,7 @@ import type {
   TestResult
 } from '../../shared/types'
 import {
+  type AlterColumnParams,
   DEFAULT_MAX_ROWS,
   PREVIEW_ROWS,
   applyPreviewLimit,
@@ -175,6 +176,20 @@ export class SQLiteDriver implements DatabaseDriver {
     return kind === 'truncate'
       ? `DELETE FROM ${quoteIdent(table)};`
       : `DROP TABLE ${quoteIdent(table)};`
+  }
+
+  /**
+   * O SQLite não tem `ALTER COLUMN`. Trocar o tipo exige recriar a tabela,
+   * copiar os dados e recriar índices, gatilhos e chaves estrangeiras — um
+   * roteiro que precisa da decisão de quem conhece o schema, não de um
+   * palpite nosso.
+   */
+  async buildAlterColumnTypeStatement(params: AlterColumnParams): Promise<string> {
+    throw new Error(
+      `O SQLite não permite alterar o tipo de uma coluna. Para mudar ${params.column}, é preciso ` +
+        'criar uma tabela nova com o tipo desejado, copiar os dados e recriar índices e relações. ' +
+        'Monte esse roteiro no editor de SQL, dentro de uma transação.'
+    )
   }
 
   async updateCell(params: {

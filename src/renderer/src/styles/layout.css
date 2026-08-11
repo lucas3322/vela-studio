@@ -1710,3 +1710,29 @@
   opacity: 0.62;
   background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
+
+/* ── Tipo editável no painel de estrutura ──────────────────────────── */
+
+.tipo-editavel {
+  border: none;
+  background: none;
+  padding: 1px 4px;
+  margin: -1px -4px;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-bottom: 1px dashed var(--border-default);
+}
+
+.tipo-editavel:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+.tipo-editavel:disabled {
+  cursor: default;
+  border-bottom-color: transparent;
+}

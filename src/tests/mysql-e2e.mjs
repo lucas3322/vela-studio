@@ -367,3 +367,100 @@ test('operação que pegaria mais de uma linha é desfeita', async () => {
   )
   assert.equal(Number(aindaLa.rows[0][0]), 2, 'o DELETE precisa ter sido desfeito')
 })
+
+// ── Alteração de tipo de coluna ──────────────────────────────────────
+
+test('o ALTER reemite NOT NULL, DEFAULT e COMMENT', async () => {
+  // A armadilha do MySQL: `MODIFY COLUMN c VARCHAR(50)` sozinho APAGA a
+  // obrigatoriedade, o padrão e o comentário da coluna, sem erro nenhum.
+  await driver.query(
+    `ALTER TABLE clientes MODIFY COLUMN cidade VARCHAR(80) NOT NULL DEFAULT 'Recife' COMMENT 'cidade natal';`,
+    { queryId: 'ac0' }
+  )
+
+  const sql = await driver.buildAlterColumnTypeStatement({
+    table: 'clientes', column: 'cidade', newType: 'varchar(120)'
+  })
+
+  assert.match(sql, /varchar\(120\)/i)
+  assert.match(sql, /NOT NULL/, 'a obrigatoriedade precisa ser reemitida')
+  assert.match(sql, /DEFAULT 'Recife'/, 'o padrão precisa ser reemitido')
+  assert.match(sql, /COMMENT 'cidade natal'/, 'o comentário precisa ser reemitido')
+})
+
+test('o ALTER montado realmente preserva os atributos ao rodar', async () => {
+  // Não basta o texto conter as palavras: o teste roda o comando e relê o
+  // catálogo. É a única prova de que nada se perdeu.
+  const sql = await driver.buildAlterColumnTypeStatement({
+    table: 'clientes', column: 'cidade', newType: 'varchar(140)'
+  })
+  await driver.query(sql, { queryId: 'ac1' })
+
+  const colunas = await driver.listColumns('clientes')
+  const cidade = colunas.find((c) => c.name === 'cidade')
+  assert.equal(cidade.type, 'varchar(140)')
+  assert.equal(cidade.nullable, false, 'NOT NULL não pode ter sumido')
+  assert.equal(cidade.defaultValue, 'Recife', 'o DEFAULT não pode ter sumido')
+  assert.equal(cidade.comment, 'cidade natal', 'o COMMENT não pode ter sumido')
+})
+
+test('coluna que aceita nulo continua aceitando', async () => {
+  const sql = await driver.buildAlterColumnTypeStatement({
+    table: 'clientes', column: 'email', newType: 'varchar(200)'
+  })
+  await driver.query(sql, { queryId: 'ac2' })
+  const email = (await driver.listColumns('clientes')).find((c) => c.name === 'email')
+  assert.equal(email.type, 'varchar(200)')
+  assert.equal(email.nullable, true, 'não pode virar NOT NULL do nada')
+})
+
+test('AUTO_INCREMENT da chave primária sobrevive', async () => {
+  // Perder o auto_increment quebra todo INSERT seguinte da aplicação.
+  // Numa tabela sem FK apontando para ela — ver o teste seguinte para o
+  // que acontece quando existe uma.
+  await driver.query(
+    'DROP TABLE IF EXISTS solta; CREATE TABLE solta (id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(10));',
+    { queryId: 'ac3a' }
+  )
+  const sql = await driver.buildAlterColumnTypeStatement({
+    table: 'solta', column: 'id', newType: 'bigint'
+  })
+  assert.match(sql, /AUTO_INCREMENT/i, JSON.stringify(sql))
+  await driver.query(sql, { queryId: 'ac3b' })
+
+  const id = (await driver.listColumns('solta')).find((c) => c.name === 'id')
+  assert.match(id.type, /bigint/)
+  assert.match(id.extra, /auto_increment/, 'o auto_increment não pode ter sumido')
+})
+
+test('o banco recusa a troca quando uma chave estrangeira depende da coluna', async () => {
+  // Cenário real: `pedidos.cliente_id` referencia `clientes.id`. Mudar só um
+  // lado deixaria os tipos incompatíveis, e o MySQL barra — corretamente.
+  // O que importa para a IDE é que o erro chegue, e não que a gente tente
+  // contornar por conta própria.
+  const sql = await driver.buildAlterColumnTypeStatement({
+    table: 'clientes', column: 'id', newType: 'bigint'
+  })
+  await assert.rejects(() => driver.query(sql, { queryId: 'ac3c' }), /incompatible|foreign key/i)
+
+  // E a coluna continua exatamente como estava.
+  const id = (await driver.listColumns('clientes')).find((c) => c.name === 'id')
+  assert.match(id.type, /^int/, 'o tipo não pode ter mudado')
+  assert.match(id.extra, /auto_increment/)
+})
+
+test('tipo com formato inválido é recusado antes de virar SQL', async () => {
+  // O tipo é interpolado no DDL — não existe placeholder para tipo. A barreira
+  // de forma é o que impede emendar um segundo comando.
+  for (const veneno of ["varchar(20); DROP TABLE clientes; --", "varchar(20)'", '', '   ']) {
+    await assert.rejects(
+      () => driver.buildAlterColumnTypeStatement({
+        table: 'clientes', column: 'cidade', newType: veneno
+      }),
+      /tipo/i,
+      `deveria recusar: ${JSON.stringify(veneno)}`
+    )
+  }
+  const [ainda] = await driver.query('SELECT COUNT(*) FROM clientes', { queryId: 'ac4' })
+  assert.ok(Number(ainda.rows[0][0]) >= 3, 'a tabela precisa continuar existindo')
+})

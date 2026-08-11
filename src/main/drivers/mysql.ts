@@ -10,11 +10,13 @@ import type {
   TestResult
 } from '../../shared/types'
 import {
+  type AlterColumnParams,
   DEFAULT_MAX_ROWS,
   PREVIEW_ROWS,
   applyPreviewLimit,
   hasExplicitLimit,
   exigirChave,
+  exigirTipoValido,
   isMutation,
   splitStatements,
   type DatabaseDriver,
@@ -216,6 +218,43 @@ export class MySQLDriver implements DatabaseDriver {
       : `DROP TABLE ${quoteIdent(table)};`
   }
 
+  /**
+   * `MODIFY COLUMN` reescreve a definição inteira da coluna.
+   *
+   * É a armadilha desta operação: mandar só o tipo novo apaga `NOT NULL`,
+   * `DEFAULT`, `COMMENT` e `AUTO_INCREMENT` sem um aviso sequer — a coluna
+   * passa a aceitar nulo e perde o padrão, e nada na tela denuncia. Por isso
+   * lemos o catálogo antes e reemitimos tudo que já estava lá.
+   */
+  async buildAlterColumnTypeStatement(params: AlterColumnParams): Promise<string> {
+    const tipo = exigirTipoValido(params.newType)
+    const [linhas] = await this.require().query<mysql.RowDataPacket[]>(
+      `SELECT IS_NULLABLE AS nulavel, COLUMN_DEFAULT AS padrao,
+              COLUMN_COMMENT AS comentario, EXTRA AS extra
+         FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+      [params.database ?? this.config?.database, params.table, params.column]
+    )
+    const atual = linhas[0]
+    if (!atual) throw new Error(`Coluna ${params.column} não encontrada em ${params.table}.`)
+
+    const partes = [
+      `ALTER TABLE ${quoteIdent(params.table)}`,
+      `MODIFY COLUMN ${quoteIdent(params.column)} ${tipo}`
+    ]
+    partes.push(atual.nulavel === 'YES' ? 'NULL' : 'NOT NULL')
+
+    if (atual.padrao !== null && atual.padrao !== undefined) {
+      // CURRENT_TIMESTAMP e afins são expressão, não literal: citar quebraria.
+      const ehExpressao = /^(CURRENT_TIMESTAMP|NOW\(\)|\()/i.test(String(atual.padrao))
+      partes.push(`DEFAULT ${ehExpressao ? atual.padrao : quoteLiteral(String(atual.padrao))}`)
+    }
+    if (atual.extra) partes.push(String(atual.extra).toUpperCase())
+    if (atual.comentario) partes.push(`COMMENT ${quoteLiteral(String(atual.comentario))}`)
+
+    return `${partes.join(' ')};`
+  }
+
   async updateCell(params: {
     table: string
     database?: string
@@ -387,4 +426,15 @@ function mysqlTypeName(code: number | undefined): string {
     case 249: case 250: case 251: case 252: return 'blob'
     default: return 'varchar'
   }
+}
+
+/**
+ * Literal entre aspas simples, escapando as internas.
+ *
+ * Serve só para reemitir DEFAULT e COMMENT já existentes no catálogo ao
+ * remontar a definição da coluna — não é caminho para valor vindo do usuário,
+ * que sempre vai parametrizado.
+ */
+function quoteLiteral(valor: string): string {
+  return `'${valor.replace(/'/g, "''")}'`
 }

@@ -192,6 +192,17 @@ export class MongoDriver implements DatabaseDriver {
    * Fazer isso direito pede uma interface própria — melhor recusar com clareza
    * do que oferecer algo que edita a coisa errada.
    */
+  /**
+   * O MongoDB não declara tipo de campo: cada documento carrega o seu. Não há
+   * o que alterar no schema porque não há schema.
+   */
+  async buildAlterColumnTypeStatement(): Promise<string> {
+    throw new Error(
+      'O MongoDB não tem tipo de coluna: o tipo vive em cada documento. Para converter um campo, ' +
+        'use uma atualização em massa no editor — por exemplo com $convert dentro de um pipeline.'
+    )
+  }
+
   async updateCell(): Promise<{ affectedRows: number; statement: string }> {
     throw new Error(
       'Edição direta na grade ainda não é suportada no MongoDB. ' +

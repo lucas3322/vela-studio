@@ -10,11 +10,13 @@ import type {
   TestResult
 } from '../../shared/types'
 import {
+  type AlterColumnParams,
   DEFAULT_MAX_ROWS,
   PREVIEW_ROWS,
   applyPreviewLimit,
   hasExplicitLimit,
   exigirChave,
+  exigirTipoValido,
   isMutation,
   splitStatements,
   type DatabaseDriver,
@@ -315,6 +317,23 @@ export class PostgresDriver implements DatabaseDriver {
     return kind === 'truncate'
       ? `TRUNCATE TABLE ${quoteIdent(table)};`
       : `DROP TABLE ${quoteIdent(table)};`
+  }
+
+  /**
+   * No Postgres o `ALTER COLUMN ... TYPE` mexe só no tipo: `NOT NULL`,
+   * default e comentário sobrevivem sozinhos. Nada de reconstruir a
+   * definição, como no MySQL.
+   *
+   * O `USING` fica de fora de propósito. Ele é necessário quando não existe
+   * conversão implícita (texto → inteiro, por exemplo), mas escolher a
+   * expressão por conta própria seria adivinhar a intenção sobre dado real.
+   * O banco recusa com uma mensagem que já diz o que fazer, e ela chega
+   * traduzida na interface.
+   */
+  async buildAlterColumnTypeStatement(params: AlterColumnParams): Promise<string> {
+    const tipo = exigirTipoValido(params.newType)
+    const esquema = params.database ?? 'public'
+    return `ALTER TABLE ${quoteIdent(esquema)}.${quoteIdent(params.table)} ALTER COLUMN ${quoteIdent(params.column)} TYPE ${tipo};`
   }
 
   async updateCell(params: {

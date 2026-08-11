@@ -45,6 +45,20 @@ export interface DatabaseDriver {
   buildDangerStatement(kind: 'truncate' | 'drop', table: string): string
 
   /**
+   * Monta o `ALTER` que troca o tipo de uma coluna — sem executá-lo.
+   *
+   * Assíncrono porque alguns bancos exigem ler o catálogo antes: no MySQL,
+   * `MODIFY COLUMN` reescreve a definição inteira, então omitir `NOT NULL`,
+   * `DEFAULT` ou `COMMENT` os **apaga em silêncio**. A implementação precisa
+   * reemitir tudo que já existia.
+   *
+   * Quem não consegue fazer isso (SQLite não altera tipo de coluna; MongoDB
+   * não tem schema) deve lançar erro explicando o caminho alternativo, nunca
+   * devolver um comando que não faz o prometido.
+   */
+  buildAlterColumnTypeStatement(params: AlterColumnParams): Promise<string>
+
+  /**
    * Altera o valor de uma célula, identificando a linha pela chave primária.
    *
    * Implementações DEVEM:
@@ -271,6 +285,33 @@ export function isUnboundedMutation(sql: string): boolean {
  * Chamado por todos os drivers: é a rede que garante que nenhuma edição saia
  * sem uma condição que isole a linha.
  */
+export interface AlterColumnParams {
+  table: string
+  column: string
+  /** Tipo novo, como o usuário digitou (`varchar(80)`, `int`, `numeric(12,2)`). */
+  newType: string
+  database?: string
+}
+
+/**
+ * Recusa tipo que não tenha cara de tipo.
+ *
+ * O valor é interpolado no DDL — não existe placeholder para tipo em nenhum
+ * dos bancos. Então a barreira é de forma: letras, dígitos, espaço, parênteses,
+ * vírgula. Nada de aspas, ponto e vírgula ou traço, que é o que permitiria
+ * emendar um segundo comando no ALTER.
+ */
+export function exigirTipoValido(tipo: string): string {
+  const limpo = tipo.trim()
+  if (!limpo) throw new Error('Informe o tipo da coluna.')
+  if (!/^[A-Za-z][A-Za-z0-9 (),]*$/.test(limpo)) {
+    throw new Error(
+      `"${tipo}" não parece um tipo de coluna. Use algo como varchar(80), int ou numeric(12,2).`
+    )
+  }
+  return limpo
+}
+
 export function exigirChave(keys: Record<string, unknown>): Array<[string, unknown]> {
   const entradas = Object.entries(keys)
   if (entradas.length === 0) {

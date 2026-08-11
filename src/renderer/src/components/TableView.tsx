@@ -4,6 +4,7 @@ import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
 import { useTabStore, type Tab } from '../store/tabs'
 import { EditableGrid, type OrdenacaoDaGrade } from './EditableGrid'
+import { AlterColumnDialog } from './AlterColumnDialog'
 import { ErrorPanel } from './ErrorPanel'
 import { IconKey, IconLink } from './Icons'
 
@@ -35,6 +36,10 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
   const [chaveDeOrdem, setChaveDeOrdem] = useState<string | null>(null)
   /** Alterações na grade esperando confirmação. Trava a navegação enquanto houver. */
   const [pendencias, setPendencias] = useState(0)
+  /** Coluna cujo tipo está sendo editado, e o texto digitado. */
+  const [tipoEmEdicao, setTipoEmEdicao] = useState<{ coluna: string; texto: string } | null>(null)
+  /** ALTER montado pelo driver, aguardando confirmação. */
+  const [alterPendente, setAlterPendente] = useState<{ coluna: string; sql: string } | null>(null)
 
   const connectionId = useConnectionStore((s) => s.activeId)
   const database = useConnectionStore((s) => s.activeDatabase)
@@ -44,6 +49,17 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
 
   const table = tab.table!
   const dialect = connection ? DRIVERS[connection.driver].dialect : 'mysql'
+
+  // SQLite não tem ALTER COLUMN e o Mongo não tem tipo de coluna. Em vez de
+  // oferecer e falhar no clique, o campo já vem desabilitado com o motivo.
+  const motivoSemAlterar = connection?.readOnly
+    ? 'conexão somente leitura'
+    : dialect === 'sqlite'
+      ? 'o SQLite não altera tipo de coluna'
+      : dialect === 'mongodb'
+        ? 'o MongoDB não tem tipo de coluna'
+        : undefined
+  const podeAlterarTipo = !motivoSemAlterar
 
   useEffect(() => {
     if (!connectionId) return
@@ -132,6 +148,56 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
     updateTab,
     notify
   ])
+
+  /**
+   * Pede ao driver o ALTER correspondente — sem executar.
+   *
+   * Montar o comando no main é o que garante que os atributos existentes
+   * sejam preservados (no MySQL, `MODIFY COLUMN` apaga NOT NULL, DEFAULT e
+   * COMMENT se não forem reemitidos). A UI nunca escreve DDL.
+   */
+  const prepararAlteracao = async (coluna: string, novoTipo: string): Promise<void> => {
+    setTipoEmEdicao(null)
+    if (!connectionId) return
+
+    const atual = columns.find((c) => c.name === coluna)
+    if (!atual || novoTipo.trim().toLowerCase() === atual.type.toLowerCase()) return
+
+    try {
+      const sql = await window.vela.schema.alterColumnStatement({
+        connectionId,
+        table,
+        column: coluna,
+        newType: novoTipo,
+        database: database ?? undefined
+      })
+      setAlterPendente({ coluna, sql })
+    } catch (error) {
+      notify((error as Error).message, 'danger')
+    }
+  }
+
+  const executarAlteracao = async (): Promise<void> => {
+    if (!alterPendente || !connectionId) return
+    const { sql } = alterPendente
+    setAlterPendente(null)
+
+    const outcome = await window.vela.query.run({
+      connectionId,
+      sql,
+      database: database ?? undefined,
+      queryId: `alter_${tab.id}`
+    })
+
+    if (outcome.error) {
+      notify(outcome.error.friendly, 'danger')
+      return
+    }
+    notify('Tipo da coluna alterado.', 'success')
+    // Relê o catálogo: o tipo efetivo pode diferir do pedido (o banco
+    // normaliza "varchar" para "character varying", por exemplo).
+    setColumns(await window.vela.schema.columns(connectionId, table, database ?? undefined))
+  }
 
   const result = tab.results[tab.activeResultIndex]
 
@@ -300,7 +366,38 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
                     ) : null}
                   </td>
                   <td style={{ fontWeight: 500 }}>{column.name}</td>
-                  <td className="mono">{column.type}</td>
+                  <td className="mono">
+                    {tipoEmEdicao?.coluna === column.name ? (
+                      <input
+                        className="grid__input"
+                        autoFocus
+                        defaultValue={column.type}
+                        onBlur={(e) => void prepararAlteracao(column.name, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            void prepararAlteracao(column.name, e.currentTarget.value)
+                          }
+                          if (e.key === 'Escape') setTipoEmEdicao(null)
+                        }}
+                      />
+                    ) : (
+                      <button
+                        className="tipo-editavel"
+                        disabled={!podeAlterarTipo}
+                        title={
+                          podeAlterarTipo
+                            ? 'Duplo clique para alterar o tipo'
+                            : motivoSemAlterar
+                        }
+                        onDoubleClick={() =>
+                          setTipoEmEdicao({ coluna: column.name, texto: column.type })
+                        }
+                      >
+                        {column.type}
+                      </button>
+                    )}
+                  </td>
                   <td className="mono">{column.nullable ? 'sim' : 'não'}</td>
                   <td className="mono">{column.defaultValue ?? '—'}</td>
                   <td style={{ color: 'var(--text-tertiary)' }}>
@@ -312,6 +409,16 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
             </tbody>
           </table>
         </div>
+      )}
+
+      {alterPendente && (
+        <AlterColumnDialog
+          table={table}
+          column={alterPendente.coluna}
+          statement={alterPendente.sql}
+          onConfirm={() => void executarAlteracao()}
+          onCancel={() => setAlterPendente(null)}
+        />
       )}
 
       {!loading && panel === 'indices' && (

@@ -52,6 +52,21 @@ implementar precisa cumprir, sem exceção:
    `affectedRows > 1` **desfaça** e lance. Duas linhas afetadas significa que a
    chave não identificava a linha — o usuário achava que editava uma célula.
 
+### `buildAlterColumnTypeStatement`: monta, não executa
+
+Segue o mesmo contrato do `buildDangerStatement` — o driver devolve o SQL, a
+UI mostra, o usuário confirma, e só então roda por `query.run`. A UI nunca
+escreve DDL.
+
+A armadilha é do MySQL: `MODIFY COLUMN c VARCHAR(50)` reescreve a definição
+**inteira** da coluna e apaga `NOT NULL`, `DEFAULT`, `COMMENT` e
+`AUTO_INCREMENT` sem erro nenhum. A implementação lê o catálogo antes e
+reemite tudo. O Postgres não tem esse problema: `ALTER COLUMN ... TYPE` mexe
+só no tipo.
+
+O tipo é interpolado (não existe placeholder para tipo em nenhum banco), então
+passa por `exigirTipoValido`, que barra aspas, ponto e vírgula e traço.
+
 Os drivers SQL fazem isso em `escreverComTransacao`. Quem não suporta (Mongo)
 lança um erro que **explica o caminho alternativo**, não um erro genérico.
 Cada garantia tem teste e2e nas quatro suítes.

@@ -298,6 +298,28 @@ export function registerIpcHandlers(manager: ConnectionManager, store: Connectio
     }
   )
 
+  ipcMain.handle(
+    IPC.schemaAlterColumnStatement,
+    async (
+      _e,
+      params: {
+        connectionId: string
+        table: string
+        column: string
+        newType: string
+        database?: string
+      }
+    ) => {
+      const { driver, config } = manager.get(params.connectionId)
+      try {
+        return await driver.buildAlterColumnTypeStatement(params)
+      } catch (error) {
+        const t = translateError(error, { driver: config.driver })
+        throw new Error(t.hint ? `${t.friendly} ${t.hint}` : t.friendly)
+      }
+    }
+  )
+
   // ── Queries salvas ────────────────────────────────────────────────────
 
   ipcMain.handle(IPC.savedList, (_e, connectionId?: string) =>
