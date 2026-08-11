@@ -3,6 +3,22 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.6.0 — 2026-08-11
+
+### Novidades
+
+- adicionar seção de novidades com notas de versão e integração com a API do GitHub (f523240)
+
+### Correções
+
+- adicionar tipos de coluna para diferentes dialetos de banco de dados (139673e)
+- adicionar verificação de persistência de senha e melhorar a lógica de conexão no modal (d49db1e)
+- melhorar a lógica de criptografia de senhas e garantir a consistência dos dados na UI (e5cb83e)
+
+### Outras mudanças
+
+- adicionar testes para regras de persistência da conexão sem dependências do Electron (d673fda)
+
 ## 0.5.0 — 2026-08-11
 
 ### Novidades
