@@ -83,9 +83,11 @@ export function ConnectionModal(): React.JSX.Element {
     try {
       const name = config.name.trim() || suggestName(config)
       const finalConfig = { ...config, name }
-      await window.vela.connections.save(finalConfig, savePassword)
+      const salva = await window.vela.connections.save(finalConfig, savePassword)
       await connect(finalConfig)
       await refreshSaved()
+
+      if (!conferirSenhaGuardada(salva)) return
       notify(`Conectado a ${name}`, 'success')
       closeModal()
     } catch (error) {
@@ -107,8 +109,10 @@ export function ConnectionModal(): React.JSX.Element {
     setSalvando(true)
     try {
       const name = config.name.trim() || suggestName(config)
-      await window.vela.connections.save({ ...config, name }, savePassword)
+      const salva = await window.vela.connections.save({ ...config, name }, savePassword)
       await refreshSaved()
+
+      if (!conferirSenhaGuardada(salva)) return
       notify(`Conexão "${name}" salva.`, 'success')
       setShowList(true)
     } catch (error) {
@@ -116,6 +120,28 @@ export function ConnectionModal(): React.JSX.Element {
     } finally {
       setSalvando(false)
     }
+  }
+
+  /**
+   * Confere se a senha realmente ficou guardada e avisa quando não ficou.
+   *
+   * O caso que motivou isto: a tela dizia "salva", o disco não tinha nada, e a
+   * pessoa só descobria na próxima vez que abriu o app. Agora, se pediram para
+   * salvar, havia senha digitada e ela não persistiu, o modal fica aberto
+   * dizendo isso — em vez de fechar comemorando.
+   */
+  const conferirSenhaGuardada = (salva: { hasPassword?: boolean }): boolean => {
+    const pediuParaSalvar = savePassword && !!config.password?.trim()
+    if (!pediuParaSalvar || salva.hasPassword) return true
+
+    notify('Conectou, mas a senha não foi guardada. Veja o aviso no formulário.', 'danger')
+    setTestResult({
+      ok: false,
+      message:
+        'A senha não ficou guardada. O sistema pode ter recusado o acesso às Chaves; ' +
+        'tente salvar de novo e autorize se o macOS pedir.'
+    })
+    return false
   }
 
   const handleConnectSaved = async (id: string): Promise<void> => {
@@ -339,7 +365,10 @@ export function ConnectionModal(): React.JSX.Element {
                       <input
                         className="input"
                         type={senhaVisivel ? 'text' : 'password'}
-                        placeholder={existing ? '••••••••  (salva)' : ''}
+                        // Dizia "(salva)" para toda conexão existente, tivesse
+                        // senha guardada ou não — era a tela afirmando o
+                        // contrário do aviso logo abaixo.
+                        placeholder={existing?.hasPassword ? '••••••••  (salva)' : ''}
                         value={config.password ?? ''}
                         onChange={(e) => update({ password: e.target.value })}
                         autoComplete="off"

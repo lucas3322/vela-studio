@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { DRIVERS, type ColumnInfo, type IndexInfo, type RelationInfo } from '@shared/types'
+import { tiposDoDialeto } from '../editor/column-types'
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
 import { useTabStore, type Tab } from '../store/tabs'
@@ -344,6 +345,12 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
 
       {!loading && panel === 'colunas' && (
         <div className="structure">
+          <datalist id="vela-tipos-de-coluna">
+            {tiposDoDialeto(dialect).map((tipo) => (
+              <option key={tipo} value={tipo} />
+            ))}
+          </datalist>
+
           <table className="data-table">
             <thead>
               <tr>
@@ -371,6 +378,9 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
                       <input
                         className="grid__input"
                         autoFocus
+                        // `list` sugere sem restringir: tipo fora da lista
+                        // (enum, decimal com precisão incomum) continua aceito.
+                        list="vela-tipos-de-coluna"
                         defaultValue={column.type}
                         onBlur={(e) => void prepararAlteracao(column.name, e.target.value)}
                         onKeyDown={(e) => {
