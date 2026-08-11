@@ -27,13 +27,25 @@ mac:
   # nome, e sobra um "Vela Studio-mac.zip" que ninguém sabe se é Intel ou
   # Apple Silicon.
   artifactName: ${productName}-${version}-${arch}.${ext}
+  #
+  # A ARQUITETURA VEM DA LINHA DE COMANDO, DE PROPÓSITO.
+  #
+  # Listar `arch: [arm64, x64]` aqui faz o electron-builder empacotar as duas
+  # numa execução só — e isso corrompe o build. Ele copia o módulo nativo para
+  # dentro do .app com *hard link*; ao recompilar o better-sqlite3 para a
+  # segunda arquitetura, o mesmo inode é sobrescrito e o conteúdo muda dentro
+  # do bundle da primeira, que já estava empacotado e assinado.
+  #
+  # O estrago é duplo e silencioso: o DMG arm64 sai com um binário x86_64
+  # dentro, e o selo da assinatura quebra — o macOS passa a dizer que o app
+  # "está danificado e não pode ser aberto".
+  #
+  # Uma execução do electron-builder por arquitetura elimina a sobreposição.
   target:
-    - target: dmg
-      arch: [arm64, x64]
+    - dmg
     # O zip existe só para atualização automática (electron-updater).
     # Para instalar na mão, o arquivo é o .dmg.
-    - target: zip
-      arch: [arm64, x64]
+    - zip
   # Só vale com Developer ID + notarização. Com assinatura ad-hoc ele apenas
   # restringe o app sem nenhum ganho de confiança.
   hardenedRuntime: false

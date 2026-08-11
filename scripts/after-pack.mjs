@@ -32,7 +32,12 @@ import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
 
 export default async function afterPack(context) {
-  if (context.electronPlatformName === 'darwin') return assinarAdHoc(context)
+  if (context.electronPlatformName === 'darwin') {
+    // A conferência vem ANTES da assinatura: assinar um binário errado só
+    // produziria um selo válido em cima de um pacote quebrado.
+    await verificarModuloNativo(context)
+    return assinarAdHoc(context)
+  }
   if (context.electronPlatformName !== 'win32') return
 
   // Empacotando Windows **no** Windows (é o que o CI faz), o
@@ -41,6 +46,7 @@ export default async function afterPack(context) {
   // rede derrubaria um build que estava correto.
   if (process.platform === 'win32') {
     console.log('  • build nativo do Windows: mantendo o better-sqlite3 compilado localmente')
+    await verificarModuloNativo(context)
     return
   }
 
@@ -94,6 +100,7 @@ export default async function afterPack(context) {
     await copyFile(extracted, target)
 
     console.log('  • better-sqlite3 substituído com sucesso')
+    await verificarModuloNativo(context)
   } catch (error) {
     throw new Error(`afterPack: ${error.message}`)
   } finally {
@@ -159,4 +166,106 @@ async function assinarAdHoc(context) {
     // das Chaves com mais frequência.
     console.log(`  • aviso: assinatura ad-hoc falhou (${String(error.stderr || error.message).trim()})`)
   }
+}
+
+/**
+ * Lê o cabeçalho de um binário e diz para qual plataforma/arquitetura ele é.
+ *
+ * Sem depender de `file` ou `lipo`, que não existem no runner do Windows.
+ * Só precisamos dos primeiros bytes: cada formato se identifica ali.
+ */
+export function identificarBinario(bytes) {
+  const u32 = (o, le) => (le ? bytes.readUInt32LE(o) : bytes.readUInt32BE(o))
+
+  // ELF: 0x7F 'E' 'L' 'F'
+  if (bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) {
+    return { plataforma: 'linux', arch: bytes[18] === 0xb7 ? 'arm64' : 'x64' }
+  }
+
+  // PE (Windows): 'MZ'
+  if (bytes[0] === 0x4d && bytes[1] === 0x5a) return { plataforma: 'win32', arch: 'x64' }
+
+  // Mach-O: pode ser little ou big endian, fino ou universal.
+  const magic = u32(0, true)
+  const gordo = magic === 0xbebafeca || magic === 0xbfbafeca // universal binary
+  if (gordo) return { plataforma: 'darwin', arch: 'universal' }
+
+  const machO = magic === 0xfeedfacf || magic === 0xfeedface || u32(0, false) === 0xfeedfacf
+  if (machO) {
+    const le = magic === 0xfeedfacf || magic === 0xfeedface
+    const cpu = u32(4, le)
+    // 0x0100000C = arm64, 0x01000007 = x86_64
+    return { plataforma: 'darwin', arch: cpu === 0x0100000c ? 'arm64' : cpu === 0x01000007 ? 'x64' : `cpu:${cpu}` }
+  }
+
+  return { plataforma: 'desconhecida', arch: 'desconhecida' }
+}
+
+/**
+ * Confere que o módulo nativo empacotado é da plataforma e arquitetura certas.
+ *
+ * POR QUE ISTO EXISTE
+ * -------------------
+ * Três vezes um binário errado foi parar dentro do pacote sem que nada
+ * reclamasse:
+ *
+ *  1. build multi-arch numa execução só — o hard link do `.node` fazia a
+ *     recompilação para x64 sobrescrever o conteúdo dentro do bundle arm64
+ *     que já estava empacotado e assinado;
+ *  2. empacotar Windows a partir do macOS levava um Mach-O dentro do .exe;
+ *  3. rodar `npm run linux` antes de `npm run mac` deixava um ELF do Linux
+ *     no node_modules, e o build de macOS o empacotava.
+ *
+ * Em todos os casos o instalador saía "com sucesso". O usuário é quem
+ * descobria — no macOS com "o app está danificado e não pode ser aberto",
+ * porque o binário trocado também quebra o selo da assinatura.
+ *
+ * Um build que falha é muito melhor que um instalador quebrado.
+ */
+async function verificarModuloNativo(context) {
+  const { readFile } = await import('node:fs/promises')
+
+  const esperado = {
+    plataforma: context.electronPlatformName,
+    arch: context.arch === 1 ? 'x64' : context.arch === 3 ? 'arm64' : 'x64'
+  }
+
+  const base =
+    esperado.plataforma === 'darwin'
+      ? join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`, 'Contents', 'Resources')
+      : join(context.appOutDir, 'resources')
+
+  const alvo = join(
+    base, 'app.asar.unpacked', 'node_modules', 'better-sqlite3', 'build', 'Release', 'better_sqlite3.node'
+  )
+
+  let cabecalho
+  try {
+    const conteudo = await readFile(alvo)
+    cabecalho = conteudo.subarray(0, 32)
+  } catch {
+    throw new Error(
+      `afterPack: não encontrei o módulo nativo em\n  ${alvo}\n` +
+        'Confira o `asarUnpack` do electron-builder.yml.'
+    )
+  }
+
+  const achado = identificarBinario(cabecalho)
+  const ok =
+    achado.plataforma === esperado.plataforma &&
+    (achado.arch === esperado.arch || achado.arch === 'universal')
+
+  if (!ok) {
+    throw new Error(
+      `afterPack: o better-sqlite3 empacotado é ${achado.plataforma}/${achado.arch}, ` +
+        `mas este build é ${esperado.plataforma}/${esperado.arch}.\n\n` +
+        '  O instalador sairia quebrado: no macOS o app abre como "danificado",\n' +
+        '  porque o binário trocado também invalida o selo da assinatura.\n\n' +
+        '  Costuma acontecer quando um build de outra plataforma deixou o\n' +
+        '  node_modules em outro estado. Para resertar:\n\n' +
+        '    npx electron-builder install-app-deps\n'
+    )
+  }
+
+  console.log(`  • better-sqlite3 confere: ${achado.plataforma}/${achado.arch}`)
 }

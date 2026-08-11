@@ -18,6 +18,7 @@ import { translateError, nearest } from '../main/error-translator.ts'
 import { parseMongoCommand, splitMongoCommands } from '../main/drivers/mongo-parser.ts'
 import { analyze, extractTables, resolveQualifier } from '../renderer/src/editor/sql-context.ts'
 import { formatSql } from '../renderer/src/editor/formatter.ts'
+import { identificarBinario } from '../../scripts/after-pack.mjs'
 
 // ── splitStatements ──────────────────────────────────────────────────
 
@@ -329,4 +330,56 @@ test('o qualificador restringe a uma única tabela', () => {
   const contexto = analyze(sql, sql.length)
   assert.equal(contexto.qualifier, 'c')
   assert.equal(resolveQualifier('c', contexto.tables), 'contracts')
+})
+
+// ── detector de binário nativo ───────────────────────────────────────
+//
+// É o guarda que impede um instalador sair com o .node da plataforma errada.
+// Três vezes isso aconteceu em silêncio; o teste existe para provar que o
+// detector realmente distingue os formatos, e não só que ele roda.
+
+/** Monta um cabeçalho mínimo com os bytes que identificam cada formato. */
+function cabecalho(bytes: number[]): Buffer {
+  const b = Buffer.alloc(32)
+  bytes.forEach((v, i) => (b[i] = v))
+  return b
+}
+
+test('reconhece Mach-O arm64 (macOS Apple Silicon)', () => {
+  // magic 0xFEEDFACF little-endian, cputype 0x0100000C
+  const b = cabecalho([0xcf, 0xfa, 0xed, 0xfe, 0x0c, 0x00, 0x00, 0x01])
+  assert.deepEqual(identificarBinario(b), { plataforma: 'darwin', arch: 'arm64' })
+})
+
+test('reconhece Mach-O x86_64 (macOS Intel)', () => {
+  const b = cabecalho([0xcf, 0xfa, 0xed, 0xfe, 0x07, 0x00, 0x00, 0x01])
+  assert.deepEqual(identificarBinario(b), { plataforma: 'darwin', arch: 'x64' })
+})
+
+test('reconhece PE do Windows', () => {
+  const b = cabecalho([0x4d, 0x5a]) // 'MZ'
+  assert.equal(identificarBinario(b).plataforma, 'win32')
+})
+
+test('reconhece ELF do Linux', () => {
+  // 0x7F 'E' 'L' 'F'; byte 18 = máquina (0x3E = x86-64, 0xB7 = aarch64)
+  const x64 = cabecalho([0x7f, 0x45, 0x4c, 0x46])
+  x64[18] = 0x3e
+  assert.deepEqual(identificarBinario(x64), { plataforma: 'linux', arch: 'x64' })
+
+  const arm = cabecalho([0x7f, 0x45, 0x4c, 0x46])
+  arm[18] = 0xb7
+  assert.deepEqual(identificarBinario(arm), { plataforma: 'linux', arch: 'arm64' })
+})
+
+test('distingue as plataformas entre si', () => {
+  // O caso real: um ELF do Linux dentro de um pacote macOS precisa ser
+  // reconhecido como linux, nunca como darwin.
+  const elf = cabecalho([0x7f, 0x45, 0x4c, 0x46])
+  elf[18] = 0xb7
+  assert.notEqual(identificarBinario(elf).plataforma, 'darwin')
+})
+
+test('não confunde lixo com binário válido', () => {
+  assert.equal(identificarBinario(cabecalho([0, 1, 2, 3])).plataforma, 'desconhecida')
 })
