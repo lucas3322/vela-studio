@@ -72,10 +72,29 @@ export function registerSqlCompletion(getSchema: SchemaAccessor): monaco.IDispos
       }
 
       // 3. Onde colunas fazem sentido.
-      if (schema && ['select', 'where', 'on', 'groupBy', 'orderBy', 'having', 'set', 'insertColumns'].includes(context.clause)) {
-        suggestions.push(...columnsInScope(schema, context, range))
-        // Tabelas com apelido também completam: `c` → `c.`
-        suggestions.push(...aliasItems(context, range))
+      const CLAUSULAS_DE_COLUNA = [
+        'select', 'where', 'on', 'groupBy', 'orderBy', 'having', 'set', 'insertColumns'
+      ]
+      if (schema && CLAUSULAS_DE_COLUNA.includes(context.clause)) {
+        if (context.tables.length > 0) {
+          suggestions.push(...columnsInScope(schema, context, range))
+          // Tabelas com apelido também completam: `c` → `c.`
+          suggestions.push(...aliasItems(context, range))
+        } else {
+          /**
+           * Nenhuma tabela no statement ainda — é o caso de quem escreve o
+           * SELECT antes do FROM.
+           *
+           * A versão anterior despejava aqui as colunas de **todas** as
+           * tabelas do schema. Num banco pequeno isso ajudava; em um de 200
+           * tabelas viram milhares de entradas ambíguas, e a lista deixa de
+           * ser útil — foi o que aconteceu.
+           *
+           * Sem saber a tabela não dá para dizer de qual coluna se trata.
+           * Sugerimos as tabelas: é o que falta para o resto funcionar.
+           */
+          suggestions.push(...schema.tables.map((t, i) => tableItem(t, range, i)))
+        }
       }
 
       // 4. Palavras-chave e funções sempre disponíveis, com prioridade menor.
@@ -129,25 +148,6 @@ function columnsInScope(
       })
     })
   })
-
-  // Sem tabela identificada, oferecemos as colunas de todas as tabelas do schema.
-  if (context.tables.length === 0) {
-    const seen = new Set<string>()
-    for (const [table, columns] of Object.entries(schema.columns)) {
-      for (const column of columns) {
-        if (seen.has(column.name)) continue
-        seen.add(column.name)
-        items.push({
-          label: { label: column.name, detail: `  ${column.type}`, description: table },
-          kind: monaco.languages.CompletionItemKind.Field,
-          insertText: column.name,
-          range,
-          sortText: `5${column.name}`,
-          documentation: { value: describeColumn(column, table) }
-        })
-      }
-    }
-  }
 
   return items
 }

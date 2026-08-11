@@ -285,3 +285,48 @@ test('aceita CTE começando com WITH', () => {
   const out = applyPreviewLimit('WITH a AS (SELECT 1) SELECT * FROM a', 100)
   assert.ok(out.endsWith('\nLIMIT 100'), out)
 })
+
+// ── escopo do autocomplete ───────────────────────────────────────────
+//
+// Estes travam a regra que decide o que a lista pode oferecer. O provider em
+// si depende do Monaco e não roda fora do navegador, mas a decisão sai toda do
+// contexto — que é o que verificamos aqui.
+
+test('SELECT antes do FROM não tem tabela em escopo', () => {
+  // Sem tabela, a lista NÃO pode oferecer coluna: seriam todas as colunas do
+  // banco. Num schema de 200 tabelas isso torna o autocomplete inútil.
+  const sql = 'select acc'
+  const contexto = analyze(sql, sql.length)
+  assert.equal(contexto.clause, 'select')
+  assert.deepEqual(contexto.tables, [])
+})
+
+test('com FROM escrito, o escopo é só a tabela da query', () => {
+  const sql = 'select acc\nfrom accounts'
+  const contexto = analyze(sql, 10) // cursor logo após "acc"
+  assert.equal(contexto.clause, 'select')
+  assert.deepEqual(contexto.tables.map((t) => t.name), ['accounts'])
+})
+
+test('o escopo do WHERE é a tabela do FROM', () => {
+  const sql = 'select * from accounts where acc'
+  const contexto = analyze(sql, sql.length)
+  assert.equal(contexto.clause, 'where')
+  assert.deepEqual(contexto.tables.map((t) => t.name), ['accounts'])
+})
+
+test('JOIN coloca as duas tabelas em escopo, com os apelidos', () => {
+  const sql = 'select * from accounts a join contracts c on c.id = a.id where '
+  const contexto = analyze(sql, sql.length)
+  assert.deepEqual(contexto.tables, [
+    { name: 'accounts', alias: 'a' },
+    { name: 'contracts', alias: 'c' }
+  ])
+})
+
+test('o qualificador restringe a uma única tabela', () => {
+  const sql = 'select * from accounts a join contracts c on c.'
+  const contexto = analyze(sql, sql.length)
+  assert.equal(contexto.qualifier, 'c')
+  assert.equal(resolveQualifier('c', contexto.tables), 'contracts')
+})

@@ -156,6 +156,16 @@ export const editorOptions: monaco.editor.IStandaloneEditorConstructionOptions =
   tabCompletion: 'on',
   suggestSelection: 'first',
   snippetSuggestions: 'top',
+  /**
+   * Desliga a sugestão baseada em palavras do documento.
+   *
+   * Por padrão o Monaco também sugere qualquer palavra já escrita no editor —
+   * então digitar `acc` trazia todo texto solto que contivesse "acc", junto
+   * das tabelas e colunas de verdade. É a opção de nível de editor que manda
+   * aqui; `suggest.showWords` sozinho não desliga o provedor.
+   */
+  wordBasedSuggestions: 'off',
+
   // Mostra o nome da tabela/coluna e o tipo sem precisar abrir o painel lateral.
   suggest: {
     showWords: false,
