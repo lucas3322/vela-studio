@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.7.0 — 2026-08-11
+
+### Novidades
+
+- implementar criptografia de senhas com armazenamento local e adicionar verificação de persistência (0b9bc34)
+
 ## 0.6.0 — 2026-08-11
 
 ### Novidades
