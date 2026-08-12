@@ -3,6 +3,13 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.15.0 — 2026-08-12
+
+### Novidades
+
+- adicionar confirmação para comandos UPDATE/DELETE sem WHERE e refatorar lógica de detecção (76eed47)
+- ajustar layout da barra de filtro para melhorar acessibilidade e responsividade (65f1196)
+
 ## 0.14.0 — 2026-08-12
 
 ### Novidades
