@@ -8,6 +8,7 @@ import { HistoryModal } from './components/HistoryModal'
 import { CheatsheetModal } from './components/CheatsheetModal'
 import { UpdateModal } from './components/UpdateModal'
 import { SaveQueryModal } from './components/SaveQueryModal'
+import { PreferencesModal } from './components/PreferencesModal'
 import { Toast } from './components/Toast'
 import { useAppStore } from './store/app'
 import { useConnectionStore } from './store/connections'
@@ -86,6 +87,7 @@ export function App(): React.JSX.Element {
       {modal === 'cheatsheet' && <CheatsheetModal />}
       {modal === 'update' && <UpdateModal />}
       {modal === 'saveQuery' && <SaveQueryModal />}
+      {modal === 'preferences' && <PreferencesModal />}
       <Toast />
     </div>
   )

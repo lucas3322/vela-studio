@@ -49,6 +49,20 @@ export const IconCode = (p: IconProps): React.JSX.Element => (
   </Icon>
 )
 
+/**
+ * Engrenagem de 8 dentes.
+ *
+ * O contorno é gerado por cálculo, não desenhado no olho: a primeira versão
+ * era um círculo com raios saindo dele e ficava idêntica ao ícone de tema —
+ * dois sóis lado a lado na barra de título.
+ */
+export const IconSettings = (p: IconProps): React.JSX.Element => (
+  <Icon {...p}>
+    <path d="M6.47 2.93L6.76 1.21L9.24 1.21L9.53 2.93L10.50 3.33L11.92 2.32L13.68 4.08L12.67 5.50L13.07 6.47L14.79 6.76L14.79 9.24L13.07 9.53L12.67 10.50L13.68 11.92L11.92 13.68L10.50 12.67L9.53 13.07L9.24 14.79L6.76 14.79L6.47 13.07L5.50 12.67L4.08 13.68L2.32 11.92L3.33 10.50L2.93 9.53L1.21 9.24L1.21 6.76L2.93 6.47L3.33 5.50L2.32 4.08L4.08 2.32L5.50 3.33Z" />
+    <circle cx="8" cy="8" r="2.5" />
+  </Icon>
+)
+
 export const IconView = (p: IconProps): React.JSX.Element => (
   <Icon {...p}>
     <path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8Z" />

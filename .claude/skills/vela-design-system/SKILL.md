@@ -117,6 +117,20 @@ Antes de escrever CSS novo, veja se já existe em `global.css`:
 Layout e componentes específicos ficam em `layout.css`, nomeados por bloco
 (`.sidebar__connection`, `.grid__cell--number`).
 
+## Paleta de acento
+
+O usuário escolhe a cor de destaque em Preferências, de uma **lista fechada**
+(`styles/palettes.ts`). Não é um seletor livre, e o motivo é medido: trocar só
+o matiz mantendo a claridade quebra o contraste — dos oito tons testados com
+as claridades do âmbar, **só o âmbar passava**. Violeta a 60% é escuro demais
+para tinta branca em cima; verde a 42% some contra o fundo branco.
+
+Por isso cada paleta carrega as próprias claridades (`lClaro`, `lTextoClaro`,
+`lEscuro`, `lTextoEscuro`) e a própria tinta por tema. Para adicionar uma cor:
+resolva os valores, acrescente à lista e rode `npm test` — o
+`src/tests/palettes.test.ts` reprova qualquer combinação abaixo de 3:1 para
+interface ou 4.5:1 para texto, nos dois temas.
+
 ## Abas: tipo pelo ícone, atual pelo fundo
 
 Aba de tabela usa ícone de grade em `--accent-text`; aba de query, chevrons

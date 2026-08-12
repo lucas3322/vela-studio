@@ -44,6 +44,9 @@ export function useMenuEvents(): void {
       }),
       window.velaEvents.on('menu:history', () => useAppStore.getState().openModal('history')),
       window.velaEvents.on('menu:cheatsheet', () => useAppStore.getState().openModal('cheatsheet')),
+      // O menu manda 'menu:preferences' desde sempre, mas ninguém escutava:
+      // o ⌘, simplesmente não fazia nada.
+      window.velaEvents.on('menu:preferences', () => useAppStore.getState().openModal('preferences')),
       window.velaEvents.on('menu:checkUpdate', () => useAppStore.getState().openModal('update')),
       window.velaEvents.on('menu:saveQuery', () => {
         // Só faz sentido em aba de query: numa aba de tabela não há SQL do usuário.

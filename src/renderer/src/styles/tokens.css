@@ -88,14 +88,14 @@
   --text-tertiary: #6e7783;
   --text-inverse: #16181d;
 
-  --accent: hsl(var(--accent-h) var(--accent-s) 60%);
+  --accent: hsl(var(--accent-h) var(--accent-s) var(--accent-l-escuro, 60%));
   --accent-hover: hsl(var(--accent-h) var(--accent-s) 66%);
   --accent-subtle: hsl(var(--accent-h) var(--accent-s) 60% / 0.14);
-  --accent-text: hsl(var(--accent-h) var(--accent-s) 70%);
+  --accent-text: hsl(var(--accent-h) var(--accent-s) var(--accent-text-l-escuro, 70%));
   /* Tinta que vai POR CIMA do âmbar. Escura nos dois temas, porque âmbar é
      uma cor clara nos dois — `--text-inverse` não serve aqui: no tema claro
      ele é branco, e branco sobre âmbar dava 2.87:1 no botão primário. */
-  --accent-ink: #16181d;
+  --accent-ink: var(--accent-ink-escuro, #16181d);
 
   --success: #4ade80;
   --success-subtle: rgba(74, 222, 128, 0.14);
@@ -150,12 +150,12 @@
 
   /* 42% é onde o âmbar cruza 3:1 contra branco — o mínimo para um elemento
      de interface ser percebido. A 44% media 2.87:1 e sumia. */
-  --accent: hsl(var(--accent-h) 88% 42%);
-  --accent-hover: hsl(var(--accent-h) 88% 36%);
+  --accent: hsl(var(--accent-h) var(--accent-s) var(--accent-l-claro, 42%));
+  --accent-hover: hsl(var(--accent-h) var(--accent-s) calc(var(--accent-l-claro, 42%) - 6%));
   --accent-subtle: hsl(var(--accent-h) var(--accent-s) 50% / 0.14);
   /* 33% cruza 4.5:1: é o âmbar que pode virar texto sobre superfície clara. */
-  --accent-text: hsl(var(--accent-h) 90% 33%);
-  --accent-ink: #1a1d23;
+  --accent-text: hsl(var(--accent-h) var(--accent-s) var(--accent-text-l-claro, 33%));
+  --accent-ink: var(--accent-ink-claro, #1a1d23);
 
   --success: #16a34a;
   --success-subtle: rgba(22, 163, 74, 0.1);

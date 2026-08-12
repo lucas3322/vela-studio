@@ -1810,3 +1810,45 @@
 .grid__row--selecionada:hover .grid__gutter {
   background: var(--accent);
 }
+
+/* ── Seletor de paleta ─────────────────────────────────────────────── */
+
+.paletas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.paleta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px var(--space-2) 5px 5px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.paleta:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.paleta--ativa {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: var(--accent-subtle);
+}
+
+.paleta__amostra {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  /* Contorno interno para a amostra clara não sumir no fundo claro. */
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+}

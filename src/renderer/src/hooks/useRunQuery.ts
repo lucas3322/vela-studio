@@ -48,7 +48,10 @@ export function useRunQuery(): {
           connectionId,
           sql,
           database: activeDatabase ?? undefined,
-          queryId
+          queryId,
+          // Só vale para query sem LIMIT declarado: o driver respeita o LIMIT
+          // do usuário quando ele existe, e este teto é o corte de segurança.
+          maxRows: useAppStore.getState().limitePreview
         })
 
         useTabStore.getState().updateTab(tab.id, {

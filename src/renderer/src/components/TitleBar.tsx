@@ -5,6 +5,7 @@ import {
   IconHistory,
   IconSail,
   IconMoon,
+  IconSettings,
   IconSidebar,
   IconSun
 } from './Icons'
@@ -62,6 +63,13 @@ export function TitleBar(): React.JSX.Element {
           title={resolvedTheme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
         >
           {resolvedTheme === 'dark' ? <IconSun /> : <IconMoon />}
+        </button>
+        <button
+          className="icon-btn"
+          onClick={() => openModal('preferences')}
+          title="Preferências (⌘,)"
+        >
+          <IconSettings />
         </button>
       </div>
     </header>

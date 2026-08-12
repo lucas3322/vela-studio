@@ -24,7 +24,11 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
   const [loading, setLoading] = useState(false)
   const [ordem, setOrdem] = useState<OrdenacaoDaGrade | null>(null)
   const [pagina, setPagina] = useState(0)
-  const [tamanhoPagina, setTamanhoPagina] = useState(TAMANHOS_DE_PAGINA[0])
+  // Lido uma vez, na criação da aba: mudar a preferência não deve reconsultar
+  // as abas que já estão abertas na largada do usuário.
+  const [tamanhoPagina, setTamanhoPagina] = useState(
+    () => useAppStore.getState().tamanhoPaginaPadrao
+  )
   const [temProxima, setTemProxima] = useState(false)
   /**
    * Coluna que ancora a paginação quando o usuário não escolheu ordem.
@@ -352,7 +356,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
                     setPagina(0)
                   }}
                 >
-                  {TAMANHOS_DE_PAGINA.map((tamanho) => (
+                  {opcoesDeTamanho(tamanhoPagina).map((tamanho) => (
                     <option key={tamanho} value={tamanho}>
                       {tamanho}
                     </option>
@@ -570,8 +574,20 @@ function montarFind(
   return `db.${table}.find({})${ordenacao}${pulo}.limit(${limite})`
 }
 
-/** Opções do seletor. A primeira é o padrão. */
+/**
+ * Opções do seletor.
+ *
+ * O valor preferido do usuário entra na lista se ainda não estiver lá — senão
+ * o `<select>` abriria sem nenhuma opção correspondente ao valor atual e
+ * pareceria vazio.
+ */
 const TAMANHOS_DE_PAGINA = [100, 500, 1000]
+
+function opcoesDeTamanho(preferido: number): number[] {
+  return TAMANHOS_DE_PAGINA.includes(preferido)
+    ? TAMANHOS_DE_PAGINA
+    : [...TAMANHOS_DE_PAGINA, preferido].sort((a, b) => a - b)
+}
 
 function formatarNumero(valor: number): string {
   return valor.toLocaleString('pt-BR')
