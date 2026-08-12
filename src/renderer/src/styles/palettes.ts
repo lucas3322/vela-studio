@@ -107,6 +107,32 @@ export const PALETAS: Paleta[] = [
 
 export const PALETA_PADRAO = 'ambar'
 
+/**
+ * Converte HSL para hex sem `#`.
+ *
+ * O Monaco não aceita `hsl()` nem custom property nas regras de tema: as cores
+ * precisam ser hex literal. Por isso a paleta calcula, em vez de a folha de
+ * estilo resolver.
+ */
+export function hslParaHex(h: number, s: number, l: number): string {
+  const sn = s / 100
+  const ln = l / 100
+  const k = (n: number): number => (n + h / 30) % 12
+  const a = sn * Math.min(ln, 1 - ln)
+  const canal = (n: number): number =>
+    Math.round((ln - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)))) * 255)
+  return [canal(0), canal(8), canal(4)].map((v) => v.toString(16).padStart(2, '0')).join('')
+}
+
+/** Cores do acento para o editor, já em hex, por tema. */
+export function coresDoEditor(id: string): { escuro: string; claro: string } {
+  const paleta = acharPaleta(id)
+  return {
+    escuro: hslParaHex(paleta.h, paleta.s, paleta.lTextoEscuro),
+    claro: hslParaHex(paleta.h, paleta.s, paleta.lTextoClaro)
+  }
+}
+
 export function acharPaleta(id: string): Paleta {
   return PALETAS.find((p) => p.id === id) ?? PALETAS[0]
 }

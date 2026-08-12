@@ -4,6 +4,7 @@
  * carregado no start só para termos SQL e JavaScript.
  */
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
+import { PALETA_PADRAO, coresDoEditor } from '../styles/palettes'
 
 // Contribuições do editor: cada import liga um recurso da UI.
 import 'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController'
@@ -46,15 +47,27 @@ self.MonacoEnvironment = {
  * Os padrões do Monaco não conversam com nossa paleta: o fundo destoa
  * e a cor de comentário some no tema claro.
  */
-export function defineThemes(): void {
+/**
+ * Define os dois temas do editor com o acento da paleta escolhida.
+ *
+ * Recebe a paleta em vez de ler CSS porque o Monaco só aceita hex literal nas
+ * regras — `hsl()` e custom property não funcionam ali.
+ */
+export function defineThemes(paletaId = PALETA_PADRAO): void {
+  const acento = coresDoEditor(paletaId)
+
   monaco.editor.defineTheme('vela-dark', {
     base: 'vs-dark',
     inherit: true,
     rules: [
       { token: '', foreground: 'e8eaed', background: '1f232a' },
-      { token: 'keyword', foreground: 'ff9d4d', fontStyle: 'bold' },
-      { token: 'keyword.sql', foreground: 'ff9d4d', fontStyle: 'bold' },
-      { token: 'operator.sql', foreground: 'a2a9b5' },
+      { token: 'keyword', foreground: acento.escuro, fontStyle: 'bold' },
+      { token: 'keyword.sql', foreground: acento.escuro, fontStyle: 'bold' },
+      // `AND`, `IS`, `NOT`, `NULL` caem aqui. Estavam em cinza — mais apagados
+      // que os próprios nomes de coluna, então a lógica da condição recuava
+      // enquanto os identificadores avançavam. Mesma cor do keyword, sem
+      // negrito: a condição fica visível e o esqueleto da query segue saltando.
+      { token: 'operator.sql', foreground: acento.escuro },
       { token: 'string', foreground: '86efac' },
       { token: 'string.sql', foreground: '86efac' },
       { token: 'number', foreground: '7dd3fc' },
@@ -72,7 +85,7 @@ export function defineThemes(): void {
       'editor.selectionBackground': '#3a4150',
       'editor.inactiveSelectionBackground': '#2c323c',
       'editor.lineHighlightBackground': '#00000028',
-      'editorCursor.foreground': '#f5a623',
+      'editorCursor.foreground': `#${acento.escuro}`,
       'editorIndentGuide.background1': '#2b3038',
       'editorIndentGuide.activeBackground1': '#3d434d',
       'editorWidget.background': '#262b33',
@@ -80,7 +93,7 @@ export function defineThemes(): void {
       'editorSuggestWidget.background': '#262b33',
       'editorSuggestWidget.border': '#343a44',
       'editorSuggestWidget.selectedBackground': '#343b46',
-      'editorSuggestWidget.highlightForeground': '#f5a623',
+      'editorSuggestWidget.highlightForeground': `#${acento.escuro}`,
       'editorHoverWidget.background': '#262b33',
       'editorHoverWidget.border': '#343a44',
       'scrollbarSlider.background': '#ffffff18',
@@ -94,9 +107,9 @@ export function defineThemes(): void {
     inherit: true,
     rules: [
       { token: '', foreground: '1a1d23', background: 'ffffff' },
-      { token: 'keyword', foreground: 'b45309', fontStyle: 'bold' },
-      { token: 'keyword.sql', foreground: 'b45309', fontStyle: 'bold' },
-      { token: 'operator.sql', foreground: '5a6472' },
+      { token: 'keyword', foreground: acento.claro, fontStyle: 'bold' },
+      { token: 'keyword.sql', foreground: acento.claro, fontStyle: 'bold' },
+      { token: 'operator.sql', foreground: acento.claro },
       { token: 'string', foreground: '15803d' },
       { token: 'string.sql', foreground: '15803d' },
       { token: 'number', foreground: '0369a1' },
@@ -113,14 +126,14 @@ export function defineThemes(): void {
       'editorLineNumber.activeForeground': '#5a6472',
       'editor.selectionBackground': '#fde68a80',
       'editor.lineHighlightBackground': '#00000008',
-      'editorCursor.foreground': '#b45309',
+      'editorCursor.foreground': `#${acento.claro}`,
       'editorIndentGuide.background1': '#eef0f3',
       'editorWidget.background': '#ffffff',
       'editorWidget.border': '#e2e5ea',
       'editorSuggestWidget.background': '#ffffff',
       'editorSuggestWidget.border': '#e2e5ea',
       'editorSuggestWidget.selectedBackground': '#f1f3f6',
-      'editorSuggestWidget.highlightForeground': '#b45309',
+      'editorSuggestWidget.highlightForeground': `#${acento.claro}`,
       'editorHoverWidget.background': '#ffffff',
       'editorHoverWidget.border': '#e2e5ea'
     }

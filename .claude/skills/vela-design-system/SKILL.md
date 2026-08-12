@@ -131,6 +131,14 @@ resolva os valores, acrescente à lista e rode `npm test` — o
 `src/tests/palettes.test.ts` reprova qualquer combinação abaixo de 3:1 para
 interface ou 4.5:1 para texto, nos dois temas.
 
+### O editor também segue a paleta
+
+As regras de tema do Monaco só aceitam **hex literal** — `hsl()` e custom
+property não funcionam ali. Por isso `defineThemes(paletaId)` recebe a paleta e
+calcula a cor, e o `QueryEditor` redefine os dois temas quando ela muda. Palavra
+reservada e operador (`AND`, `IS`, `NOT`, `NULL`) usam o mesmo acento; o negrito
+é o que separa o esqueleto da query da lógica da condição.
+
 ## Abas: tipo pelo ícone, atual pelo fundo
 
 Aba de tabela usa ícone de grade em `--accent-text`; aba de query, chevrons

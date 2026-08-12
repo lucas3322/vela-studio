@@ -25,7 +25,9 @@ export function PreferencesModal(): React.JSX.Element {
     limitePreview,
     setLimitePreview,
     tamanhoPaginaPadrao,
-    setTamanhoPaginaPadrao
+    setTamanhoPaginaPadrao,
+    limiteAviso,
+    setLimiteAviso
   } = useAppStore()
 
   useEffect(() => {
@@ -118,6 +120,23 @@ export function PreferencesModal(): React.JSX.Element {
               onChange={(e) => setTamanhoPaginaPadrao(Number(e.target.value))}
             />
             <span className="field__hint">Vale para as próximas abas que você abrir.</span>
+          </div>
+
+          <div className="field">
+            <span className="field__label">Avisar sobre consulta pesada acima de</span>
+            <input
+              className="input"
+              type="number"
+              min={1}
+              max={1000000}
+              value={limiteAviso}
+              onChange={(e) => setLimiteAviso(Number(e.target.value))}
+            />
+            <span className="field__hint">
+              Abaixo disso, o corte do resultado continua sendo informado — só que discretamente,
+              embaixo da grade. O aviso em destaque, sugerindo <code>LIMIT</code>, aparece a partir
+              deste número.
+            </span>
           </div>
         </div>
 

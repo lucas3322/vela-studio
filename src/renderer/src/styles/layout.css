@@ -686,16 +686,36 @@
   background: var(--bg-surface);
 }
 
+/*
+ * Constatação de que o resultado foi cortado.
+ *
+ * O padrão é discreto: é informação que precisa estar sempre lá, e em tom de
+ * alerta ela virava ruído a cada execução — principalmente para quem escolheu
+ * o próprio limite e recebia a barra âmbar dizendo o que ele mesmo pediu.
+ */
 .grid__truncated {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
+  background: var(--bg-sidebar);
+  color: var(--text-tertiary);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  border-top: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+/* Acima do limite configurado deixa de ser constatação e vira conselho. */
+.grid__truncated--alerta {
   background: var(--warning-subtle);
   color: var(--warning);
-  font-family: var(--font-ui);
   font-size: var(--text-sm);
-  border-top: 1px solid var(--border-subtle);
+  border-top-color: var(--warning);
+}
+
+.grid__truncated--alerta strong {
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Painel de erro ──────────────────────────────────────────────── */

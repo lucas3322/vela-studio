@@ -62,10 +62,15 @@ export function useRunQuery(): {
           error: outcome.error
         })
 
-        const truncated = outcome.results.find((r) => r.truncatedAt)
-        if (truncated) {
+        // O corte já é informado na própria grade, embaixo do resultado. Um
+        // toast a cada execução repetia a mesma coisa em cima disso, e some
+        // sozinho antes de a pessoa terminar de ler — só entra quando o
+        // volume passa do limite e vira conselho de desempenho.
+        const cortado = outcome.results.find((r) => r.truncatedAt)
+        const limiteAviso = useAppStore.getState().limiteAviso
+        if (cortado?.truncatedAt && cortado.truncatedAt >= limiteAviso) {
           notify(
-            `Resultado cortado em ${truncated.truncatedAt?.toLocaleString('pt-BR')} linhas. Use LIMIT para refinar.`,
+            `${cortado.truncatedAt.toLocaleString('pt-BR')} linhas. Um LIMIT ou filtro deixa a consulta mais rápida.`,
             'info'
           )
         }

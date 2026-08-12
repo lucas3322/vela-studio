@@ -26,6 +26,14 @@ interface AppState {
   limitePreview: number
   /** Tamanho inicial da página na aba de tabela. */
   tamanhoPaginaPadrao: number
+  /**
+   * A partir de quantas linhas o resultado vira um aviso de desempenho.
+   *
+   * Abaixo disso o corte continua sendo informado, só que discretamente: a
+   * informação "faltam linhas" não pode sumir, ou você tira conclusão de dado
+   * incompleto sem saber. O que muda é o volume do aviso, não a verdade dele.
+   */
+  limiteAviso: number
   /** Acento da interface. Ver `styles/palettes.ts` para o porquê da lista fechada. */
   paleta: string
   helpPanelVisible: boolean
@@ -40,6 +48,7 @@ interface AppState {
   setEditorHeight: (altura: number) => void
   setLimitePreview: (linhas: number) => void
   setTamanhoPaginaPadrao: (linhas: number) => void
+  setLimiteAviso: (linhas: number) => void
   setPaleta: (id: string) => void
   toggleHelpPanel: () => void
   openModal: (modal: AppState['modal'], connectionId?: string) => void
@@ -56,12 +65,14 @@ const PREFS_KEY = 'vela.preferencias'
 interface Preferencias {
   limitePreview: number
   tamanhoPaginaPadrao: number
+  limiteAviso: number
   paleta: string
 }
 
 const PADROES: Preferencias = {
   limitePreview: 100,
   tamanhoPaginaPadrao: 100,
+  limiteAviso: 10_000,
   paleta: PALETA_PADRAO
 }
 
@@ -75,6 +86,7 @@ function readPrefs(): Preferencias {
       // pode fazer a IDE abrir com limite zero ou paleta inexistente.
       limitePreview: sanear(lido.limitePreview, 1, 100_000, PADROES.limitePreview),
       tamanhoPaginaPadrao: sanear(lido.tamanhoPaginaPadrao, 1, 10_000, PADROES.tamanhoPaginaPadrao),
+      limiteAviso: sanear(lido.limiteAviso, 1, 1_000_000, PADROES.limiteAviso),
       paleta: typeof lido.paleta === 'string' ? lido.paleta : PADROES.paleta
     }
   } catch {
@@ -132,6 +144,7 @@ export const useAppStore = create<AppState>((set, get) => {
     editorHeight: readStoredHeight(),
     limitePreview: prefs.limitePreview,
     tamanhoPaginaPadrao: prefs.tamanhoPaginaPadrao,
+    limiteAviso: prefs.limiteAviso,
     paleta: prefs.paleta,
     helpPanelVisible: false,
     modal: null,
@@ -171,6 +184,12 @@ export const useAppStore = create<AppState>((set, get) => {
       gravarPrefs({ ...prefsAtuais(get), tamanhoPaginaPadrao: valor })
     },
 
+    setLimiteAviso: (linhas) => {
+      const valor = sanear(linhas, 1, 1_000_000, PADROES.limiteAviso)
+      set({ limiteAviso: valor })
+      gravarPrefs({ ...prefsAtuais(get), limiteAviso: valor })
+    },
+
     setPaleta: (id) => {
       aplicarPaleta(id)
       set({ paleta: id })
@@ -195,6 +214,7 @@ function prefsAtuais(get: () => AppState): Preferencias {
   return {
     limitePreview: s.limitePreview,
     tamanhoPaginaPadrao: s.tamanhoPaginaPadrao,
+    limiteAviso: s.limiteAviso,
     paleta: s.paleta
   }
 }

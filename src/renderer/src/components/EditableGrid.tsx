@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ColumnInfo, QueryResult } from '@shared/types'
 import { ContextMenu, type MenuEntry } from './ContextMenu'
+import { TruncationNotice } from './TruncationNotice'
 import { IconCopy, IconTrash, IconWarning } from './Icons'
 
 const ROW_HEIGHT = 30
@@ -693,13 +694,7 @@ export function EditableGrid({
         </div>
       )}
 
-      {result.truncatedAt && (
-        <div className="grid__truncated">
-          <IconWarning size={14} />
-          Mostrando as primeiras {numberFormat.format(result.truncatedAt)} linhas. Adicione um{' '}
-          <code>LIMIT</code> ou filtros para reduzir o resultado.
-        </div>
-      )}
+      <TruncationNotice cortadoEm={result.truncatedAt} />
 
       {menu && (
         <ContextMenu

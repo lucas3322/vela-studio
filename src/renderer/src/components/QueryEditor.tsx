@@ -27,6 +27,7 @@ export function QueryEditor({ tabId }: { tabId: string }): React.JSX.Element {
   const container = useRef<HTMLDivElement>(null)
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor>()
   const resolvedTheme = useAppStore((s) => s.resolvedTheme)
+  const paleta = useAppStore((s) => s.paleta)
   const connection = useConnectionStore((s) => s.saved.find((c) => c.id === s.activeId))
   const schema = useConnectionStore((s) => s.currentSchema())
   const updateTab = useTabStore((s) => s.updateTab)
@@ -44,7 +45,7 @@ export function QueryEditor({ tabId }: { tabId: string }): React.JSX.Element {
     if (!container.current) return
 
     if (!providersRegistered) {
-      defineThemes()
+      defineThemes(useAppStore.getState().paleta)
       registerSqlCompletion(() => schemaRef.current)
       registerMongoCompletion(() => schemaRef.current)
       registerHover(() => schemaRef.current, 'sql')
@@ -122,10 +123,13 @@ export function QueryEditor({ tabId }: { tabId: string }): React.JSX.Element {
     // Recriamos o editor ao trocar de aba ou de linguagem — o modelo muda junto.
   }, [tabId, language, run, updateTab])
 
-  // Tema muda sem recriar o editor.
+  // Tema e paleta mudam sem recriar o editor. A paleta entra aqui porque as
+  // cores do Monaco são hex fixo dentro do tema: trocar de cor exige
+  // redefinir os dois temas e reaplicar o atual.
   useEffect(() => {
+    defineThemes(paleta)
     monaco.editor.setTheme(resolvedTheme === 'dark' ? 'vela-dark' : 'vela-light')
-  }, [resolvedTheme])
+  }, [resolvedTheme, paleta])
 
   return <div className="editor-pane__monaco" ref={container} />
 }

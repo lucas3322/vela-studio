@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { QueryResult } from '@shared/types'
 import { IconWarning } from './Icons'
+import { TruncationNotice } from './TruncationNotice'
 
 const ROW_HEIGHT = 30
 const GUTTER_WIDTH = 52
@@ -179,13 +180,7 @@ export function ResultsGrid({ result }: { result: QueryResult }): React.JSX.Elem
         </div>
       </div>
 
-      {result.truncatedAt && (
-        <div className="grid__truncated">
-          <IconWarning size={14} />
-          Mostrando as primeiras {numberFormat.format(result.truncatedAt)} linhas. Adicione um{' '}
-          <code>LIMIT</code> ou filtros para reduzir o resultado.
-        </div>
-      )}
+      <TruncationNotice cortadoEm={result.truncatedAt} />
     </>
   )
 }
