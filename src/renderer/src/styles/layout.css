@@ -1969,6 +1969,9 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  /* Em janela estreita a linha quebra em vez de empurrar os botões para fora
+     da tela — sem isto, "+" e "Filtrar" ficavam inalcançáveis. */
+  flex-wrap: wrap;
 }
 
 /* "onde" / "e" — a leitura da condição em voz corrente, para quem não
@@ -1981,22 +1984,57 @@
   color: var(--text-tertiary);
 }
 
+/*
+ * `width: auto` é obrigatório aqui: o `.input` define `width: 100%`, e num
+ * contexto flex isso faz cada campo pedir a linha inteira. Com o
+ * `flex-shrink: 0` que eu tinha posto, eles se recusavam a encolher e
+ * empurravam os botões para fora da tela.
+ */
 .filtro__coluna,
-.filtro__operador {
+.filtro__operador,
+.filtro__valor {
   height: 28px;
-  flex-shrink: 0;
+  width: auto;
   font-size: var(--text-sm);
+  padding: 0 var(--space-2);
 }
 
+/*
+ * Base fixa e sem crescer: é o que faz as linhas formarem colunas.
+ *
+ * Com `flex: 1` no valor, ele engolia toda a largura sobrando e empurrava os
+ * botões para a borda da tela, longe dos campos — e cada linha terminava num
+ * ponto diferente. Como todas as linhas têm a mesma estrutura, encolher na
+ * mesma proporção mantém o alinhamento em qualquer largura.
+ */
 .filtro__coluna {
-  max-width: 220px;
+  flex: 0 1 200px;
+  min-width: 120px;
+}
+
+.filtro__operador {
+  flex: 0 1 150px;
+  min-width: 110px;
 }
 
 .filtro__valor {
-  height: 28px;
-  flex: 1;
-  min-width: 120px;
-  font-size: var(--text-sm);
+  flex: 0 1 260px;
+  min-width: 110px;
+}
+
+/* Empurra só as ações da primeira linha para longe dos campos de filtro,
+   mantendo os campos colados uns nos outros. */
+.filtro__acoes {
+  display: flex;
+  gap: var(--space-2);
+  margin-left: var(--space-3);
+}
+
+/* Botões nunca encolhem nem somem: são a única saída da barra. */
+.filtro__linha .icon-btn,
+.filtro__linha .btn,
+.filtro__acoes {
+  flex-shrink: 0;
 }
 
 .filtro__valor:disabled {

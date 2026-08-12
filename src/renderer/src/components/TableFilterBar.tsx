@@ -129,7 +129,7 @@ export function TableFilterBar({
           )}
 
           {indice === 0 && (
-            <>
+            <span className="filtro__acoes">
               <button
                 className="btn btn--primary btn--sm"
                 onClick={aplicar}
@@ -144,7 +144,7 @@ export function TableFilterBar({
                   Limpar
                 </button>
               )}
-            </>
+            </span>
           )}
         </div>
       ))}
