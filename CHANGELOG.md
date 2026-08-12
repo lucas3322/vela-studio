@@ -3,6 +3,14 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.13.0 — 2026-08-12
+
+### Novidades
+
+- implementar barra de filtro rápido com suporte a SQL e MongoDB (6fb9ffd)
+- melhorar a experiência de carregamento da grade e preservar a rolagem horizontal (d43a81a)
+- implementar componente ConnectionRow e refatorar modal de conexão para uso de ações no hover (b51804b)
+
 ## 0.12.0 — 2026-08-12
 
 ### Novidades
