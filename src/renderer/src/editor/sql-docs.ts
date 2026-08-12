@@ -18,6 +18,250 @@ export interface SqlDoc {
 }
 
 export const SQL_DOCS: Record<string, SqlDoc> = {
+  // ── Junção e apelido ──────────────────────────────────────────────
+  JOIN: {
+    category: 'juncao',
+    summary: 'Combina linhas de duas tabelas',
+    detail:
+      'Escrito sozinho, `JOIN` significa `INNER JOIN`: só as linhas que casam dos **dois** lados entram. Os bancos aceitam a forma curta, mas escrever o tipo deixa claro para quem lê depois.',
+    example: 'SELECT p.id, c.nome FROM pedidos p JOIN clientes c ON c.id = p.cliente_id',
+    gotcha: 'Esquecer o `ON` produz um produto cartesiano: 1.000 × 1.000 vira um milhão de linhas.'
+  },
+  AS: {
+    category: 'modificador',
+    summary: 'Dá um apelido a uma coluna ou tabela',
+    detail:
+      'Renomeia o resultado só na saída da consulta — nada muda no banco. Serve para encurtar nome de tabela (`clientes c`) e para batizar uma expressão (`SUM(valor) AS total`).',
+    example: 'SELECT SUM(valor) AS total_vendido FROM pedidos p',
+    gotcha:
+      'O apelido criado no `SELECT` não pode ser usado no `WHERE` da mesma consulta: o `WHERE` roda antes. Use no `HAVING` ou repita a expressão.'
+  },
+
+  // ── Operadores lógicos ────────────────────────────────────────────
+  AND: {
+    category: 'operador',
+    summary: 'Exige que as duas condições sejam verdadeiras',
+    detail: 'A linha só entra se **ambos** os lados forem verdadeiros.',
+    example: "SELECT * FROM pedidos WHERE status = 'pago' AND valor > 100"
+  },
+  OR: {
+    category: 'operador',
+    summary: 'Basta uma das condições ser verdadeira',
+    detail: 'A linha entra se **qualquer** um dos lados for verdadeiro.',
+    example: "SELECT * FROM pedidos WHERE status = 'novo' OR status = 'pago'",
+    gotcha:
+      '`AND` tem precedência sobre `OR`: `a AND b OR c` é lido como `(a AND b) OR c`. Use parênteses quando misturar os dois.'
+  },
+  NOT: {
+    category: 'operador',
+    summary: 'Inverte a condição',
+    detail: 'Nega o que vem depois — `NOT IN`, `NOT LIKE`, `NOT EXISTS`.',
+    example: "SELECT * FROM clientes WHERE cidade NOT IN ('Recife', 'Olinda')",
+    gotcha:
+      '`NOT IN` com uma lista que contenha `NULL` não devolve nenhuma linha, porque a comparação com nulo é desconhecida, não falsa.'
+  },
+
+  // ── Ordenação e conjuntos ─────────────────────────────────────────
+  ASC: {
+    category: 'modificador',
+    summary: 'Ordena do menor para o maior',
+    detail: 'É o padrão do `ORDER BY` — escrever é opcional, mas deixa a intenção explícita.',
+    example: 'SELECT * FROM clientes ORDER BY nome ASC'
+  },
+  DESC: {
+    category: 'modificador',
+    summary: 'Ordena do maior para o menor',
+    detail: 'Inverte a ordem. Usado para "mais recentes primeiro" e "maiores valores primeiro".',
+    example: 'SELECT * FROM pedidos ORDER BY criado_em DESC'
+  },
+  'UNION ALL': {
+    category: 'clausula',
+    summary: 'Empilha resultados sem remover repetidos',
+    detail:
+      'Junta o resultado de duas consultas uma embaixo da outra, mantendo linhas iguais. É mais rápido que `UNION`, que precisa comparar tudo para eliminar duplicatas.',
+    example: 'SELECT nome FROM clientes UNION ALL SELECT nome FROM fornecedores',
+    gotcha: 'As duas consultas precisam ter o mesmo número de colunas, e tipos compatíveis.'
+  },
+
+  // ── CASE ──────────────────────────────────────────────────────────
+  WHEN: {
+    category: 'operador',
+    summary: 'Abre uma condição dentro do CASE',
+    detail: 'Cada `WHEN` testa uma condição; o primeiro que der verdadeiro define o resultado.',
+    example: "CASE WHEN valor > 1000 THEN 'alto' ELSE 'normal' END"
+  },
+  THEN: {
+    category: 'operador',
+    summary: 'O valor devolvido quando o WHEN acerta',
+    detail: 'Vem logo depois da condição e diz o que aquela condição produz.',
+    example: "CASE WHEN status = 'pago' THEN 1 ELSE 0 END"
+  },
+  ELSE: {
+    category: 'operador',
+    summary: 'O valor quando nenhuma condição acertou',
+    detail: 'Fecha o `CASE` com um padrão.',
+    example: "CASE WHEN ativo = 1 THEN 'sim' ELSE 'não' END",
+    gotcha: 'Sem `ELSE`, o `CASE` devolve `NULL` quando nada casa — e nulo costuma passar batido.'
+  },
+  END: {
+    category: 'operador',
+    summary: 'Encerra o bloco CASE',
+    detail: 'Todo `CASE` precisa de `END`. Um apelido com `AS` costuma vir logo depois.',
+    example: "CASE WHEN x > 0 THEN 'positivo' ELSE 'zero ou negativo' END AS sinal"
+  },
+
+  // ── Escrita ───────────────────────────────────────────────────────
+  'INSERT INTO': {
+    category: 'dml',
+    summary: 'Grava linhas novas na tabela',
+    detail:
+      'Listar as colunas explicitamente é o que protege a instrução: sem a lista, ela depende da ordem física das colunas e quebra quando alguém acrescenta uma.',
+    example: "INSERT INTO clientes (nome, email) VALUES ('Ana', 'ana@x.com')"
+  },
+  VALUES: {
+    category: 'dml',
+    summary: 'Os dados que serão inseridos',
+    detail: 'Vem depois do `INSERT INTO`, na mesma ordem das colunas listadas.',
+    example: "INSERT INTO clientes (nome, cidade) VALUES ('Ana', 'Recife'), ('Bruno', 'Olinda')"
+  },
+  SET: {
+    category: 'dml',
+    summary: 'As colunas e os novos valores do UPDATE',
+    detail: 'Define o que muda. Várias colunas de uma vez, separadas por vírgula.',
+    example: "UPDATE pedidos SET status = 'pago', pago_em = NOW() WHERE id = 7",
+    gotcha: 'Sem `WHERE`, o `SET` atinge a tabela inteira — e não há como desfazer.'
+  },
+  'DELETE FROM': {
+    category: 'dml',
+    summary: 'Apaga linhas da tabela',
+    detail: 'Remove as linhas que o `WHERE` selecionar. A estrutura da tabela fica.',
+    example: 'DELETE FROM logs WHERE criado_em < NOW() - INTERVAL 90 DAY',
+    gotcha: 'Sem `WHERE`, apaga tudo. Rode antes o mesmo comando como `SELECT` para ver o que sairá.'
+  },
+
+  // ── Funções de texto e número ─────────────────────────────────────
+  UPPER: {
+    category: 'funcao',
+    summary: 'Converte o texto para maiúsculas',
+    detail: 'Útil para comparar sem depender de como o dado foi digitado.',
+    example: "SELECT * FROM clientes WHERE UPPER(nome) = 'ANA'",
+    gotcha: 'Usar função na coluna impede o banco de aproveitar o índice dela.'
+  },
+  LOWER: {
+    category: 'funcao',
+    summary: 'Converte o texto para minúsculas',
+    detail: 'O par de `UPPER`, com a mesma ressalva sobre índice.',
+    example: 'SELECT LOWER(email) FROM clientes'
+  },
+  TRIM: {
+    category: 'funcao',
+    summary: 'Remove espaços das pontas',
+    detail: 'Limpa espaço no começo e no fim — a causa comum de "o filtro não acha o registro".',
+    example: 'SELECT * FROM clientes WHERE TRIM(nome) = :nome'
+  },
+  LENGTH: {
+    category: 'funcao',
+    summary: 'Conta os caracteres do texto',
+    detail: 'Serve para achar dado truncado ou fora do formato esperado.',
+    example: 'SELECT * FROM clientes WHERE LENGTH(cnpj) <> 14'
+  },
+  ROUND: {
+    category: 'funcao',
+    summary: 'Arredonda o número',
+    detail: 'O segundo argumento é quantas casas decimais manter.',
+    example: 'SELECT ROUND(AVG(valor), 2) FROM pedidos'
+  },
+  ABS: {
+    category: 'funcao',
+    summary: 'Valor absoluto, sem o sinal',
+    detail: 'Transforma negativo em positivo.',
+    example: 'SELECT ABS(saldo) FROM contas'
+  },
+  CONCAT: {
+    category: 'funcao',
+    summary: 'Junta textos',
+    detail: 'Emenda dois ou mais valores num só.',
+    example: "SELECT CONCAT(nome, ' <', email, '>') FROM clientes",
+    gotcha: 'No MySQL, se qualquer parte for `NULL` o resultado inteiro vira `NULL`. Use `COALESCE`.'
+  },
+  SUBSTRING: {
+    category: 'funcao',
+    summary: 'Recorta um pedaço do texto',
+    detail: 'Recebe a posição inicial e quantos caracteres levar. A contagem começa em 1, não em 0.',
+    example: 'SELECT SUBSTRING(cnpj, 1, 8) FROM empresas'
+  },
+  REPLACE: {
+    category: 'funcao',
+    summary: 'Troca um trecho do texto por outro',
+    detail: 'Substitui todas as ocorrências encontradas.',
+    example: "SELECT REPLACE(telefone, '-', '') FROM clientes"
+  },
+
+  // ── Específicas de dialeto ────────────────────────────────────────
+  IFNULL: {
+    category: 'funcao',
+    summary: 'Devolve um substituto quando o valor é nulo',
+    detail: 'Versão de dois argumentos do `COALESCE`, no MySQL e no SQLite.',
+    example: 'SELECT IFNULL(apelido, nome) FROM clientes'
+  },
+  GROUP_CONCAT: {
+    category: 'funcao',
+    summary: 'Junta os valores de um grupo numa string',
+    detail: 'Agrega várias linhas num texto só, separado por vírgula.',
+    example: 'SELECT cliente_id, GROUP_CONCAT(produto) FROM itens GROUP BY cliente_id',
+    gotcha: 'No MySQL o resultado é cortado em 1024 bytes por padrão (`group_concat_max_len`).'
+  },
+  'NOW()': {
+    category: 'funcao',
+    summary: 'Data e hora atuais do servidor',
+    detail: 'Vem do relógio do **banco**, não do seu computador.',
+    example: 'UPDATE pedidos SET pago_em = NOW() WHERE id = 7'
+  },
+  'CURDATE()': {
+    category: 'funcao',
+    summary: 'Data de hoje, sem a hora',
+    detail: 'Equivale a `CURRENT_DATE` no MySQL.',
+    example: 'SELECT * FROM pedidos WHERE DATE(criado_em) = CURDATE()'
+  },
+  CURRENT_DATE: {
+    category: 'funcao',
+    summary: 'Data de hoje, sem a hora',
+    detail: 'Padrão SQL, disponível no PostgreSQL.',
+    example: 'SELECT * FROM pedidos WHERE criado_em::date = CURRENT_DATE'
+  },
+  DATE_FORMAT: {
+    category: 'funcao',
+    summary: 'Formata data como texto',
+    detail: 'Do MySQL. Recebe a data e a máscara de saída.',
+    example: "SELECT DATE_FORMAT(criado_em, '%d/%m/%Y') FROM pedidos"
+  },
+  RETURNING: {
+    category: 'dml',
+    summary: 'Devolve as linhas que foram gravadas',
+    detail:
+      'Do PostgreSQL. Faz o `INSERT`, `UPDATE` ou `DELETE` retornar as linhas afetadas — evita uma segunda consulta para descobrir o id gerado.',
+    example: "INSERT INTO clientes (nome) VALUES ('Ana') RETURNING id"
+  },
+  JSONB_AGG: {
+    category: 'funcao',
+    summary: 'Agrega as linhas do grupo num array JSON',
+    detail: 'Do PostgreSQL. Útil para devolver dados aninhados numa consulta só.',
+    example: 'SELECT cliente_id, JSONB_AGG(item) FROM pedidos GROUP BY cliente_id'
+  },
+  ARRAY_AGG: {
+    category: 'funcao',
+    summary: 'Agrega os valores do grupo num array',
+    detail: 'Do PostgreSQL. Equivale ao `GROUP_CONCAT`, mas devolve array de verdade.',
+    example: 'SELECT cidade, ARRAY_AGG(nome) FROM clientes GROUP BY cidade'
+  },
+  "DATETIME('NOW')": {
+    category: 'funcao',
+    summary: 'Data e hora atuais no SQLite',
+    detail: 'O SQLite não tem `NOW()`; usa-se `datetime(\'now\')`, em UTC por padrão.',
+    example: "UPDATE pedidos SET pago_em = datetime('now') WHERE id = 7",
+    gotcha: "Devolve UTC. Para o horário local, use datetime('now', 'localtime')."
+  },
+
   SELECT: {
     category: 'clausula',
     summary: 'Escolhe quais colunas trazer',
