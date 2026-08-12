@@ -12,7 +12,11 @@ Referência: densidade do Beekeeper Studio, respiro do Linear. Uma IDE de banco
 
 1. **Superfície neutra.** Cor aparece no dado e no acento, nunca na moldura.
 2. **Espaçamento em múltiplos de 4.** Não existe `13px` neste projeto.
-3. **Contraste AA nos dois temas.** Um token só existe se foi definido nos dois.
+3. **Contraste AA nos dois temas.** Um token só existe se foi definido nos dois,
+   e "definido" inclui **medido**: texto precisa de 4.5:1 contra a superfície
+   onde vive, elemento de interface precisa de 3:1. Já tivemos `--data-null` a
+   2.19:1 no claro e 2.92:1 no escuro — o `NULL` aparecia em quase toda linha
+   e ninguém conseguia lê-lo. Ao mexer numa cor, calcule a razão.
 
 ## Tokens
 
@@ -49,7 +53,18 @@ conteúdo que o usuário precisa ler.
 
 ### Acento
 Âmbar, via `--accent-h` / `--accent-s`. Único destaque cromático da interface.
-`--accent-subtle` para fundos, `--accent-text` para texto sobre superfície.
+
+| Token | Para quê | Mínimo |
+|---|---|---|
+| `--accent` | preenchimento e elemento de interface (barra ativa, ícone, borda) | 3:1 |
+| `--accent-text` | acento **como texto** sobre superfície | 4.5:1 |
+| `--accent-subtle` | fundo tênue | — |
+| `--accent-ink` | tinta que vai **por cima** do `--accent` | 4.5:1 |
+
+**`--accent-ink` existe porque `--text-inverse` não serve aqui.** O inverso do
+tema claro é branco, e branco sobre âmbar dá 2.87:1 — o botão primário do app
+ficou meses quase ilegível no tema claro por causa disso. Âmbar é uma cor
+clara nos dois temas, então a tinta em cima dele é escura nos dois.
 
 ### Linhas do grid
 
