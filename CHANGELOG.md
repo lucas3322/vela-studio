@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.12.0 — 2026-08-12
+
+### Novidades
+
+- adicionar aviso de corte de resultados e configuração de limite de desempenho (aa15f03)
+
 ## 0.11.0 — 2026-08-12
 
 ### Novidades
