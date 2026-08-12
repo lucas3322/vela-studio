@@ -17,11 +17,10 @@ import {
   applyPreviewLimit,
   hasExplicitLimit,
   exigirChave,
-  isMutation,
-  splitStatements,
   type DatabaseDriver,
   type QueryOptions
 } from './types'
+import { isMutation, splitStatements } from '../../shared/sql-shape'
 import { toGridFromArrays } from './value-types'
 
 export class SQLiteDriver implements DatabaseDriver {

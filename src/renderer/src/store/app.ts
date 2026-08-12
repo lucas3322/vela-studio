@@ -41,6 +41,14 @@ interface AppState {
   /** Conexão sendo editada no modal, se houver. */
   editingConnectionId: string | null
   toast: { message: string; tone: 'info' | 'success' | 'danger' } | null
+  /**
+   * Comandos sem WHERE esperando confirmação, com o que fazer se ela vier.
+   *
+   * Vive no store porque a detecção acontece no `useRunQuery` e a confirmação
+   * é uma tela — sem um ponto comum, cada caminho de execução precisaria da
+   * sua própria cópia do diálogo.
+   */
+  confirmacaoDeEscrita: { comandos: string[]; aoConfirmar: () => void } | null
 
   setTheme: (theme: ThemeMode) => void
   applySystemTheme: (theme: 'light' | 'dark') => void
@@ -54,6 +62,8 @@ interface AppState {
   openModal: (modal: AppState['modal'], connectionId?: string) => void
   closeModal: () => void
   notify: (message: string, tone?: 'info' | 'success' | 'danger') => void
+  pedirConfirmacaoDeEscrita: (comandos: string[], aoConfirmar: () => void) => void
+  fecharConfirmacaoDeEscrita: () => void
 }
 
 const STORAGE_KEY = 'vela.theme'
@@ -150,6 +160,7 @@ export const useAppStore = create<AppState>((set, get) => {
     modal: null,
     editingConnectionId: null,
     toast: null,
+    confirmacaoDeEscrita: null,
 
     setTheme: (theme) => {
       localStorage.setItem(STORAGE_KEY, theme)
@@ -199,6 +210,11 @@ export const useAppStore = create<AppState>((set, get) => {
 
     openModal: (modal, connectionId) => set({ modal, editingConnectionId: connectionId ?? null }),
     closeModal: () => set({ modal: null, editingConnectionId: null }),
+
+    pedirConfirmacaoDeEscrita: (comandos, aoConfirmar) =>
+      set({ confirmacaoDeEscrita: { comandos, aoConfirmar } }),
+
+    fecharConfirmacaoDeEscrita: () => set({ confirmacaoDeEscrita: null }),
 
     notify: (message, tone = 'info') => {
       clearTimeout(toastTimer)

@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { isUnboundedMutation, splitStatements } from '@shared/sql-shape'
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
 import { useTabStore } from '../store/tabs'
@@ -13,13 +14,13 @@ let queryCounter = 0
  * comportamentos sutilmente diferentes entre eles.
  */
 export function useRunQuery(): {
-  run: (sqlOverride?: string) => Promise<void>
+  run: (sqlOverride?: string, jaConfirmado?: boolean) => Promise<void>
   cancel: () => Promise<void>
 } {
   const notify = useAppStore((s) => s.notify)
 
   const run = useCallback(
-    async (sqlOverride?: string) => {
+    async (sqlOverride?: string, jaConfirmado = false) => {
       const { activeId: connectionId, activeDatabase } = useConnectionStore.getState()
       if (!connectionId) {
         notify('Conecte-se a um banco antes de executar.', 'danger')
@@ -33,6 +34,15 @@ export function useRunQuery(): {
       const sql = (sqlOverride ?? tab.sql).trim()
       if (!sql) return
       if (tab.running) return
+
+      // UPDATE/DELETE sem WHERE atinge a tabela inteira e não tem desfazer.
+      // A confirmação fica aqui, no caminho único de execução, para valer
+      // igual pelo atalho, pelo botão e pelo menu.
+      const semWhere = splitStatements(sql).filter(isUnboundedMutation)
+      if (semWhere.length > 0 && !jaConfirmado) {
+        useAppStore.getState().pedirConfirmacaoDeEscrita(semWhere, () => void run(sql, true))
+        return
+      }
 
       const queryId = `q_${Date.now()}_${++queryCounter}`
       // `connectionId` não entra no patch: a conexão da aba é imutável.

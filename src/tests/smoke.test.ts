@@ -7,13 +7,8 @@
  */
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import {
-  splitStatements,
-  isMutation,
-  isUnboundedMutation,
-  hasExplicitLimit,
-  applyPreviewLimit
-} from '../main/drivers/types.ts'
+import { hasExplicitLimit, applyPreviewLimit } from '../main/drivers/types.ts'
+import { splitStatements, isMutation, isUnboundedMutation } from '../shared/sql-shape.ts'
 import { translateError, nearest } from '../main/error-translator.ts'
 import { parseMongoCommand, splitMongoCommands } from '../main/drivers/mongo-parser.ts'
 import {

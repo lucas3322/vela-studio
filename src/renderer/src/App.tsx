@@ -9,6 +9,7 @@ import { CheatsheetModal } from './components/CheatsheetModal'
 import { UpdateModal } from './components/UpdateModal'
 import { SaveQueryModal } from './components/SaveQueryModal'
 import { PreferencesModal } from './components/PreferencesModal'
+import { UnboundedMutationDialog } from './components/UnboundedMutationDialog'
 import { Toast } from './components/Toast'
 import { useAppStore } from './store/app'
 import { useConnectionStore } from './store/connections'
@@ -19,6 +20,8 @@ import './styles/layout.css'
 
 export function App(): React.JSX.Element {
   const { sidebarVisible, modal, applySystemTheme } = useAppStore()
+  const confirmacaoDeEscrita = useAppStore((s) => s.confirmacaoDeEscrita)
+  const fecharConfirmacaoDeEscrita = useAppStore((s) => s.fecharConfirmacaoDeEscrita)
   const refreshSaved = useConnectionStore((s) => s.refreshSaved)
   const connectionId = useConnectionStore((s) => s.activeId)
   const database = useConnectionStore((s) => s.activeDatabase)
@@ -88,6 +91,17 @@ export function App(): React.JSX.Element {
       {modal === 'update' && <UpdateModal />}
       {modal === 'saveQuery' && <SaveQueryModal />}
       {modal === 'preferences' && <PreferencesModal />}
+      {confirmacaoDeEscrita && (
+        <UnboundedMutationDialog
+          comandos={confirmacaoDeEscrita.comandos}
+          onConfirm={() => {
+            const { aoConfirmar } = confirmacaoDeEscrita
+            fecharConfirmacaoDeEscrita()
+            aoConfirmar()
+          }}
+          onCancel={fecharConfirmacaoDeEscrita}
+        />
+      )}
       <Toast />
     </div>
   )

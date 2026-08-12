@@ -11,7 +11,7 @@ import type {
 import { ConnectionManager } from './connection-manager'
 import { ConnectionStore } from './connection-store'
 import { translateError } from './error-translator'
-import { isUnboundedMutation, splitStatements } from './drivers/types'
+import { isMutation, splitStatements } from '../shared/sql-shape'
 import { abrirArquivo, abrirPaginaDaRelease, baixarAtualizacao, verificarAtualizacao } from './updater'
 
 export function registerIpcHandlers(manager: ConnectionManager, store: ConnectionStore): void {
@@ -180,9 +180,13 @@ export function registerIpcHandlers(manager: ConnectionManager, store: Connectio
       const started = Date.now()
 
       try {
+        // `isMutation`, não `isUnboundedMutation`: em somente-leitura o que se
+        // bloqueia é qualquer escrita. Com o predicado antigo, um
+        // `UPDATE ... WHERE id = 1` passava por aqui — os drivers ainda
+        // barravam, mas a checagem dizia outra coisa do que fazia.
         if (config.readOnly && config.driver !== 'mongodb') {
           for (const statement of splitStatements(params.sql)) {
-            if (isUnboundedMutation(statement)) {
+            if (isMutation(statement)) {
               throw new Error('Conexão em modo somente-leitura: comandos de escrita estão bloqueados.')
             }
           }
