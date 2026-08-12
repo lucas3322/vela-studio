@@ -198,7 +198,30 @@ h1, h2, h3 { font-family: var(--display); font-weight: 400; line-height: 1.02; l
 
 /* ── Hero ────────────────────────────────────────────────────────── */
 
-.hero { position: relative; padding: 168px 0 96px; z-index: 1; }
+/*
+ * O hero precisa terminar depois da primeira dobra, não no meio dela.
+ *
+ * Com altura só de conteúdo ele fechava em ~793px. Num monitor de 1080 isso
+ * deixava 287px da prancha clara aparecendo embaixo — uma faixa creme colada
+ * ao hero, cortada pela borda da tela. Em 720p o problema sumia, que é por que
+ * ele só aparecia "em certos monitores".
+ *
+ * `min-height: 100svh` com o conteúdo centralizado. Tentei limitar a 960px
+ * antes, mas o teto só mudava o monitor onde o defeito aparecia: em 1440p
+ * sobravam 480px de creme na dobra. Preencher a viewport é o que faz a junta
+ * cair sempre no lugar certo, em qualquer altura de tela.
+ *
+ * `svh` em vez de `vh` porque no mobile a barra do navegador some e volta —
+ * com `vh` o hero saltaria de tamanho durante a rolagem.
+ */
+.hero {
+  position: relative;
+  z-index: 1;
+  padding: clamp(124px, 15vh, 168px) 0 clamp(96px, 11vh, 148px);
+  min-height: 100svh;
+  display: grid;
+  align-content: center;
+}
 
 .hero__grid {
   display: grid;
@@ -305,7 +328,9 @@ h1, h2, h3 { font-family: var(--display); font-weight: 400; line-height: 1.02; l
   color: #14181D;
   position: relative;
   z-index: 1;
-  border-top: 1px solid rgba(0,0,0,.1);
+  /* Uma linha preta sobre fundo escuro vira sujeira, não separação. O tom
+     quente do papel rebatido em opacidade baixa marca a junta sem endurecer. */
+  border-top: 1px solid rgba(232, 226, 211, .14);
   border-bottom: 1px solid rgba(0,0,0,.1);
 }
 .thesis::before {
@@ -422,6 +447,13 @@ h1, h2, h3 { font-family: var(--display); font-weight: 400; line-height: 1.02; l
   font-size: 13.5px; line-height: 1.6; color: #D9C79A;
 }
 .notice svg { flex-shrink: 0; margin-top: 2px; color: #FBBF24; }
+
+/* Item de flex não encolhe abaixo do próprio conteúdo: o padrão é
+   `min-width: auto`. Com o comando de terminal em `nowrap` lá dentro, esse
+   mínimo virava 455px e a página inteira ganhava rolagem lateral no celular.
+   `min-width: 0` devolve ao texto a permissão de encolher, e aí o `code`
+   consegue rolar dentro da própria caixa. */
+.notice > span { min-width: 0; }
 .notice__passos { display: block; margin-top: 11px; }
 .notice__passos b { color: #F0DFAE; }
 .notice__alt { display: block; margin-top: 5px; font-size: 12.5px; opacity: .82; }
@@ -478,9 +510,13 @@ h1, h2, h3 { font-family: var(--display); font-weight: 400; line-height: 1.02; l
 }
 .nota__hash:hover { color: var(--amber); background: rgba(251,191,36,.12); }
 
+/* `display: block` é o que faz o comando rolar dentro da própria caixa.
+   Como `inline-block`, o `max-width: 100%` era resolvido no contexto inline e
+   não segurava nada: o comando esticava a linha e a página inteira ganhava
+   142px de rolagem lateral no celular — a tela andava de lado. */
 .notice__alt code {
-  display: inline-block; max-width: 100%; overflow-x: auto; vertical-align: bottom;
-  padding: 2px 6px; border-radius: 4px;
+  display: block; max-width: 100%; overflow-x: auto;
+  margin-top: 4px; padding: 4px 7px; border-radius: 4px;
   background: rgba(0,0,0,.28); font-size: 12px; white-space: nowrap;
 }
 
@@ -507,8 +543,15 @@ h1, h2, h3 { font-family: var(--display); font-weight: 400; line-height: 1.02; l
 
 /* ── Responsivo ──────────────────────────────────────────────────── */
 
+/* Telas baixas (notebook em 768px de altura, janela pela metade): o
+   `min-height` viraria uma gaiola e o conteúdo transbordaria. Volta a crescer
+   pelo conteúdo. */
+@media (max-height: 760px) {
+  .hero { min-height: 0; }
+}
+
 @media (max-width: 960px) {
-  .hero { padding-top: 128px; }
+  .hero { padding-top: 128px; min-height: 0; }
   .hero__grid, .demo, .demo--flip .demo__text { grid-template-columns: 1fr; order: 0; }
   .nav__links { display: none; }
   .window__body { grid-template-columns: 1fr; }
