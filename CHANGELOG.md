@@ -3,6 +3,13 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.17.0 — 2026-08-12
+
+### Novidades
+
+- adicionar testes de cobertura para documentação de hover por dialeto (156e91c)
+- adicionar suporte a previewRows e ajustar lógica de limite nas consultas (b58a2f8)
+
 ## 0.16.0 — 2026-08-12
 
 ### Novidades
