@@ -1137,41 +1137,6 @@
   margin-top: var(--space-2);
 }
 
-.welcome__item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  background: var(--bg-surface);
-  text-align: left;
-  transition: border-color var(--duration-fast) var(--ease),
-    background var(--duration-fast) var(--ease);
-}
-
-.welcome__item:hover {
-  border-color: var(--accent);
-  background: var(--bg-hover);
-}
-
-.welcome__item-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.welcome__item-name {
-  font-weight: 500;
-}
-
-.welcome__item-meta {
-  font-size: var(--text-xs);
-  color: var(--text-tertiary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 /* ── Lista de histórico ──────────────────────────────────────────── */
 
 .history-item {
@@ -1871,4 +1836,105 @@
   flex-shrink: 0;
   /* Contorno interno para a amostra clara não sumir no fundo claro. */
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+/* ── Conexão salva na lista ────────────────────────────────────────── */
+
+.conexao {
+  position: relative;
+  display: flex;
+}
+
+.conexao__abrir {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease),
+    background var(--duration-fast) var(--ease);
+}
+
+.conexao__abrir:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.conexao__abrir:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.conexao__corpo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.conexao__nome {
+  font-weight: 500;
+}
+
+.conexao__destino {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/*
+ * As ações ocupam o lugar do rótulo do driver, sobrepostas ao cartão.
+ *
+ * Ficavam ao lado, sempre visíveis, disputando atenção com o nome da conexão
+ * em cada linha. Aqui elas só existem quando a linha é o alvo — e `focus-within`
+ * garante que quem navega por teclado também as alcance.
+ */
+.conexao__acoes {
+  position: absolute;
+  right: var(--space-2);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  /* No tema claro `--bg-elevated` é branco, igual à superfície do cartão: sem
+     a borda, a caixa de ações se apoiaria só na sombra e mal se distinguiria. */
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-sm);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease);
+}
+
+.conexao:hover .conexao__acoes,
+.conexao:focus-within .conexao__acoes {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* O rótulo do driver cede o lugar em vez de ficar por baixo das ações. */
+.conexao--com-acoes:hover .conexao__driver,
+.conexao--com-acoes:focus-within .conexao__driver {
+  opacity: 0;
+}
+
+.conexao__driver {
+  transition: opacity var(--duration-fast) var(--ease);
+}
+
+.icon-btn--danger:hover {
+  color: var(--danger);
+  background: var(--danger-subtle);
 }

@@ -1,7 +1,8 @@
 import { DRIVERS, type StoredConnection } from '@shared/types'
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
-import { IconDatabase, IconSail, IconPlus } from './Icons'
+import { IconSail, IconPlus } from './Icons'
+import { ConnectionRow } from './ConnectionRow'
 
 /**
  * A conexão exige senha e não tem nenhuma guardada?
@@ -25,6 +26,7 @@ export function WelcomeScreen(): React.JSX.Element {
   const saved = useConnectionStore((s) => s.saved)
   const connect = useConnectionStore((s) => s.connect)
   const connecting = useConnectionStore((s) => s.connecting)
+  const removeConnection = useConnectionStore((s) => s.removeConnection)
 
   const handleConnect = async (id: string): Promise<void> => {
     const stored = saved.find((c) => c.id === id)
@@ -63,24 +65,14 @@ export function WelcomeScreen(): React.JSX.Element {
       {saved.length > 0 && (
         <div className="welcome__list">
           {saved.slice(0, 6).map((connection) => (
-            <button
+            <ConnectionRow
               key={connection.id}
-              className="welcome__item"
-              onClick={() => void handleConnect(connection.id)}
+              connection={connection}
               disabled={connecting}
-            >
-              <IconDatabase size={17} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-              <span className="welcome__item-body">
-                <div className="welcome__item-name">{connection.name}</div>
-                <div className="welcome__item-meta">
-                  {connection.filePath ??
-                    `${connection.host ?? 'localhost'}${connection.port ? `:${connection.port}` : ''}${
-                      connection.database ? `/${connection.database}` : ''
-                    }`}
-                </div>
-              </span>
-              <span className="badge">{DRIVERS[connection.driver].label.split(' ')[0]}</span>
-            </button>
+              onOpen={() => void handleConnect(connection.id)}
+              onEdit={() => openModal('connection', connection.id)}
+              onRemove={() => void removeConnection(connection.id)}
+            />
           ))}
         </div>
       )}

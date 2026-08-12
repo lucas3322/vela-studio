@@ -117,6 +117,23 @@ Antes de escrever CSS novo, veja se já existe em `global.css`:
 Layout e componentes específicos ficam em `layout.css`, nomeados por bloco
 (`.sidebar__connection`, `.grid__cell--number`).
 
+## Ações reveladas no hover
+
+Ações secundárias de um item de lista (editar, remover) ficam **dentro** do
+cartão, sobrepostas à direita, e só aparecem no `:hover`. Fora dele, cada
+linha carregava ícones permanentes competindo com o conteúdo que a pessoa
+está procurando.
+
+Duas regras que acompanham:
+
+- **Sempre `:focus-within` junto do `:hover`.** Revelar só no hover deixa quem
+  navega por teclado sem acesso à ação.
+- **`pointer-events: none` enquanto escondido**, senão a área continua
+  clicável e o usuário aperta um botão invisível.
+
+Um `<button>` não pode conter outro botão: o cartão é uma `<div>` com o botão
+principal ocupando a área e as ações sobrepostas. Ver `ConnectionRow.tsx`.
+
 ## Paleta de acento
 
 O usuário escolhe a cor de destaque em Preferências, de uma **lista fechada**

@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react'
+import { ConnectionRow } from './ConnectionRow'
 import { DRIVERS, type ConnectionConfig, type DriverId, type TestResult } from '@shared/types'
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
 import {
   IconCheck,
   IconClose,
-  IconDatabase,
-  IconEdit,
-  IconTrash,
   IconView,
   IconViewOff,
   IconWarning
@@ -194,47 +192,21 @@ export function ConnectionModal(): React.JSX.Element {
           <>
             <div className="modal__body" style={{ gap: 'var(--space-2)' }}>
               {saved.map((connection) => (
-                <div key={connection.id} style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                  <button
-                    className="welcome__item"
-                    style={{ flex: 1 }}
-                    onClick={() => void handleConnectSaved(connection.id)}
-                    disabled={connecting}
-                  >
-                    <IconDatabase size={17} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                    <span className="welcome__item-body">
-                      <div className="welcome__item-name">{connection.name}</div>
-                      <div className="welcome__item-meta">
-                        {connection.filePath ??
-                          `${connection.host}${connection.port ? `:${connection.port}` : ''}${
-                            connection.database ? `/${connection.database}` : ''
-                          }`}
-                      </div>
-                    </span>
-                    <span className="badge">{DRIVERS[connection.driver].label.split(' ')[0]}</span>
-                  </button>
-                  <button
-                    className="icon-btn"
-                    title="Editar conexão"
-                    onClick={() => {
-                      // A senha não vem do store para o renderer; o campo abre
-                      // vazio e, se não for digitada, a salva é preservada.
-                      setConfig({ ...connection, password: '' })
-                      setSenhaVisivel(false)
-                      setTestResult(null)
-                      setShowList(false)
-                    }}
-                  >
-                    <IconEdit size={14} />
-                  </button>
-                  <button
-                    className="icon-btn"
-                    title="Remover conexão"
-                    onClick={() => void removeConnection(connection.id)}
-                  >
-                    <IconTrash size={14} />
-                  </button>
-                </div>
+                <ConnectionRow
+                  key={connection.id}
+                  connection={connection}
+                  disabled={connecting}
+                  onOpen={() => void handleConnectSaved(connection.id)}
+                  onEdit={() => {
+                    // A senha não vem do store para o renderer; o campo abre
+                    // vazio e, se não for digitada, a salva é preservada.
+                    setConfig({ ...connection, password: '' })
+                    setSenhaVisivel(false)
+                    setTestResult(null)
+                    setShowList(false)
+                  }}
+                  onRemove={() => void removeConnection(connection.id)}
+                />
               ))}
             </div>
             <div className="modal__footer">
