@@ -7,7 +7,7 @@ import { useTabStore, type Tab } from '../store/tabs'
 import { EditableGrid, type OrdenacaoDaGrade } from './EditableGrid'
 import { AlterColumnDialog } from './AlterColumnDialog'
 import { ErrorPanel } from './ErrorPanel'
-import { IconKey, IconLink } from './Icons'
+import { IconKey, IconLink, IconRefresh } from './Icons'
 
 type Panel = 'dados' | 'colunas' | 'indices' | 'relacoes'
 
@@ -46,6 +46,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
   const database = useConnectionStore((s) => s.activeDatabase)
   const connection = useConnectionStore((s) => s.saved.find((c) => c.id === s.activeId))
   const updateTab = useTabStore((s) => s.updateTab)
+  const reloadTab = useTabStore((s) => s.reloadTab)
   const notify = useAppStore((s) => s.notify)
 
   const table = tab.table!
@@ -146,6 +147,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
     pagina,
     tamanhoPagina,
     tab.id,
+    tab.reloadToken,
     updateTab,
     notify
   ])
@@ -242,6 +244,11 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
               // E volta para a primeira página — a linha 250 de outra ordenação
               // não é a mesma linha, então continuar na página 3 não faria sentido.
               onPendingChange={setPendencias}
+              // Reconsulta depois de gravar. O banco pode ter guardado algo
+              // diferente do que foi digitado — trigger, coerção de tipo, um
+              // varchar que truncou — e a tela seguiria mostrando o texto do
+              // usuário como se fosse o valor real.
+              onApplied={() => reloadTab(tab.id)}
               onSort={(nova) => {
                 // Reordenar remonta o resultado e levaria as pendências junto.
                 if (pendencias > 0) {
@@ -317,6 +324,20 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
                   ordem não garantida — clique num cabeçalho para fixar
                 </span>
               )}
+
+              <button
+                className="btn btn--secondary btn--sm"
+                onClick={() => reloadTab(tab.id)}
+                disabled={loading || pendencias > 0}
+                title={
+                  pendencias > 0
+                    ? 'Confirme ou descarte as alterações antes de recarregar'
+                    : 'Recarregar do banco (⌘R)'
+                }
+              >
+                <IconRefresh size={13} />
+                Atualizar
+              </button>
 
               <span className="paginacao__espaco" />
 

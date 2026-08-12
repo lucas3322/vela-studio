@@ -44,6 +44,13 @@ interface Props {
    * voltaria achando que gravou.
    */
   onPendingChange?: (quantidade: number) => void
+  /**
+   * Chamado quando **tudo** foi gravado sem falha.
+   *
+   * Só nesse caso: com alguma pendência restante, reconsultar o banco
+   * descartaria em silêncio a alteração que ainda não entrou.
+   */
+  onApplied?: () => void
 }
 
 export interface OrdenacaoDaGrade {
@@ -81,7 +88,8 @@ export function EditableGrid({
   onNotify,
   sort,
   onSort,
-  onPendingChange
+  onPendingChange,
+  onApplied
 }: Props): React.JSX.Element {
   const scroller = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
@@ -112,6 +120,20 @@ export function EditableGrid({
   useEffect(() => {
     onPendingChange?.(Object.keys(pendentes).length + exclusoesPendentes.size)
   }, [pendentes, exclusoesPendentes, onPendingChange])
+
+  /**
+   * Tipo real de cada coluna, vindo do catálogo.
+   *
+   * O `QueryResult` só carrega a categoria inferida (`string`, `number`), que
+   * serve para colorir a célula mas diz pouco: `varchar(32)` e `text` viram
+   * ambos "STRING". Quando a aba é de tabela temos o tipo de verdade, e é ele
+   * que ajuda a decidir se um valor cabe.
+   */
+  const tiposReais = useMemo(() => {
+    const mapa: Record<string, string> = {}
+    for (const coluna of schemaColumns ?? []) mapa[coluna.name] = coluna.type
+    return mapa
+  }, [schemaColumns])
 
   const chavesPrimarias = useMemo(
     () => (schemaColumns ?? []).filter((c) => c.isPrimaryKey).map((c) => c.name),
@@ -321,6 +343,7 @@ export function EditableGrid({
 
       if (falhas.length === 0) {
         onNotify?.(`${gravadas} alteração(ões) gravada(s).`, 'success')
+        onApplied?.()
       } else {
         onNotify?.(
           `${gravadas} gravada(s), ${falhas.length} falhou(ram). ${falhas[0]}`,
@@ -330,7 +353,16 @@ export function EditableGrid({
     } finally {
       setAplicando(false)
     }
-  }, [aplicando, pendentes, exclusoesPendentes, chaveDaLinha, onEditCell, onDeleteRow, onNotify])
+  }, [
+    aplicando,
+    pendentes,
+    exclusoesPendentes,
+    chaveDaLinha,
+    onEditCell,
+    onDeleteRow,
+    onNotify,
+    onApplied
+  ])
 
   // ── Teclado ────────────────────────────────────────────────────────
 
@@ -478,7 +510,9 @@ export function EditableGrid({
                   {ordenadaPor && (
                     <span className="grid__th-ordem">{ordenadaPor === 'asc' ? '↑' : '↓'}</span>
                   )}
-                  <span className="grid__th-type">{coluna.type}</span>
+                  <span className="grid__th-type">
+                    {tiposReais[coluna.name] ?? coluna.type}
+                  </span>
                   <span
                     className="grid__th-resize"
                     onMouseDown={iniciarRedimensionamento(indice)}

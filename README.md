@@ -155,6 +155,7 @@ editor desconhecido.
 | `⌘⇧↵` | Executar a aba inteira |
 | `⌘.` | Cancelar execução |
 | `⌘S` | Salvar a query da aba |
+| `⌘R` | Atualizar — reconsulta a tabela ou reexecuta a query |
 | `⌘⇧F` | Formatar SQL |
 | `⌘T` | Nova aba de query |
 | `⌘B` | Barra lateral |

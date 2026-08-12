@@ -32,6 +32,16 @@ export function useMenuEvents(): void {
       window.velaEvents.on('menu:runAll', () => triggerEditorAction('vela.runAll')),
       window.velaEvents.on('menu:format', () => triggerEditorAction('vela.format')),
       window.velaEvents.on('menu:cancel', () => void cancel()),
+      window.velaEvents.on('menu:refresh', () => {
+        const connectionId = useConnectionStore.getState().activeId
+        const tab = useTabStore.getState().activeTabFor(connectionId)
+        if (!tab) return
+        // Numa aba de tabela, recarregar é reconsultar o banco. Numa aba de
+        // query, é reexecutar o que está escrito — as duas coisas são "me
+        // mostre o estado atual", que é o que ⌘R significa em todo lugar.
+        if (tab.kind === 'table') useTabStore.getState().reloadTab(tab.id)
+        else triggerEditorAction('vela.run')
+      }),
       window.velaEvents.on('menu:history', () => useAppStore.getState().openModal('history')),
       window.velaEvents.on('menu:cheatsheet', () => useAppStore.getState().openModal('cheatsheet')),
       window.velaEvents.on('menu:checkUpdate', () => useAppStore.getState().openModal('update')),

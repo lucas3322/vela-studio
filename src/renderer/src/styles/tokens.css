@@ -77,6 +77,11 @@
   --border-subtle: rgba(255, 255, 255, 0.06);
   --border-default: rgba(255, 255, 255, 0.1);
   --border-strong: rgba(255, 255, 255, 0.18);
+  /* Linha do grid. Separada de `--border-subtle` porque tem trabalho
+     diferente: a borda sutil separa painéis grandes, esta precisa desenhar
+     uma malha de milhares de células. A 0.06 ela media 1.17:1 contra o fundo
+     e simplesmente não era vista — o grid lia como texto solto, não tabela. */
+  --grid-line: rgba(255, 255, 255, 0.13);
 
   --text-primary: #e8eaed;
   --text-secondary: #a2a9b5;
@@ -132,6 +137,7 @@
   --border-subtle: rgba(0, 0, 0, 0.06);
   --border-default: rgba(0, 0, 0, 0.11);
   --border-strong: rgba(0, 0, 0, 0.2);
+  --grid-line: rgba(0, 0, 0, 0.14);
 
   --text-primary: #1a1d23;
   --text-secondary: #5a6472;

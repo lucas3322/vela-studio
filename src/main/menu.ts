@@ -101,6 +101,13 @@ export function buildMenu(getWindow: () => BrowserWindow | null): Menu {
           accelerator: 'Cmd+.',
           click: () => send('menu:cancel')
         },
+        {
+          // Cmd+R é livre aqui: este menu é montado do zero e não inclui o
+          // papel `reload` do Electron, que recarregaria a janela inteira.
+          label: 'Atualizar Dados',
+          accelerator: 'Cmd+R',
+          click: () => send('menu:refresh')
+        },
         { type: 'separator' },
         {
           label: 'Histórico',

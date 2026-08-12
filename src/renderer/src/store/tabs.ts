@@ -17,6 +17,14 @@ export interface Tab {
    * na lista.
    */
   savedQueryId?: string
+  /**
+   * Contador que força a aba a reconsultar o banco.
+   *
+   * Um número em vez de um booleano: recarregar duas vezes seguidas precisa
+   * disparar duas vezes, e um `true` que já era `true` não muda nada — o
+   * efeito não reagiria ao segundo pedido.
+   */
+  reloadToken?: number
   /** Nome da tabela — só em abas de tabela. */
   table?: string
   /**
@@ -51,6 +59,14 @@ interface TabState {
     sql?: string
     title?: string
     savedQueryId?: string
+  /**
+   * Contador que força a aba a reconsultar o banco.
+   *
+   * Um número em vez de um booleano: recarregar duas vezes seguidas precisa
+   * disparar duas vezes, e um `true` que já era `true` não muda nada — o
+   * efeito não reagiria ao segundo pedido.
+   */
+  reloadToken?: number
   }) => string
   openTableTab: (options: {
     connectionId: string
@@ -61,6 +77,8 @@ interface TabState {
   closeTab: (id: string) => void
   setActive: (id: string) => void
   updateTab: (id: string, patch: Partial<Tab>) => void
+  /** Pede à aba que reconsulte o banco. */
+  reloadTab: (id: string) => void
   /** Fecha todas as abas de uma conexão — usado ao desconectar. */
   closeConnectionTabs: (connectionId: string) => void
 
@@ -183,6 +201,13 @@ export const useTabStore = create<TabState>((set, get) => ({
       }
     })
   },
+
+  reloadTab: (id) =>
+    set((state) => ({
+      tabs: state.tabs.map((t) =>
+        t.id === id ? { ...t, reloadToken: (t.reloadToken ?? 0) + 1 } : t
+      )
+    })),
 
   updateTab: (id, patch) =>
     set((state) => ({

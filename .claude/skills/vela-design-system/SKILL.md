@@ -27,10 +27,16 @@ nunca o valor literal.
 
 ### Tipografia
 - `--font-ui` — SF Pro / system
-- `--font-mono` — SF Mono / JetBrains Mono (código e **dados do grid**)
+- `--font-mono` — SF Mono / JetBrains Mono (código e dados que **alinham**:
+  número, data, booleano, NULL)
 - `--text-xs` 11 · `--text-sm` 12 · `--text-base` 13 · `--text-md` 14 · `--text-lg` 16
 
 13px é o corpo padrão. Densidade de IDE, não de site.
+
+**No grid, a fonte depende do que a coluna carrega.** Monoespaçada é a base,
+porque número e data precisam alinhar por coluna. Texto corrido (`string`,
+`json`) usa `--font-ui`: um nome de empresa em mono ocupa ~15% mais largura e
+obriga a soletrar em vez de reconhecer a palavra.
 
 ### Superfícies (do fundo para a frente)
 `--bg-app` → `--bg-sidebar` → `--bg-surface` → `--bg-elevated`
@@ -44,6 +50,14 @@ conteúdo que o usuário precisa ler.
 ### Acento
 Âmbar, via `--accent-h` / `--accent-s`. Único destaque cromático da interface.
 `--accent-subtle` para fundos, `--accent-text` para texto sobre superfície.
+
+### Linhas do grid
+
+`--grid-line` é a malha do grid, separada de `--border-subtle` de propósito: a
+borda sutil separa painéis grandes, e a malha desenha milhares de células. Com
+o valor da borda sutil ela media **1.17:1** contra o fundo — abaixo do limiar
+de percepção, e o grid lia como texto solto em vez de tabela. Hoje está em
+1.47:1 no escuro e 1.38:1 no claro.
 
 ### Cores de dado (só no grid)
 `--data-number` · `--data-string` · `--data-date` · `--data-boolean` ·

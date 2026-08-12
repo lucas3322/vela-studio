@@ -512,8 +512,21 @@
   min-height: 0;
   overflow: auto;
   position: relative;
+  /*
+   * Monoespaçada é a base: número, data e código alinham por coluna e a
+   * leitura vertical depende disso.
+   *
+   * Texto corrido é a exceção, logo abaixo. Um nome de empresa em mono ocupa
+   * ~15% mais largura e obriga a soletrar em vez de reconhecer a palavra —
+   * era o que fazia a grade parecer esparsa ao lado do Beekeeper.
+   */
   font-family: var(--font-mono);
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
+}
+
+.grid__cell--string,
+.grid__cell--json {
+  font-family: var(--font-ui);
 }
 
 .grid__inner {
@@ -546,11 +559,13 @@
   flex-shrink: 0;
 }
 
+/* Em caixa alta o rótulo do tipo gritava mais que o nome da coluna, que é o
+   que a pessoa procura. E 10px era valor mágico — não existe no sistema. */
 .grid__th-type {
   font-weight: 400;
   color: var(--text-tertiary);
-  font-size: 10px;
-  text-transform: uppercase;
+  font-size: var(--text-xs);
+  white-space: nowrap;
 }
 
 .grid__th-resize {
@@ -570,7 +585,7 @@
 .grid__row {
   display: flex;
   height: var(--row-height);
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--grid-line);
 }
 
 .grid__row:hover {
@@ -586,7 +601,7 @@
   align-items: center;
   height: var(--row-height);
   padding: 0 var(--space-2);
-  border-right: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--grid-line);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -629,7 +644,7 @@
   justify-content: flex-end;
   width: 52px;
   padding-right: var(--space-2);
-  border-right: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--grid-line);
   color: var(--text-tertiary);
   font-size: var(--text-xs);
   flex-shrink: 0;
