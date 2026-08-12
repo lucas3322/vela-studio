@@ -42,6 +42,13 @@ export const IconTable = (p: IconProps): React.JSX.Element => (
   </Icon>
 )
 
+/** Chevrons de código — marca a aba de query, como no editor. */
+export const IconCode = (p: IconProps): React.JSX.Element => (
+  <Icon {...p}>
+    <path d="M5.5 4.5 2 8l3.5 3.5M10.5 4.5 14 8l-3.5 3.5" />
+  </Icon>
+)
+
 export const IconView = (p: IconProps): React.JSX.Element => (
   <Icon {...p}>
     <path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8Z" />

@@ -326,7 +326,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
               )}
 
               <button
-                className="btn btn--secondary btn--sm"
+                className="btn btn--secondary btn--sm btn--acento"
                 onClick={() => reloadTab(tab.id)}
                 disabled={loading || pendencias > 0}
                 title={

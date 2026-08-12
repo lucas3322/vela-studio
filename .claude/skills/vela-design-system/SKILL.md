@@ -117,6 +117,16 @@ Antes de escrever CSS novo, veja se já existe em `global.css`:
 Layout e componentes específicos ficam em `layout.css`, nomeados por bloco
 (`.sidebar__connection`, `.grid__cell--number`).
 
+## Abas: tipo pelo ícone, atual pelo fundo
+
+Aba de tabela usa ícone de grade em `--accent-text`; aba de query, chevrons
+`<>` em `--text-tertiary`. Quem está **ativa** é o fundo (`--bg-surface`), não
+a cor.
+
+Os dois sinais precisam ficar separados: pintar toda aba de tabela de âmbar
+faria o usuário não saber se o âmbar quer dizer "é tabela" ou "é a atual". E o
+ícone sobrevive a quem não distingue cores — a forma já diz o tipo.
+
 ## Ícones
 
 `components/Icons.tsx`, grade de 16px, traço 1.5, `currentColor`. Inline em

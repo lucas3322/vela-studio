@@ -9,7 +9,16 @@ import { ErrorPanel } from './ErrorPanel'
 import { HelpPanel } from './HelpPanel'
 import { TableView } from './TableView'
 import { WelcomeScreen } from './WelcomeScreen'
-import { IconClose, IconDownload, IconPlay, IconPlus, IconSparkle, IconStop } from './Icons'
+import {
+  IconClose,
+  IconCode,
+  IconDownload,
+  IconPlay,
+  IconPlus,
+  IconSparkle,
+  IconStop,
+  IconTable
+} from './Icons'
 
 const numberFormat = new Intl.NumberFormat('pt-BR')
 
@@ -51,6 +60,15 @@ export function Workspace(): React.JSX.Element {
             }}
             title={item.kind === 'table' ? `Tabela ${item.title}` : item.title}
           >
+            {/*
+              O ícone carrega o tipo da aba; a cor de fundo continua carregando
+              "qual está ativa". Pintar toda aba de tabela de âmbar faria os
+              dois sinais brigarem — você não saberia se o âmbar quer dizer
+              "é tabela" ou "é a aba atual".
+            */}
+            <span className={`tab__kind tab__kind--${item.kind}`}>
+              {item.kind === 'table' ? <IconTable size={13} /> : <IconCode size={13} />}
+            </span>
             {item.kind === 'query' && item.dirty && item.sql.trim() && <span className="tab__dot" />}
             <span className="tab__label">{item.title}</span>
             <span
