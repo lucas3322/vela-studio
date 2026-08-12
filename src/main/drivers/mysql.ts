@@ -61,7 +61,11 @@ export class MySQLDriver implements DatabaseDriver {
   async disconnect(): Promise<void> {
     await this.pool?.end()
     this.pool = undefined
-    this.buildOptions.apply(this, [this.config!]) // força erro se tentar reconectar sem config
+    // Nada além disso. Havia aqui uma chamada a `buildOptions` cujo resultado
+    // era descartado, com o comentário de que "forçava erro se reconectasse
+    // sem config" — o que ela de fato fazia era estourar em quem só testou a
+    // conexão e nunca a abriu, porque `this.config` ainda é indefinido nesse
+    // caso. Desconectar precisa ser seguro em qualquer estado.
   }
 
   async testConnection(config: ConnectionConfig): Promise<TestResult> {

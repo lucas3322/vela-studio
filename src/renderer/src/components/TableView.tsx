@@ -6,6 +6,8 @@ import { useConnectionStore } from '../store/connections'
 import { useTabStore, type Tab } from '../store/tabs'
 import { EditableGrid, type OrdenacaoDaGrade } from './EditableGrid'
 import { AlterColumnDialog } from './AlterColumnDialog'
+import { TableFilterBar } from './TableFilterBar'
+import { montarFiltroMongo, montarWhere, type Condicao } from '../editor/filter-builder'
 import { ErrorPanel } from './ErrorPanel'
 import { IconKey, IconLink, IconRefresh } from './Icons'
 
@@ -45,6 +47,8 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
   const [tipoEmEdicao, setTipoEmEdicao] = useState<{ coluna: string; texto: string } | null>(null)
   /** ALTER montado pelo driver, aguardando confirmação. */
   const [alterPendente, setAlterPendente] = useState<{ coluna: string; sql: string } | null>(null)
+  /** Filtro em vigor. Entra na consulta e volta para a primeira página. */
+  const [filtro, setFiltro] = useState<Condicao[]>([])
 
   const connectionId = useConnectionStore((s) => s.activeId)
   const database = useConnectionStore((s) => s.activeDatabase)
@@ -88,8 +92,8 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
       const limite = tamanhoPagina + 1
       const sql =
         dialect === 'mongodb'
-          ? montarFind(table, ordemEfetiva, limite, salto)
-          : montarSelect(table, dialect, ordemEfetiva, limite, salto)
+          ? montarFind(table, ordemEfetiva, limite, salto, montarFiltroMongo(filtro))
+          : montarSelect(table, dialect, ordemEfetiva, limite, salto, montarWhere(filtro, dialect))
 
       try {
         const [outcome, cols, idx, rels] = await Promise.all([
@@ -148,6 +152,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
     dialect,
     ordem,
     chaveDeOrdem,
+    filtro,
     pagina,
     tamanhoPagina,
     tab.id,
@@ -241,6 +246,18 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
 
       {panel === 'dados' && result && (
         <div className={`results ${loading ? 'results--recarregando' : ''}`}>
+          <TableFilterBar
+            columns={columns}
+            dialect={dialect}
+            aplicado={filtro}
+            disabled={pendencias > 0}
+            onAplicar={(condicoes) => {
+              // Filtrar muda o conjunto de linhas: continuar na página 5 do
+              // resultado anterior mostraria uma página vazia sem explicação.
+              setFiltro(condicoes)
+              setPagina(0)
+            }}
+          />
           {tab.error && <ErrorPanel error={tab.error} />}
           {result && (
             <EditableGrid
@@ -555,7 +572,8 @@ function montarSelect(
   dialect: string,
   ordem: OrdenacaoDaGrade | null,
   limite: number,
-  salto: number
+  salto: number,
+  where = ''
 ): string {
   const ordenacao = ordem
     ? ` ORDER BY ${quote(ordem.column, dialect)} ${ordem.direction === 'asc' ? 'ASC' : 'DESC'}`
@@ -565,20 +583,22 @@ function montarSelect(
   // 1. Só emitimos o OFFSET quando ele é necessário, e a paginação de verdade
   // pressupõe uma ordenação — por isso o aviso na barra.
   const paginacao = salto > 0 ? ` LIMIT ${limite} OFFSET ${salto}` : ` LIMIT ${limite}`
-  return `SELECT * FROM ${quote(table, dialect)}${ordenacao}${paginacao}`
+  const filtragem = where ? ` ${where}` : ''
+  return `SELECT * FROM ${quote(table, dialect)}${filtragem}${ordenacao}${paginacao}`
 }
 
 function montarFind(
   table: string,
   ordem: OrdenacaoDaGrade | null,
   limite: number,
-  salto: number
+  salto: number,
+  filtro = '{}'
 ): string {
   const ordenacao = ordem
     ? `.sort({ ${JSON.stringify(ordem.column)}: ${ordem.direction === 'asc' ? 1 : -1} })`
     : ''
   const pulo = salto > 0 ? `.skip(${salto})` : ''
-  return `db.${table}.find({})${ordenacao}${pulo}.limit(${limite})`
+  return `db.${table}.find(${filtro})${ordenacao}${pulo}.limit(${limite})`
 }
 
 /**

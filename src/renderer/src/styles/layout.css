@@ -1952,3 +1952,67 @@
   pointer-events: none;
   transition: opacity var(--duration-fast) var(--ease);
 }
+
+/* ── Barra de filtro rápido ────────────────────────────────────────── */
+
+.filtro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-sidebar);
+  flex-shrink: 0;
+}
+
+.filtro__linha {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* "onde" / "e" — a leitura da condição em voz corrente, para quem não
+   reconhece WHERE e AND de imediato. */
+.filtro__juncao {
+  width: 40px;
+  flex-shrink: 0;
+  text-align: right;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.filtro__coluna,
+.filtro__operador {
+  height: 28px;
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+}
+
+.filtro__coluna {
+  max-width: 220px;
+}
+
+.filtro__valor {
+  height: 28px;
+  flex: 1;
+  min-width: 120px;
+  font-size: var(--text-sm);
+}
+
+.filtro__valor:disabled {
+  opacity: 0.5;
+}
+
+/* O SQL gerado, à vista. Rola dentro da própria caixa em vez de esticar a
+   barra quando a condição fica longa. */
+.filtro__previa {
+  margin-left: 48px;
+  padding: 4px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--accent-text);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-x: auto;
+  white-space: nowrap;
+}
