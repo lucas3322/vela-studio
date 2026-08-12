@@ -3,6 +3,20 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.10.0 — 2026-08-12
+
+### Novidades
+
+- adicionar seleção de linha e copiar conteúdo da célula na grade (851af49)
+- adicionar ícone de código e ajustar exibição de abas no Workspace (8fae1ad)
+- ajustar cores e estilos dos botões e abas para melhor legibilidade (c8a023d)
+- atualizar diretrizes de contraste e acentos no sistema de design (019fdbf)
+- adicionar funcionalidade de recarga de aba e atualizar documentação (38bfb9e)
+
+### Outras mudanças
+
+- alteração na landing page (a854270)
+
 ## 0.9.0 — 2026-08-11
 
 ### Novidades
