@@ -340,7 +340,11 @@ h1, h2, h3 { font-family: var(--display); font-weight: 400; line-height: 1.02; l
   background-size: 34px 34px;
   pointer-events: none;
 }
-.thesis__inner { position: relative; padding: clamp(72px, 9vw, 118px) 0; }
+/* O `0` no lugar do recuo lateral zerava o `padding` que o `.wrap` já dava, e
+   esta era a única seção da página com o texto encostado na borda da janela.
+   Só aparecia abaixo de 1320px, onde o `max-width` deixa de criar margem
+   sozinho — em tela cheia passava despercebido. */
+.thesis__inner { position: relative; padding: clamp(72px, 9vw, 118px) var(--gutter); }
 .thesis blockquote {
   margin: 0;
   font-family: var(--display);
