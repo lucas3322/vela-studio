@@ -221,7 +221,9 @@ export class MongoDriver implements DatabaseDriver {
     // Com `.limit()` explícito respeitamos o pedido até o teto de segurança;
     // sem ele, devolvemos só a prévia.
     const explicit = /\.limit\s*\(/.test(source)
-    const maxRows = options.maxRows ?? (explicit ? DEFAULT_MAX_ROWS : PREVIEW_ROWS)
+    const maxRows =
+      options.maxRows ??
+      (explicit ? DEFAULT_MAX_ROWS : (options.previewRows ?? PREVIEW_ROWS))
     const results: QueryResult[] = []
 
     for (const command of splitMongoCommands(source)) {

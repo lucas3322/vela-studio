@@ -19,6 +19,16 @@ export interface QueryOptions {
   database?: string
   /** Teto de linhas trazidas pro renderer. Acima disso cortamos e avisamos. */
   maxRows?: number
+  /**
+   * Teto para quando a consulta **não** declara LIMIT.
+   *
+   * Separado do `maxRows` de propósito: `maxRows` é um teto que o chamador
+   * impõe custe o que custar (a exportação usa isso), enquanto este é só o
+   * padrão de quem não pediu limite nenhum. Espremer os dois num campo só fez
+   * um `LIMIT 50000` escrito pelo usuário ser cortado em 100 — o valor da
+   * preferência vencia o comando dele.
+   */
+  previewRows?: number
 }
 
 /**

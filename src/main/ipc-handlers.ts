@@ -174,6 +174,7 @@ export function registerIpcHandlers(manager: ConnectionManager, store: Connectio
         database?: string
         queryId: string
         maxRows?: number
+        previewRows?: number
       }
     ): Promise<QueryRunResult> => {
       const { driver, config } = manager.get(params.connectionId)
@@ -195,7 +196,8 @@ export function registerIpcHandlers(manager: ConnectionManager, store: Connectio
         const results = await driver.query(params.sql, {
           queryId: params.queryId,
           database: params.database,
-          maxRows: params.maxRows
+          maxRows: params.maxRows,
+          previewRows: params.previewRows
         })
 
         store.addHistory({

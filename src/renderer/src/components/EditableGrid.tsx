@@ -720,7 +720,7 @@ export function EditableGrid({
         </div>
       )}
 
-      <TruncationNotice cortadoEm={result.truncatedAt} />
+      <TruncationNotice linhas={result.rowCount} cortadoEm={result.truncatedAt} />
 
       {menu && (
         <ContextMenu

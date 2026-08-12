@@ -18,13 +18,36 @@ const numero = new Intl.NumberFormat('pt-BR')
  * Acima do limite configurado o aviso ganha o tom de alerta e fala de
  * desempenho. Abaixo, é só uma linha discreta constatando o corte.
  */
-export function TruncationNotice({ cortadoEm }: { cortadoEm?: number }): React.JSX.Element | null {
+export function TruncationNotice({
+  linhas,
+  cortadoEm
+}: {
+  /** Quantas linhas chegaram à grade. */
+  linhas: number
+  /** Onde o resultado foi cortado, se foi. */
+  cortadoEm?: number
+}): React.JSX.Element | null {
   const limiteAviso = useAppStore((s) => s.limiteAviso)
-  if (!cortadoEm) return null
+  const pesada = linhas >= limiteAviso || (!!cortadoEm && cortadoEm >= limiteAviso)
 
-  const pesada = cortadoEm >= limiteAviso
+  // Trazer muita linha é pesado mesmo quando nada foi cortado: um
+  // `LIMIT 50000` obedecido é justamente o caso em que o aviso mais importa,
+  // e olhar só o truncamento fazia ele nunca aparecer ali.
+  if (pesada) {
+    return (
+      <div className="grid__truncated grid__truncated--alerta">
+        <IconWarning size={14} />
+        <span>
+          <strong>{numero.format(linhas)} linhas</strong> é muita coisa para trazer de uma vez
+          {cortadoEm ? ' — e ainda há mais no banco' : ''}. Um <code>LIMIT</code> menor ou um
+          filtro no <code>WHERE</code> deixam a consulta mais rápida e o resultado mais fácil de
+          ler.
+        </span>
+      </div>
+    )
+  }
 
-  if (!pesada) {
+  if (cortadoEm) {
     return (
       <div className="grid__truncated">
         Mostrando {numero.format(cortadoEm)} linhas — o banco tem mais.
@@ -32,14 +55,5 @@ export function TruncationNotice({ cortadoEm }: { cortadoEm?: number }): React.J
     )
   }
 
-  return (
-    <div className="grid__truncated grid__truncated--alerta">
-      <IconWarning size={14} />
-      <span>
-        <strong>{numero.format(cortadoEm)} linhas</strong> é muita coisa para trazer de uma vez —
-        e ainda há mais no banco. Um <code>LIMIT</code> ou um filtro no{' '}
-        <code>WHERE</code> deixam a consulta mais rápida e o resultado mais fácil de ler.
-      </span>
-    </div>
-  )
+  return null
 }

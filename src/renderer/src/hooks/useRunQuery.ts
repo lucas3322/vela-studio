@@ -59,9 +59,10 @@ export function useRunQuery(): {
           sql,
           database: activeDatabase ?? undefined,
           queryId,
-          // Só vale para query sem LIMIT declarado: o driver respeita o LIMIT
-          // do usuário quando ele existe, e este teto é o corte de segurança.
-          maxRows: useAppStore.getState().limitePreview
+          // `previewRows`, não `maxRows`: o LIMIT que o usuário escreveu tem
+          // precedência. Como `maxRows`, a preferência cortava um
+          // `LIMIT 50000` em 100.
+          previewRows: useAppStore.getState().limitePreview
         })
 
         useTabStore.getState().updateTab(tab.id, {
@@ -76,11 +77,11 @@ export function useRunQuery(): {
         // toast a cada execução repetia a mesma coisa em cima disso, e some
         // sozinho antes de a pessoa terminar de ler — só entra quando o
         // volume passa do limite e vira conselho de desempenho.
-        const cortado = outcome.results.find((r) => r.truncatedAt)
         const limiteAviso = useAppStore.getState().limiteAviso
-        if (cortado?.truncatedAt && cortado.truncatedAt >= limiteAviso) {
+        const pesado = outcome.results.find((r) => r.rowCount >= limiteAviso)
+        if (pesado) {
           notify(
-            `${cortado.truncatedAt.toLocaleString('pt-BR')} linhas. Um LIMIT ou filtro deixa a consulta mais rápida.`,
+            `${pesado.rowCount.toLocaleString('pt-BR')} linhas. Um LIMIT menor ou filtro deixa a consulta mais rápida.`,
             'info'
           )
         }

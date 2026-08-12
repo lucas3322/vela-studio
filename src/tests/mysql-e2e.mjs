@@ -464,3 +464,39 @@ test('tipo com formato inválido é recusado antes de virar SQL', async () => {
   const [ainda] = await driver.query('SELECT COUNT(*) FROM clientes', { queryId: 'ac4' })
   assert.ok(Number(ainda.rows[0][0]) >= 3, 'a tabela precisa continuar existindo')
 })
+
+// ── precedência do LIMIT ─────────────────────────────────────────────
+
+test('o LIMIT da consulta vence a preferência de visualização', async () => {
+  // O bug relatado: com a preferência em 100, `LIMIT 5000` devolvia 100 e a
+  // tela não dizia que o comando do usuário tinha sido ignorado.
+  await driver.query(
+    `DROP TABLE IF EXISTS muitas;
+     CREATE TABLE muitas (id INT PRIMARY KEY AUTO_INCREMENT);
+     INSERT INTO muitas (id) SELECT NULL FROM information_schema.columns LIMIT 600;`,
+    { queryId: 'lim0' }
+  )
+
+  const [r] = await driver.query('SELECT * FROM muitas LIMIT 500', {
+    queryId: 'lim1',
+    previewRows: 100
+  })
+  assert.equal(r.rowCount, 500, 'o LIMIT escrito na consulta precisa valer')
+  assert.equal(r.truncatedAt, undefined, 'nada foi cortado, então não há aviso de corte')
+})
+
+test('sem LIMIT, a preferência corta e o corte é sinalizado', async () => {
+  const [r] = await driver.query('SELECT * FROM muitas', { queryId: 'lim2', previewRows: 50 })
+  assert.equal(r.rowCount, 50)
+  assert.equal(r.truncatedAt, 50, 'a UI precisa saber que faltam linhas')
+})
+
+test('maxRows do chamador continua sendo teto absoluto', async () => {
+  // É o que a exportação usa; a preferência não pode reduzi-lo.
+  const [r] = await driver.query('SELECT * FROM muitas', {
+    queryId: 'lim3',
+    maxRows: 300,
+    previewRows: 50
+  })
+  assert.equal(r.rowCount, 300)
+})

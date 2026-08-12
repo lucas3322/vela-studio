@@ -114,6 +114,7 @@ export interface VelaApi {
       database?: string
       queryId: string
       maxRows?: number
+      previewRows?: number
     }): Promise<QueryRunResult>
     cancel(connectionId: string, queryId: string): Promise<void>
   }

@@ -180,7 +180,7 @@ export function ResultsGrid({ result }: { result: QueryResult }): React.JSX.Elem
         </div>
       </div>
 
-      <TruncationNotice cortadoEm={result.truncatedAt} />
+      <TruncationNotice linhas={result.rowCount} cortadoEm={result.truncatedAt} />
     </>
   )
 }

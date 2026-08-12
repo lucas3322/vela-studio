@@ -251,7 +251,9 @@ export class SQLiteDriver implements DatabaseDriver {
         throw new Error('Conexão em modo somente-leitura: comandos de escrita estão bloqueados.')
       }
       const explicit = hasExplicitLimit(statement)
-      const maxRows = options.maxRows ?? (explicit ? DEFAULT_MAX_ROWS : PREVIEW_ROWS)
+      const maxRows =
+        options.maxRows ??
+        (explicit ? DEFAULT_MAX_ROWS : (options.previewRows ?? PREVIEW_ROWS))
       // Uma linha a mais que o teto: é assim que sabemos que havia mais e
       // conseguimos avisar "mostrando as primeiras N". Com LIMIT exato o
       // resultado nunca sobra e o aviso nunca apareceria.

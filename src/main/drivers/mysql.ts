@@ -354,7 +354,9 @@ export class MySQLDriver implements DatabaseDriver {
         // Sem LIMIT próprio, a query vai ao banco já limitada — cortar depois
         // de receber não impede a varredura nem o tráfego.
         const explicit = hasExplicitLimit(statement)
-        const maxRows = options.maxRows ?? (explicit ? DEFAULT_MAX_ROWS : PREVIEW_ROWS)
+        const maxRows =
+          options.maxRows ??
+          (explicit ? DEFAULT_MAX_ROWS : (options.previewRows ?? PREVIEW_ROWS))
         // Uma linha a mais que o teto: é assim que sabemos que havia mais e
         // conseguimos avisar "mostrando as primeiras N". Com LIMIT exato o
         // resultado nunca sobra e o aviso nunca apareceria.
