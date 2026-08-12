@@ -3,6 +3,16 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.11.0 — 2026-08-12
+
+### Novidades
+
+- Adicionando aba de configuração na IDE (b28769a)
+
+### Outras mudanças
+
+- ajustes no espaçamento da landing page (6071f7f)
+
 ## 0.10.0 — 2026-08-12
 
 ### Novidades
