@@ -92,6 +92,10 @@
   --accent-hover: hsl(var(--accent-h) var(--accent-s) 66%);
   --accent-subtle: hsl(var(--accent-h) var(--accent-s) 60% / 0.14);
   --accent-text: hsl(var(--accent-h) var(--accent-s) 70%);
+  /* Tinta que vai POR CIMA do âmbar. Escura nos dois temas, porque âmbar é
+     uma cor clara nos dois — `--text-inverse` não serve aqui: no tema claro
+     ele é branco, e branco sobre âmbar dava 2.87:1 no botão primário. */
+  --accent-ink: #16181d;
 
   --success: #4ade80;
   --success-subtle: rgba(74, 222, 128, 0.14);
@@ -107,7 +111,7 @@
   --data-string: #e8eaed;
   --data-date: #c4b5fd;
   --data-boolean: #86efac;
-  --data-null: #5b636e;
+  --data-null: #7a8288;   /* era #5b636e, 2.92:1 — ilegível */
   --data-json: #fbbf24;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -141,19 +145,23 @@
 
   --text-primary: #1a1d23;
   --text-secondary: #5a6472;
-  --text-tertiary: #8a939f;
+  --text-tertiary: #70767e;   /* era #8a939f, 3.11:1 */
   --text-inverse: #ffffff;
 
-  --accent: hsl(var(--accent-h) 85% 44%);
-  --accent-hover: hsl(var(--accent-h) 85% 38%);
+  /* 42% é onde o âmbar cruza 3:1 contra branco — o mínimo para um elemento
+     de interface ser percebido. A 44% media 2.87:1 e sumia. */
+  --accent: hsl(var(--accent-h) 88% 42%);
+  --accent-hover: hsl(var(--accent-h) 88% 36%);
   --accent-subtle: hsl(var(--accent-h) var(--accent-s) 50% / 0.14);
-  --accent-text: hsl(var(--accent-h) 90% 34%);
+  /* 33% cruza 4.5:1: é o âmbar que pode virar texto sobre superfície clara. */
+  --accent-text: hsl(var(--accent-h) 90% 33%);
+  --accent-ink: #1a1d23;
 
   --success: #16a34a;
   --success-subtle: rgba(22, 163, 74, 0.1);
   --danger: #dc2626;
   --danger-subtle: rgba(220, 38, 38, 0.09);
-  --warning: #d97706;
+  --warning: #b45309;   /* era #d97706, 3.19:1 */
   --warning-subtle: rgba(217, 119, 6, 0.11);
   --info: #2563eb;
   --info-subtle: rgba(37, 99, 235, 0.1);
@@ -162,7 +170,7 @@
   --data-string: #1a1d23;
   --data-date: #6d28d9;
   --data-boolean: #15803d;
-  --data-null: #a8b0ba;
+  --data-null: #70767e;   /* era #a8b0ba, 2.19:1 — quase invisível */
   --data-json: #b45309;
 
   --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);

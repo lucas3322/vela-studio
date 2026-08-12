@@ -109,7 +109,10 @@ textarea {
 
 .btn--primary {
   background: var(--accent);
-  color: var(--text-inverse);
+  /* `--accent-ink`, não `--text-inverse`: o inverso do tema claro é branco, e
+     branco sobre âmbar dava 2.87:1 — o botão principal do app era quase
+     ilegível. Tinta escura sobre âmbar dá 5.9:1. */
+  color: var(--accent-ink);
 }
 .btn--primary:hover {
   background: var(--accent-hover);
@@ -249,4 +252,26 @@ textarea {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/*
+ * Botão secundário com o acento no ícone e no texto.
+ *
+ * Não vira `--primary`: preenchido de âmbar, "Atualizar" competiria com o
+ * "Executar" do editor, que é a ação mais importante do app. Aqui o âmbar
+ * marca a ação sem gritar mais alto que ela.
+ */
+.btn--acento {
+  color: var(--accent-text);
+  border-color: var(--accent-subtle);
+}
+
+.btn--acento:hover:not(:disabled) {
+  background: var(--accent-subtle);
+  border-color: var(--accent);
+}
+
+.btn--acento:disabled {
+  color: var(--text-tertiary);
+  border-color: var(--border-default);
 }

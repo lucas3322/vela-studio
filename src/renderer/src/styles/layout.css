@@ -342,6 +342,34 @@
   box-shadow: var(--shadow-sm);
 }
 
+/*
+ * Ícone do tipo da aba.
+ *
+ * Aba de tabela usa o âmbar; aba de query fica neutra. É o mesmo par de
+ * sinais do Beekeeper, e sobrevive a quem não distingue cores: a forma do
+ * ícone (grade × chevrons) já diz o tipo sem depender do tom.
+ */
+.tab__kind {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  opacity: 0.55;
+  transition: opacity var(--duration-fast) var(--ease);
+}
+
+.tab--active .tab__kind,
+.tab:hover .tab__kind {
+  opacity: 1;
+}
+
+.tab__kind--table {
+  color: var(--accent-text);
+}
+
+.tab__kind--query {
+  color: var(--text-tertiary);
+}
+
 .tab__label {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -373,8 +401,8 @@
 }
 
 .tab__close:hover {
-  background: var(--bg-active);
-  color: var(--text-primary);
+  background: var(--accent-subtle);
+  color: var(--accent-text);
 }
 
 /* ── Editor ──────────────────────────────────────────────────────── */
