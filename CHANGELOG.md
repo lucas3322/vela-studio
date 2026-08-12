@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.16.0 — 2026-08-12
+
+### Novidades
+
+- adicionar cache para ferramentas de empacotamento e permitir tentativas de download (9863019)
+
 ## 0.15.0 — 2026-08-12
 
 ### Novidades
