@@ -61,6 +61,28 @@ jobs:
         with:
           python-version: '3.11'
 
+      # Ferramentas que o electron-builder baixa em tempo de build: os binários
+      # do Electron, o fpm (para .deb), o appimage-12 (para AppImage), o
+      # mksquashfs. Sem cache, toda execução depende de o download dar certo —
+      # e foi exatamente um desses que derrubou o build do Linux, com o
+      # artefato existindo e respondendo normalmente fora do runner.
+      #
+      # Com o cache, a rede só é necessária na primeira execução de cada
+      # versão do electron-builder.
+      - name: Cache das ferramentas de empacotamento
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+            ~\AppData\Local\electron\Cache
+            ~\AppData\Local\electron-builder\Cache
+          key: ferramentas-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ferramentas-${{ runner.os }}-
+
       - run: npm ci
 
       - name: Verificar tipos e testes
@@ -68,8 +90,12 @@ jobs:
           npm run typecheck
           npm test
 
+      # Uma segunda tentativa. O download dessas ferramentas falha de vez em
+      # quando por limite de requisição do GitHub, e repetir custa menos que
+      # segurar um release inteiro por causa disso.
       - name: Empacotar
-        run: npm run ${{ matrix.script }}
+        run: npm run ${{ matrix.script }} || npm run ${{ matrix.script }}
+        shell: bash
         env:
           # Sem certificado configurado o electron-builder pula a assinatura
           # em vez de falhar. Adicione os secrets quando tiver as contas.
