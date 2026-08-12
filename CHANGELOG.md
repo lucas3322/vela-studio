@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.14.0 — 2026-08-12
+
+### Novidades
+
+- atualizar configuração do build para usar windows-2022 devido a problemas de compatibilidade com node-gyp (b9cd243)
+
 ## 0.13.0 — 2026-08-12
 
 ### Novidades
