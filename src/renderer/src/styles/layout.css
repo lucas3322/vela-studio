@@ -1938,3 +1938,17 @@
   color: var(--danger);
   background: var(--danger-subtle);
 }
+
+/*
+ * Recarga em andamento com a grade ainda na tela.
+ *
+ * Antes a grade era desmontada e substituída por "Carregando…", o que zerava
+ * a rolagem horizontal a cada ordenação. Agora ela fica, levemente apagada, e
+ * deixa de aceitar clique — para ninguém editar uma célula que está prestes a
+ * ser substituída pelo resultado novo.
+ */
+.results--recarregando .grid {
+  opacity: 0.55;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease);
+}

@@ -225,15 +225,22 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
         ))}
       </div>
 
-      {loading && (
+      {/*
+        A tela de "Carregando" só toma o lugar da grade na primeira carga,
+        quando ainda não há nada para mostrar. Numa reordenação ou troca de
+        página ela desmontava a grade inteira, e a grade nova vinha com a
+        rolagem horizontal zerada — quem estava olhando a vigésima coluna
+        voltava para a primeira a cada clique no cabeçalho.
+      */}
+      {loading && !result && (
         <div className="results__empty">
           <span className="spinner" />
           Carregando {table}…
         </div>
       )}
 
-      {!loading && panel === 'dados' && (
-        <div className="results">
+      {panel === 'dados' && result && (
+        <div className={`results ${loading ? 'results--recarregando' : ''}`}>
           {tab.error && <ErrorPanel error={tab.error} />}
           {result && (
             <EditableGrid
@@ -368,7 +375,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
         </div>
       )}
 
-      {!loading && panel === 'colunas' && (
+      {panel === 'colunas' && (
         <div className="structure">
           <datalist id="vela-tipos-de-coluna">
             {tiposDoDialeto(dialect).map((tipo) => (
@@ -456,7 +463,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
         />
       )}
 
-      {!loading && panel === 'indices' && (
+      {panel === 'indices' && (
         <div className="structure">
           {indexes.length === 0 ? (
             <div className="tree-empty">Esta tabela não tem índices além da chave primária.</div>
@@ -485,7 +492,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
         </div>
       )}
 
-      {!loading && panel === 'relacoes' && (
+      {panel === 'relacoes' && (
         <div className="structure">
           {relations.length === 0 ? (
             <div className="tree-empty">

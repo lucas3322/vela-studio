@@ -197,26 +197,52 @@ export function EditableGrid({
     [pendentes, result.rows]
   )
 
-  // Larguras derivadas do conteúdo: uma amostra basta e é barata.
+  /**
+   * Assinatura das colunas do resultado anterior.
+   *
+   * Reordenar ou virar a página traz **as mesmas colunas** com outras linhas.
+   * Quando é esse o caso, largura e rolagem horizontal são a referência visual
+   * de onde a pessoa estava — recalcular tudo a joga de volta para a primeira
+   * coluna e desfaz qualquer redimensionamento que ela tenha feito à mão.
+   */
+  const assinaturaAnterior = useRef<string>('')
+
   useEffect(() => {
-    const amostra = result.rows.slice(0, 60)
-    setWidths(
-      result.columns.map((coluna, indice) => {
-        const cabecalho = coluna.name.length * 7 + 40
-        const conteudo = amostra.reduce((max, linha) => {
-          const texto = formatarCelula(linha[indice])
-          return Math.max(max, Math.min(texto.length, 60) * 7 + 20)
-        }, 0)
-        return Math.min(420, Math.max(90, cabecalho, conteudo))
-      })
-    )
+    // `\u0000` como separador: nome de coluna pode conter vírgula ou espaço,
+    // e duas listas diferentes não podem produzir a mesma assinatura.
+    const assinatura = result.columns.map((c) => c.name).join('\u0000')
+    const mesmasColunas = assinatura === assinaturaAnterior.current
+    assinaturaAnterior.current = assinatura
+
+    if (!mesmasColunas) {
+      // Larguras derivadas do conteúdo: uma amostra basta e é barata.
+      const amostra = result.rows.slice(0, 60)
+      setWidths(
+        result.columns.map((coluna, indice) => {
+          const cabecalho = coluna.name.length * 7 + 40
+          const conteudo = amostra.reduce((max, linha) => {
+            const texto = formatarCelula(linha[indice])
+            return Math.max(max, Math.min(texto.length, 60) * 7 + 20)
+          }, 0)
+          return Math.min(420, Math.max(90, cabecalho, conteudo))
+        })
+      )
+    }
+
     setScrollTop(0)
     setSelecao(null)
     setEditing(null)
     setPendentes({})
     setExclusoesPendentes(new Set())
     setExcluidas(new Set())
-    scroller.current?.scrollTo({ top: 0, left: 0 })
+
+    // O vertical volta ao topo sempre — a ordem das linhas mudou, e continuar
+    // na linha 400 não significa nada. O horizontal só volta quando o conjunto
+    // de colunas muda de verdade.
+    const elemento = scroller.current
+    if (elemento) {
+      elemento.scrollTo({ top: 0, left: mesmasColunas ? elemento.scrollLeft : 0 })
+    }
   }, [result])
 
   useEffect(() => {
