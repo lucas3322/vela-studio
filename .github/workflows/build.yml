@@ -20,7 +20,23 @@ jobs:
         include:
           - os: macos-latest
             script: mac
-          - os: windows-latest
+          # `windows-2022`, não `windows-latest`, e isso é deliberado.
+          #
+          # O GitHub migrou o `windows-latest` para a imagem do Server 2025
+          # (o log do build falho reporta `Windows_NT 10.0.26100`; a 2022
+          # reporta `10.0.20348`). Nela, o node-gyp 9.4.1 — que vem junto do
+          # @electron/rebuild — não acha o Visual Studio: ele detecta compilando
+          # um arquivo C# via `Add-Type` no PowerShell, e esse caminho falha
+          # ali. O stack cai nos fallbacks de VS 2013/2015 e desiste.
+          #
+          # O better-sqlite3 precisa de toolchain C++ de qualquer forma, porque
+          # o `electron-builder install-app-deps` recompila para o ABI do
+          # Electron, não para o do Node.
+          #
+          # Isto é uma trégua, não a cura: a imagem 2022 tem data para sair. A
+          # correção durável é subir o node-gyp (o 11 tem mais estratégias de
+          # detecção), e isso só dá para validar rodando no Windows.
+          - os: windows-2022
             script: win
           - os: ubuntu-latest
             script: linux
