@@ -1779,3 +1779,34 @@
   cursor: default;
   border-bottom-color: transparent;
 }
+
+/* ── Seleção de linha pelo número ──────────────────────────────────── */
+
+.grid__gutter--clicavel {
+  cursor: pointer;
+  user-select: none;
+}
+
+.grid__gutter--clicavel:hover {
+  color: var(--accent-text);
+  background: var(--accent-subtle);
+}
+
+/*
+ * A linha selecionada usa o mesmo fundo da célula selecionada, mais uma barra
+ * âmbar no gutter. Sem a barra, com o cursor longe do número, não daria para
+ * dizer se o destaque é seleção ou só o hover passando.
+ */
+.grid__row--selecionada {
+  background: var(--bg-selected);
+}
+
+.grid__row--selecionada .grid__gutter {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.grid__row--selecionada:hover .grid__gutter {
+  background: var(--accent);
+}

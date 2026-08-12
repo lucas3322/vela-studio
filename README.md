@@ -156,6 +156,8 @@ editor desconhecido.
 | `⌘.` | Cancelar execução |
 | `⌘S` | Salvar a query da aba |
 | `⌘R` | Atualizar — reconsulta a tabela ou reexecuta a query |
+| `⌘C` | Copiar a célula; com a linha selecionada, a linha em TSV |
+| `Esc` | Limpar a seleção da grade |
 | `⌘⇧F` | Formatar SQL |
 | `⌘T` | Nova aba de query |
 | `⌘B` | Barra lateral |

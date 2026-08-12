@@ -58,6 +58,18 @@ export interface OrdenacaoDaGrade {
   direction: 'asc' | 'desc'
 }
 
+/**
+ * O que está selecionado agora.
+ *
+ * União, não dois estados separados: célula e linha são mutuamente
+ * exclusivas, e com dois booleanos daria para acabar com as duas marcadas ao
+ * mesmo tempo — aí o ⌘C não saberia o que copiar.
+ */
+type Selecao =
+  | { tipo: 'celula'; linha: number; coluna: number }
+  | { tipo: 'linha'; linha: number }
+  | null
+
 interface ValorPendente {
   linha: number
   coluna: number
@@ -95,7 +107,7 @@ export function EditableGrid({
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportHeight, setViewportHeight] = useState(400)
   const [widths, setWidths] = useState<number[]>([])
-  const [selected, setSelected] = useState<{ row: number; col: number } | null>(null)
+  const [selecao, setSelecao] = useState<Selecao>(null)
   const [editing, setEditing] = useState<{ row: number; col: number; valor: string } | null>(null)
   const [aplicando, setAplicando] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; row: number; col: number } | null>(null)
@@ -198,7 +210,7 @@ export function EditableGrid({
       })
     )
     setScrollTop(0)
-    setSelected(null)
+    setSelecao(null)
     setEditing(null)
     setPendentes({})
     setExclusoesPendentes(new Set())
@@ -369,20 +381,33 @@ export function EditableGrid({
   useEffect(() => {
     const aoTeclar = (evento: KeyboardEvent): void => {
       if (editing) return
-      if (!selected) return
+      if (!selecao) return
 
-      if ((evento.metaKey || evento.ctrlKey) && evento.key === 'c') {
-        void navigator.clipboard.writeText(formatarCelula(valorDe(selected.row, selected.col)))
+      if (evento.key === 'Escape') {
+        setSelecao(null)
         return
       }
-      if (evento.key === 'Enter') {
+
+      if ((evento.metaKey || evento.ctrlKey) && evento.key === 'c') {
+        // Linha vai em TSV: é o formato que a planilha cola em colunas
+        // separadas. Copiar a linha como uma frase só seria inútil.
+        const texto =
+          selecao.tipo === 'linha'
+            ? result.columns.map((_, i) => formatarCelula(valorDe(selecao.linha, i))).join('\t')
+            : formatarCelula(valorDe(selecao.linha, selecao.coluna))
+        void navigator.clipboard.writeText(texto)
+        onNotify?.(selecao.tipo === 'linha' ? 'Linha copiada.' : 'Valor copiado.', 'success')
+        return
+      }
+
+      if (evento.key === 'Enter' && selecao.tipo === 'celula') {
         evento.preventDefault()
-        abrirEdicao(selected.row, selected.col)
+        abrirEdicao(selecao.linha, selecao.coluna)
       }
     }
     window.addEventListener('keydown', aoTeclar)
     return () => window.removeEventListener('keydown', aoTeclar)
-  }, [selected, editing, valorDe, abrirEdicao])
+  }, [selecao, editing, valorDe, abrirEdicao, result.columns, onNotify])
 
   const iniciarRedimensionamento = (indice: number) => (evento: React.MouseEvent) => {
     evento.preventDefault()
@@ -531,20 +556,42 @@ export function EditableGrid({
                 const indiceLinha = start + deslocamento
                 const excluida = excluidas.has(indiceLinha)
                 const marcadaParaExcluir = exclusoesPendentes.has(indiceLinha)
+                const linhaSelecionada = selecao?.tipo === 'linha' && selecao.linha === indiceLinha
                 return (
                   <div
                     key={indiceLinha}
                     className={`grid__row ${indiceLinha % 2 ? 'grid__row--odd' : ''} ${
                       excluida ? 'grid__row--excluida' : ''
-                    } ${marcadaParaExcluir ? 'grid__row--marcada' : ''}`}
+                    } ${marcadaParaExcluir ? 'grid__row--marcada' : ''} ${
+                      linhaSelecionada ? 'grid__row--selecionada' : ''
+                    }`}
                     style={{ width: larguraTotal }}
                   >
-                    <div className="grid__gutter">{indiceLinha + 1}</div>
+                    {/*
+                      Clicar no número seleciona a linha inteira, como em
+                      qualquer planilha. É `onMouseDown` para casar com o
+                      gesto das células — no `click` a seleção só apareceria
+                      ao soltar o botão.
+                    */}
+                    <div
+                      className="grid__gutter grid__gutter--clicavel"
+                      onMouseDown={() => setSelecao({ tipo: 'linha', linha: indiceLinha })}
+                      onContextMenu={(e) => {
+                        e.preventDefault()
+                        setSelecao({ tipo: 'linha', linha: indiceLinha })
+                        setMenu({ x: e.clientX, y: e.clientY, row: indiceLinha, col: 0 })
+                      }}
+                      title="Clique para selecionar a linha · ⌘C copia para a planilha"
+                    >
+                      {indiceLinha + 1}
+                    </div>
                     {result.columns.map((coluna, indiceColuna) => {
                       const valor = valorDe(indiceLinha, indiceColuna)
                       const marca = `${indiceLinha}:${indiceColuna}`
                       const selecionada =
-                        selected?.row === indiceLinha && selected?.col === indiceColuna
+                        selecao?.tipo === 'celula' &&
+                        selecao.linha === indiceLinha &&
+                        selecao.coluna === indiceColuna
                       const emEdicao =
                         editing?.row === indiceLinha && editing?.col === indiceColuna
 
@@ -585,11 +632,13 @@ export function EditableGrid({
                           }`}
                           style={{ width: widths[indiceColuna] }}
                           title={valor === null ? 'NULL' : formatarCelula(valor)}
-                          onMouseDown={() => setSelected({ row: indiceLinha, col: indiceColuna })}
+                          onMouseDown={() =>
+                            setSelecao({ tipo: 'celula', linha: indiceLinha, coluna: indiceColuna })
+                          }
                           onDoubleClick={() => abrirEdicao(indiceLinha, indiceColuna)}
                           onContextMenu={(e) => {
                             e.preventDefault()
-                            setSelected({ row: indiceLinha, col: indiceColuna })
+                            setSelecao({ tipo: 'celula', linha: indiceLinha, coluna: indiceColuna })
                             setMenu({
                               x: e.clientX,
                               y: e.clientY,
