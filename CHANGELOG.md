@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.19.0 — 2026-08-13
+
+### Novidades
+
+- adição de estilos e lógica de layout para o diagrama de modelagem (8173a03)
+
 ## 0.18.0 — 2026-08-13
 
 ### Novidades
