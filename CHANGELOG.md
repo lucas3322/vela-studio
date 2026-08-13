@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.18.0 — 2026-08-13
+
+### Novidades
+
+- adicionar crédito de autoria na tela inicial e no rodapé (d23c76f)
+
 ## 0.17.0 — 2026-08-12
 
 ### Novidades
