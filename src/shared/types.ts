@@ -88,6 +88,18 @@ export interface RelationInfo {
   onUpdate?: string
 }
 
+/**
+ * Uma chave estrangeira vista de fora da tabela — inclui de onde ela sai.
+ *
+ * `RelationInfo` basta quando já se sabe qual tabela foi consultada. A
+ * modelagem lê o schema inteiro de uma vez, então precisa da ponta de origem
+ * junto: sem ela, 211 listas de relação viram um monte indistinguível.
+ */
+export interface SchemaRelation extends RelationInfo {
+  /** Tabela que declara a FK. */
+  table: string
+}
+
 export interface QueryColumn {
   name: string
   /** Tipo inferido para alinhamento e formatação no grid. */

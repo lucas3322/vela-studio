@@ -57,6 +57,24 @@ export default defineConfig({
   renderer: {
     define: buildInfo,
     root: resolve('src/renderer'),
+    /*
+     * Porta fixa e endereço explícito, os dois de propósito.
+     *
+     * O padrão do Vite escuta em `localhost`, que resolve para `::1`, enquanto
+     * um `python3 -m http.server --bind 127.0.0.1` na mesma porta escuta em
+     * IPv4. As duas famílias de endereço convivem: **nenhum dos dois acusa
+     * porta ocupada**. Aí o Electron pede `http://localhost:5173`, o
+     * resolvedor escolhe o IPv4, e a janela do Vela abre o app do vizinho —
+     * sem um único erro no console. Aconteceu de verdade.
+     *
+     * Fixando o endereço em IPv4, a colisão vira falha de bind; com
+     * `strictPort`, essa falha derruba o `npm run dev` com mensagem clara em
+     * vez de escolher outra porta e deixar o Electron apontado para a errada.
+     */
+    server: {
+      host: '127.0.0.1',
+      strictPort: true
+    },
     resolve: {
       alias: {
         '@': resolve('src/renderer/src'),

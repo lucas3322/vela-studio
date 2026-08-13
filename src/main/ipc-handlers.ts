@@ -77,6 +77,10 @@ export function registerIpcHandlers(manager: ConnectionManager, store: Connectio
     manager.get(id).driver.listRelations(table, database)
   )
 
+  ipcMain.handle(IPC.schemaAllRelations, (_e, id: string, database?: string) =>
+    manager.get(id).driver.listAllRelations(database)
+  )
+
   /**
    * Carrega tabelas e colunas em lote. Em bancos grandes isso são centenas de
    * consultas ao information_schema; limitamos a concorrência pra não estourar

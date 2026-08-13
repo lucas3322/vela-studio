@@ -95,6 +95,16 @@ test('listIndexes encontra o índice declarado', async () => {
   assert.deepEqual(found.columns, ['status'])
 })
 
+test('listAllRelations percorre todas as tabelas do arquivo', async () => {
+  // No SQLite não há catálogo de FK consultável: é um pragma por tabela. O
+  // teste garante que o laço não pula nem duplica.
+  const todas = await driver.listAllRelations()
+  const nossa = todas.filter((r) => r.table === 'pedidos')
+  assert.equal(nossa.length, 1)
+  assert.equal(nossa[0].column, 'cliente_id')
+  assert.equal(nossa[0].referencedTable, 'clientes')
+})
+
 test('listRelations resolve a chave estrangeira', async () => {
   const relations = await driver.listRelations('pedidos')
   assert.equal(relations.length, 1)

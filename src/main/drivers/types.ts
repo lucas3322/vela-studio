@@ -5,6 +5,7 @@ import type {
   IndexInfo,
   QueryResult,
   RelationInfo,
+  SchemaRelation,
   TableInfo,
   TestResult
 } from '../../shared/types'
@@ -47,6 +48,19 @@ export interface DatabaseDriver {
   listColumns(table: string, database?: string): Promise<ColumnInfo[]>
   listIndexes(table: string, database?: string): Promise<IndexInfo[]>
   listRelations(table: string, database?: string): Promise<RelationInfo[]>
+
+  /**
+   * Todas as chaves estrangeiras do banco, de uma vez.
+   *
+   * Existe porque `listRelations` é por tabela, e a modelagem precisa do mapa
+   * inteiro: num CRM de 211 tabelas isso seriam 211 idas ao banco só para
+   * desenhar a primeira tela. Nos bancos com catálogo (MySQL, PostgreSQL) é
+   * **uma** consulta; no SQLite é um pragma por tabela, mas o arquivo é local.
+   *
+   * Quem não tem FK declarada devolve lista vazia — e a UI diz isso em vez de
+   * mostrar um diagrama vazio como se o schema não tivesse ligação nenhuma.
+   */
+  listAllRelations(database?: string): Promise<SchemaRelation[]>
 
   /** DDL de criação da tabela, para o menu de contexto e para documentação. */
   getCreateStatement(table: string, database?: string): Promise<string>

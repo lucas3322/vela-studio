@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { QueryError, QueryResult } from '@shared/types'
 
-export type TabKind = 'query' | 'table'
+export type TabKind = 'query' | 'table' | 'model'
 
 export interface Tab {
   id: string
@@ -28,6 +28,13 @@ export interface Tab {
   /** Nome da tabela — só em abas de tabela. */
   table?: string
   /**
+   * Tabela no centro do diagrama — só em abas de modelagem.
+   * `undefined` significa o mapa completo do banco.
+   */
+  modelFocus?: string
+  /** Quantos saltos de distância o diagrama mostra a partir do foco. */
+  modelDepth?: number
+  /**
    * Painel em que a aba de tabela abre. "Ver dados" e "Ver estrutura" são
    * itens diferentes no menu de contexto; sem isto os dois caíam em "dados".
    */
@@ -52,6 +59,13 @@ interface TabState {
   tabs: Tab[]
   /** Aba ativa por conexão — cada banco lembra onde você parou. */
   activeByConnection: Record<string, string>
+
+  /** Diagrama de modelagem. `focus` indefinido abre o mapa completo. */
+  openModelTab: (options: {
+    connectionId: string
+    database?: string | null
+    focus?: string
+  }) => string
 
   openQueryTab: (options: {
     connectionId: string
@@ -155,6 +169,48 @@ export const useTabStore = create<TabState>((set, get) => ({
       title: table,
       table,
       initialPanel,
+      sql: '',
+      connectionId,
+      database: database ?? null,
+      results: [],
+      activeResultIndex: 0,
+      running: false,
+      dirty: false
+    }
+    set((state) => ({
+      tabs: [...state.tabs, tab],
+      activeByConnection: { ...state.activeByConnection, [connectionId]: id }
+    }))
+    return id
+  },
+
+  openModelTab: ({ connectionId, database, focus }) => {
+    // Uma aba de modelagem por conexão. Abrir uma por tabela clicada encheria
+    // a barra de abas quase idênticas — o que a pessoa quer é **mover o foco**
+    // do mesmo diagrama, não colecionar diagramas.
+    const existente = get()
+      .tabsFor(connectionId)
+      .find((t) => t.kind === 'model' && t.database === (database ?? null))
+
+    if (existente) {
+      set((state) => ({
+        tabs: state.tabs.map((t) =>
+          t.id === existente.id
+            ? { ...t, modelFocus: focus, title: focus ?? 'Modelagem', reloadToken: (t.reloadToken ?? 0) + 1 }
+            : t
+        ),
+        activeByConnection: { ...state.activeByConnection, [connectionId]: existente.id }
+      }))
+      return existente.id
+    }
+
+    const id = newId()
+    const tab: Tab = {
+      id,
+      kind: 'model',
+      title: focus ?? 'Modelagem',
+      modelFocus: focus,
+      modelDepth: 1,
       sql: '',
       connectionId,
       database: database ?? null,

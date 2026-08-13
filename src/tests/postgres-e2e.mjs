@@ -130,6 +130,23 @@ test('listIndexes agrupa colunas por índice', async () => {
   assert.ok(indexes.some((i) => i.primary))
 })
 
+test('listAllRelations traz o mapa inteiro numa consulta só', async () => {
+  const todas = await driver.listAllRelations()
+  const nossa = todas.filter((r) => r.table === 'pedidos')
+  assert.equal(nossa.length, 1)
+  assert.equal(nossa[0].column, 'cliente_id')
+  assert.equal(nossa[0].referencedTable, 'clientes')
+  assert.equal(nossa[0].onDelete, 'CASCADE')
+})
+
+test('listAllRelations diz de qual tabela cada FK sai', async () => {
+  const todas = await driver.listAllRelations()
+  assert.ok(todas.length > 0)
+  for (const r of todas) {
+    assert.ok(typeof r.table === 'string' && r.table.length > 0, JSON.stringify(r))
+  }
+})
+
 test('listRelations resolve a chave estrangeira', async () => {
   const relations = await driver.listRelations('pedidos')
   assert.equal(relations.length, 1)

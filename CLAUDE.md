@@ -38,6 +38,7 @@ src/
 └── renderer/     React
     └── src/
         ├── editor/      autocomplete, hover, docs PT-BR, formatador, receitas
+        ├── model/       grafo do schema e layout do diagrama de modelagem
         ├── components/  UI
         ├── store/       Zustand
         └── styles/      tokens.css é a fonte da verdade visual
@@ -65,6 +66,9 @@ Agentes especializados em `.claude/agents/`: `driver-engineer`,
 - Zustand sempre com seletor: `useStore((s) => s.campo)`.
 - Lista longa é virtualizada. O grid aguenta 50.000 linhas.
 - Estado que sobrevive à troca de aba mora no store, não em `useState`.
+- Módulo do renderer que tem teste importa irmão **com a extensão `.ts`**. O
+  `node --experimental-strip-types` não resolve sem ela, e o `tsc` só aceita
+  por causa do `allowImportingTsExtensions` em `tsconfig.web.json`.
 
 ## Armadilhas já pagas
 
@@ -94,7 +98,19 @@ Cada uma tem teste que a trava.
    idêntica nos dois casos. O clique no cabeçalho **reexecuta a query** com
    `ORDER BY`, e o `LIMIT` vem depois, para o corte cair sobre a tabela já
    ordenada.
-8. **Instalador de outra arquitetura instala e depois falha.** Um DMG arm64 com
+8. **No tema claro, `--bg-app`, `--bg-surface` e `--bg-elevated` são todos
+   brancos.** A elevação ali é feita por sombra, não por cor de superfície.
+   Quem desenha um objeto flutuante com `fill: var(--bg-surface)` e
+   `stroke: var(--border-default)` produz cartão branco sobre fundo branco com
+   contorno de 1.28:1 — invisível. O contorno do cartão da modelagem tem token
+   próprio (`--model-card-line`, 3.10:1 nos dois temas) pelo mesmo motivo que
+   o `--grid-line` tem o dele.
+9. **Chave estrangeira declarada é minoria em banco real.** Muito sistema
+   legado mantém a integridade na aplicação. Ler só o catálogo faz a
+   modelagem abrir vazia — o que não é neutro, é uma afirmação falsa sobre o
+   schema. Por isso existe a inferência por nome de coluna, sempre desenhada
+   tracejada e rotulada como provável. **Palpite nunca se veste de fato.**
+10. **Instalador de outra arquitetura instala e depois falha.** Um DMG arm64 com
    binário x86_64 dentro abre como "app danificado". O `escolherAsset` do
    atualizador não tem fallback: sem o arquivo da arquitetura exata, ele
    devolve nada e a UI manda o usuário para a página da release.

@@ -90,6 +90,20 @@ export const IconLink = (p: IconProps): React.JSX.Element => (
   </Icon>
 )
 
+/**
+ * Modelagem: duas tabelas ligadas por um conector em cotovelo.
+ *
+ * É como diagrama ER desenha relação desde sempre — a forma já diz do que se
+ * trata, sem depender da cor nem do rótulo ao lado.
+ */
+export const IconModel = (p: IconProps): React.JSX.Element => (
+  <Icon {...p}>
+    <rect x="1.5" y="2.5" width="6" height="4.5" rx="1" />
+    <rect x="8.5" y="9" width="6" height="4.5" rx="1" />
+    <path d="M7.5 4.75 H 11.5 V 9" />
+  </Icon>
+)
+
 export const IconPlay = (p: IconProps): React.JSX.Element => (
   <Icon {...p} fill="currentColor" stroke="none">
     <path d="M4.5 3.2v9.6a.5.5 0 0 0 .77.42l7.3-4.8a.5.5 0 0 0 0-.84l-7.3-4.8a.5.5 0 0 0-.77.42Z" />

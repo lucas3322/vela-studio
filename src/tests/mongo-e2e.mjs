@@ -113,6 +113,13 @@ test('listIndexes traz o índice implícito de _id', async () => {
   assert.deepEqual(primary.columns, ['_id'])
 })
 
+test('listAllRelations também devolve vazio, sem inventar ligação', async () => {
+  // O MongoDB não declara relação entre coleções. Deduzir aqui, no driver,
+  // faria palpite passar por fato do banco — a dedução acontece na camada de
+  // modelagem, onde ela é desenhada tracejada e rotulada como provável.
+  assert.deepEqual(await driver.listAllRelations(), [])
+})
+
 test('listRelations devolve vazio em vez de inventar relação', async () => {
   assert.deepEqual(await driver.listRelations('pedidos'), [])
 })

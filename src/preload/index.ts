@@ -21,6 +21,8 @@ const api: VelaApi = {
     columns: (id, table, database) => ipcRenderer.invoke(IPC.schemaColumns, id, table, database),
     indexes: (id, table, database) => ipcRenderer.invoke(IPC.schemaIndexes, id, table, database),
     relations: (id, table, database) => ipcRenderer.invoke(IPC.schemaRelations, id, table, database),
+    allRelations: (connectionId, database) =>
+      ipcRenderer.invoke(IPC.schemaAllRelations, connectionId, database),
     loadAll: (id, database) => ipcRenderer.invoke(IPC.schemaLoadAll, id, database),
     createStatement: (id, table, database) =>
       ipcRenderer.invoke(IPC.schemaCreateStatement, id, table, database),

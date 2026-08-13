@@ -2061,3 +2061,301 @@
   font-size: var(--text-xs);
   color: var(--text-tertiary);
 }
+
+/* ── Modelagem: diagrama de tabelas e ligações ─────────────────────── */
+
+.modelo {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: var(--bg-app);
+}
+
+.modelo__barra {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  flex-shrink: 0;
+}
+
+.modelo__titulo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.modelo__titulo svg {
+  color: var(--accent-text);
+}
+
+.modelo__espaco {
+  flex: 1;
+}
+
+.modelo__palpite {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.modelo__nota {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  background: var(--accent-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.modelo__nota svg {
+  color: var(--accent-text);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/*
+  O palco recorta o diagrama e é a área de arrasto. `overflow: hidden` em vez
+  de barra de rolagem: o deslocamento é por arrastar e por roda, e duas formas
+  de mover a mesma coisa brigam entre si.
+*/
+.modelo__palco {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  cursor: grab;
+}
+
+.modelo__palco:active {
+  cursor: grabbing;
+}
+
+.modelo__svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+/* ── ligações ─────────────────────────────────────────────────────── */
+
+/*
+  Declarada e provável se distinguem por traço e espessura, não por matiz.
+  Uma diferença só de cor sumiria para quem não distingue cores — e o que está
+  em jogo aqui é justamente separar o que o banco garante do que nós supomos.
+*/
+.modelo__linha {
+  fill: none;
+  stroke: var(--text-tertiary);
+  stroke-width: 1.5;
+  transition: stroke var(--duration-fast) var(--ease);
+}
+
+.modelo__linha--declarada {
+  stroke: var(--text-secondary);
+  stroke-width: 1.75;
+}
+
+.modelo__linha--provavel {
+  stroke: var(--text-tertiary);
+  stroke-width: 1.25;
+  stroke-dasharray: 5 4;
+}
+
+.modelo__linha--ativa {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+.modelo__ponta {
+  fill: var(--text-secondary);
+  stroke: none;
+}
+
+.modelo__ponta--palpite {
+  fill: var(--text-tertiary);
+}
+
+/* ── cartões ──────────────────────────────────────────────────────── */
+
+.modelo__cartao {
+  cursor: pointer;
+}
+
+.modelo__caixa {
+  fill: var(--bg-surface);
+  stroke: var(--model-card-line);
+  stroke-width: 1;
+  transition: stroke var(--duration-fast) var(--ease);
+}
+
+.modelo__cabecalho {
+  fill: var(--bg-elevated);
+}
+
+.modelo__cartao:hover .modelo__caixa {
+  stroke: var(--accent);
+}
+
+.modelo__cartao--foco .modelo__caixa {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.modelo__cartao--foco .modelo__cabecalho {
+  fill: var(--accent-subtle);
+}
+
+.modelo__nome {
+  fill: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.modelo__coluna {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  fill: var(--text-secondary);
+}
+
+.modelo__coluna--pk {
+  fill: var(--text-primary);
+}
+
+.modelo__marca--pk {
+  color: var(--accent-text);
+}
+
+.modelo__marca--fk {
+  color: var(--text-tertiary);
+}
+
+.modelo__resto {
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  fill: var(--text-tertiary);
+}
+
+/* ── legenda ──────────────────────────────────────────────────────── */
+
+/*
+  Faixa fixa embaixo, não painel sobreposto ao desenho.
+  Flutuando sobre o palco ela cobria um cartão inteiro — e como precisava de
+  `pointer-events: none` para não roubar o arrasto, a tabela por baixo ficava
+  inclicável sem nada explicar o porquê.
+*/
+.modelo__legenda {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-shrink: 0;
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.modelo__legenda span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  /* A legenda é uma faixa de uma linha; quebrar "provável, não declarada" no
+     meio faz a faixa dobrar de altura e roubar espaço do desenho. */
+  white-space: nowrap;
+}
+
+/* Numa janela estreita, a dica é o primeiro item dispensável. */
+@media (max-width: 900px) {
+  .modelo__dica {
+    display: none;
+  }
+}
+
+/*
+  Secundário, não terciário: a dica ensina a interação, então precisa ser lida.
+  Com `--text-tertiary` ela media 3.48:1 sobre o painel no tema escuro.
+*/
+.modelo__dica {
+  color: var(--text-secondary);
+  border-left: 1px solid var(--border-subtle);
+  padding-left: var(--space-4);
+}
+
+/* ── índice na barra lateral ──────────────────────────────────────── */
+
+.modelo-lista__topo {
+  padding: var(--space-2) var(--space-3);
+}
+
+.modelo-lista__topo .btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.modelo-lista__nota {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0 var(--space-3) var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--accent-subtle);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.modelo-lista__nota svg {
+  color: var(--accent-text);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.modelo-lista {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.modelo-lista__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  height: var(--row-height);
+  padding: 0 var(--space-3);
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+.modelo-lista__item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.modelo-lista__nome {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modelo-lista__grau {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}

@@ -6,6 +6,7 @@ import type {
   IndexInfo,
   QueryResult,
   RelationInfo,
+  SchemaRelation,
   TableInfo,
   TestResult
 } from '../../shared/types'
@@ -195,6 +196,38 @@ export class MySQLDriver implements DatabaseDriver {
       [database ?? this.config?.database ?? null, table]
     )
     return rows.map((r) => ({
+      constraintName: r.constraint_name as string,
+      column: r.column_name as string,
+      referencedTable: r.referenced_table as string,
+      referencedColumn: r.referenced_column as string,
+      onDelete: (r.on_delete as string) || undefined,
+      onUpdate: (r.on_update as string) || undefined
+    }))
+  }
+
+  async listAllRelations(database?: string): Promise<SchemaRelation[]> {
+    // Alias explícito em toda coluna: o `information_schema` devolve os nomes
+    // em MAIÚSCULA no MySQL 8 e em minúscula no 5.7, e ler a caixa errada não
+    // dá erro — dá `undefined`, e o diagrama sai sem nenhuma ligação.
+    const [rows] = await this.require().query<mysql.RowDataPacket[]>(
+      `SELECT k.table_name AS source_table,
+              k.constraint_name AS constraint_name,
+              k.column_name AS column_name,
+              k.referenced_table_name AS referenced_table,
+              k.referenced_column_name AS referenced_column,
+              r.delete_rule AS on_delete,
+              r.update_rule AS on_update
+       FROM information_schema.key_column_usage k
+       LEFT JOIN information_schema.referential_constraints r
+              ON r.constraint_name = k.constraint_name
+             AND r.constraint_schema = k.table_schema
+       WHERE k.table_schema = COALESCE(?, DATABASE())
+         AND k.referenced_table_name IS NOT NULL
+       ORDER BY k.table_name, k.constraint_name, k.ordinal_position`,
+      [database ?? this.config?.database ?? null]
+    )
+    return rows.map((r) => ({
+      table: r.source_table as string,
       constraintName: r.constraint_name as string,
       column: r.column_name as string,
       referencedTable: r.referenced_table as string,

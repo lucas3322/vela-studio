@@ -1,10 +1,26 @@
 import { create } from 'zustand'
-import type { ColumnInfo, ConnectionConfig, StoredConnection, TableInfo } from '@shared/types'
+import type {
+  ColumnInfo,
+  ConnectionConfig,
+  SchemaRelation,
+  StoredConnection,
+  TableInfo
+} from '@shared/types'
 
 export interface SchemaCache {
   tables: TableInfo[]
   columns: Record<string, ColumnInfo[]>
   loadedAt: number
+  /**
+   * Chaves estrangeiras do banco inteiro.
+   *
+   * Carregadas sob demanda, não junto do schema: quem nunca abre a modelagem
+   * não deve pagar por elas. `undefined` significa "ainda não perguntamos" e
+   * é diferente de `[]`, que significa "perguntamos e este banco não declara
+   * nenhuma" — a tela precisa distinguir os dois para não dizer "sem relações"
+   * enquanto ainda está carregando.
+   */
+  relations?: SchemaRelation[]
 }
 
 interface ConnectionState {
@@ -18,12 +34,15 @@ interface ConnectionState {
   /** Schema por `${connectionId}::${database}` — é a base do autocomplete. */
   schemas: Record<string, SchemaCache>
   loadingSchema: boolean
+  loadingRelations: boolean
 
   refreshSaved: () => Promise<void>
   connect: (config: ConnectionConfig) => Promise<void>
   disconnect: () => Promise<void>
   selectDatabase: (database: string) => Promise<void>
   reloadSchema: () => Promise<void>
+  /** Busca as FKs do banco atual, se ainda não estiverem em cache. */
+  loadRelations: (forcar?: boolean) => Promise<void>
   removeConnection: (id: string) => Promise<void>
 
   activeConnection: () => StoredConnection | undefined
@@ -41,6 +60,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   connecting: false,
   schemas: {},
   loadingSchema: false,
+  loadingRelations: false,
 
   refreshSaved: async () => {
     set({ saved: await window.vela.connections.list() })
@@ -113,12 +133,43 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
       set((state) => ({
         schemas: {
           ...state.schemas,
+          // As relações são descartadas junto: elas descrevem o schema que
+          // acabou de ser relido, e manter as antigas desenharia ligação para
+          // tabela que pode nem existir mais.
           [schemaKey(activeId, activeDatabase)]: { tables, columns, loadedAt: Date.now() }
         },
         loadingSchema: false
       }))
     } catch {
       set({ loadingSchema: false })
+    }
+  },
+
+  loadRelations: async (forcar = false) => {
+    const { activeId, activeDatabase, schemas, loadingRelations } = get()
+    if (!activeId || loadingRelations) return
+
+    const chave = schemaKey(activeId, activeDatabase)
+    if (!forcar && schemas[chave]?.relations) return
+
+    set({ loadingRelations: true })
+    try {
+      const relations = await window.vela.schema.allRelations(
+        activeId,
+        activeDatabase ?? undefined
+      )
+      set((state) => {
+        const atual = state.schemas[chave]
+        // O schema pode ter sido recarregado enquanto isto viajava. Sem esta
+        // guarda, escreveríamos relações de volta num cache já substituído.
+        if (!atual) return { loadingRelations: false }
+        return {
+          schemas: { ...state.schemas, [chave]: { ...atual, relations } },
+          loadingRelations: false
+        }
+      })
+    } catch {
+      set({ loadingRelations: false })
     }
   },
 

@@ -77,6 +77,18 @@
   --border-subtle: rgba(255, 255, 255, 0.06);
   --border-default: rgba(255, 255, 255, 0.1);
   --border-strong: rgba(255, 255, 255, 0.18);
+
+  /*
+   * Contorno do cartão no diagrama de modelagem.
+   *
+   * Separado de `--border-default` pelo mesmo motivo do `--grid-line`: aquele
+   * token separa painéis que já têm superfícies diferentes, e aqui o cartão é
+   * o objeto. No tema claro `--bg-app`, `--bg-surface` e `--bg-elevated` são
+   * todos brancos — o contorno é a **única** coisa que define o cartão, e com
+   * `--border-default` ele media 1.28:1: cartão branco sobre fundo branco,
+   * praticamente invisível. Medido em 3.10:1 nos dois temas.
+   */
+  --model-card-line: #5f6772;
   /* Linha do grid. Separada de `--border-subtle` porque tem trabalho
      diferente: a borda sutil separa painéis grandes, esta precisa desenhar
      uma malha de milhares de células. A 0.06 ela media 1.17:1 contra o fundo
@@ -141,6 +153,8 @@
   --border-subtle: rgba(0, 0, 0, 0.06);
   --border-default: rgba(0, 0, 0, 0.11);
   --border-strong: rgba(0, 0, 0, 0.2);
+  /* Ver a nota no bloco escuro. Medido em 3.10:1 sobre o branco. */
+  --model-card-line: #8d939a;
   --grid-line: rgba(0, 0, 0, 0.14);
 
   --text-primary: #1a1d23;

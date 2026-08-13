@@ -36,6 +36,16 @@ interface AppState {
   limiteAviso: number
   /** Acento da interface. Ver `styles/palettes.ts` para o porquê da lista fechada. */
   paleta: string
+  /**
+   * Se o diagrama deduz ligações que o banco não declara.
+   *
+   * `auto` é o padrão e olha o schema: banco sem nenhuma FK declarada liga a
+   * inferência sozinho (senão o diagrama abriria vazio, afirmando que não há
+   * relação nenhuma), e banco bem modelado a mantém desligada (senão
+   * poluiríamos um mapa correto com palpite). `sim`/`nao` são a escolha
+   * explícita da pessoa, que sempre vence.
+   */
+  inferirRelacoes: 'auto' | 'sim' | 'nao'
   helpPanelVisible: boolean
   modal: 'connection' | 'history' | 'cheatsheet' | 'preferences' | 'update' | 'saveQuery' | null
   /** Conexão sendo editada no modal, se houver. */
@@ -58,6 +68,7 @@ interface AppState {
   setTamanhoPaginaPadrao: (linhas: number) => void
   setLimiteAviso: (linhas: number) => void
   setPaleta: (id: string) => void
+  setInferirRelacoes: (valor: 'auto' | 'sim' | 'nao') => void
   toggleHelpPanel: () => void
   openModal: (modal: AppState['modal'], connectionId?: string) => void
   closeModal: () => void
@@ -77,13 +88,15 @@ interface Preferencias {
   tamanhoPaginaPadrao: number
   limiteAviso: number
   paleta: string
+  inferirRelacoes: 'auto' | 'sim' | 'nao'
 }
 
 const PADROES: Preferencias = {
   limitePreview: 100,
   tamanhoPaginaPadrao: 100,
   limiteAviso: 10_000,
-  paleta: PALETA_PADRAO
+  paleta: PALETA_PADRAO,
+  inferirRelacoes: 'auto'
 }
 
 function readPrefs(): Preferencias {
@@ -97,7 +110,10 @@ function readPrefs(): Preferencias {
       limitePreview: sanear(lido.limitePreview, 1, 100_000, PADROES.limitePreview),
       tamanhoPaginaPadrao: sanear(lido.tamanhoPaginaPadrao, 1, 10_000, PADROES.tamanhoPaginaPadrao),
       limiteAviso: sanear(lido.limiteAviso, 1, 1_000_000, PADROES.limiteAviso),
-      paleta: typeof lido.paleta === 'string' ? lido.paleta : PADROES.paleta
+      paleta: typeof lido.paleta === 'string' ? lido.paleta : PADROES.paleta,
+      inferirRelacoes: ['auto', 'sim', 'nao'].includes(lido.inferirRelacoes as string)
+        ? (lido.inferirRelacoes as Preferencias['inferirRelacoes'])
+        : PADROES.inferirRelacoes
     }
   } catch {
     return PADROES
@@ -156,6 +172,7 @@ export const useAppStore = create<AppState>((set, get) => {
     tamanhoPaginaPadrao: prefs.tamanhoPaginaPadrao,
     limiteAviso: prefs.limiteAviso,
     paleta: prefs.paleta,
+    inferirRelacoes: prefs.inferirRelacoes,
     helpPanelVisible: false,
     modal: null,
     editingConnectionId: null,
@@ -206,6 +223,11 @@ export const useAppStore = create<AppState>((set, get) => {
       set({ paleta: id })
       gravarPrefs({ ...prefsAtuais(get), paleta: id })
     },
+
+    setInferirRelacoes: (valor) => {
+      set({ inferirRelacoes: valor })
+      gravarPrefs({ ...prefsAtuais(get), inferirRelacoes: valor })
+    },
     toggleHelpPanel: () => set((s) => ({ helpPanelVisible: !s.helpPanelVisible })),
 
     openModal: (modal, connectionId) => set({ modal, editingConnectionId: connectionId ?? null }),
@@ -231,6 +253,7 @@ function prefsAtuais(get: () => AppState): Preferencias {
     limitePreview: s.limitePreview,
     tamanhoPaginaPadrao: s.tamanhoPaginaPadrao,
     limiteAviso: s.limiteAviso,
-    paleta: s.paleta
+    paleta: s.paleta,
+    inferirRelacoes: s.inferirRelacoes
   }
 }

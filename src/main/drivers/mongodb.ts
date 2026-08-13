@@ -6,6 +6,7 @@ import type {
   IndexInfo,
   QueryResult,
   RelationInfo,
+  SchemaRelation,
   TableInfo,
   TestResult
 } from '../../shared/types'
@@ -136,6 +137,16 @@ export class MongoDriver implements DatabaseDriver {
 
   /** Mongo não declara chave estrangeira. Devolvemos vazio em vez de inventar. */
   async listRelations(): Promise<RelationInfo[]> {
+    return []
+  }
+
+  /**
+   * O MongoDB não declara ligação entre coleções — a integridade vive na
+   * aplicação. Devolver vazio aqui é a resposta correta, e a modelagem usa
+   * isso para dizer o que está acontecendo em vez de desenhar coleções soltas
+   * como se o banco realmente não tivesse relação nenhuma.
+   */
+  async listAllRelations(): Promise<SchemaRelation[]> {
     return []
   }
 

@@ -7,6 +7,7 @@ import type {
   IndexInfo,
   QueryResult,
   RelationInfo,
+  SchemaRelation,
   TableInfo,
   TestResult
 } from '../../shared/types'
@@ -152,6 +153,23 @@ export class SQLiteDriver implements DatabaseDriver {
       onDelete: r.on_delete,
       onUpdate: r.on_update
     }))
+  }
+
+  async listAllRelations(): Promise<SchemaRelation[]> {
+    // O SQLite não tem catálogo de FK consultável: só o pragma, por tabela. É
+    // um laço, mas o banco é um arquivo local e o pragma lê estrutura já
+    // carregada — não é a mesma coisa que 211 idas pela rede.
+    const tabelas = await this.listTables()
+    const todas: SchemaRelation[] = []
+    for (const tabela of tabelas) {
+      try {
+        const relacoes = await this.listRelations(tabela.name)
+        todas.push(...relacoes.map((r) => ({ ...r, table: tabela.name })))
+      } catch {
+        // Uma tabela ilegível não pode zerar o mapa inteiro.
+      }
+    }
+    return todas
   }
 
   async getCreateStatement(table: string): Promise<string> {

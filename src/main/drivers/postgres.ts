@@ -6,6 +6,7 @@ import type {
   IndexInfo,
   QueryResult,
   RelationInfo,
+  SchemaRelation,
   TableInfo,
   TestResult
 } from '../../shared/types'
@@ -28,6 +29,15 @@ import { toGridFromArrays } from './value-types'
 // números acima de 2^53, que praticamente não aparecem como valor de coluna.
 pg.types.setTypeParser(20, (v) => (v === null ? null : Number(v)))
 pg.types.setTypeParser(1700, (v) => (v === null ? null : Number(v)))
+
+/** Códigos de ação do `pg_constraint` por extenso. */
+const FK_ACTIONS: Record<string, string> = {
+  a: 'NO ACTION',
+  r: 'RESTRICT',
+  c: 'CASCADE',
+  n: 'SET NULL',
+  d: 'SET DEFAULT'
+}
 
 export class PostgresDriver implements DatabaseDriver {
   readonly dialect: Dialect = 'postgres'
@@ -225,14 +235,45 @@ export class PostgresDriver implements DatabaseDriver {
        WHERE con.contype = 'f' AND cl.relname = $1 AND n.nspname = COALESCE($2, 'public')`,
       [table, schema ?? null]
     )
-    const actions: Record<string, string> = { a: 'NO ACTION', r: 'RESTRICT', c: 'CASCADE', n: 'SET NULL', d: 'SET DEFAULT' }
     return res.rows.map((r) => ({
       constraintName: r.constraint_name as string,
       column: r.column_name as string,
       referencedTable: r.referenced_table as string,
       referencedColumn: r.referenced_column as string,
-      onDelete: actions[r.on_delete as string],
-      onUpdate: actions[r.on_update as string]
+      onDelete: FK_ACTIONS[r.on_delete as string],
+      onUpdate: FK_ACTIONS[r.on_update as string]
+    }))
+  }
+
+  async listAllRelations(schema?: string): Promise<SchemaRelation[]> {
+    const res = await this.require().query(
+      `SELECT cl.relname AS source_table,
+              con.conname AS constraint_name,
+              att.attname AS column_name,
+              ref_cl.relname AS referenced_table,
+              ref_att.attname AS referenced_column,
+              con.confdeltype AS on_delete,
+              con.confupdtype AS on_update
+       FROM pg_constraint con
+       JOIN pg_class cl ON cl.oid = con.conrelid
+       JOIN pg_namespace n ON n.oid = cl.relnamespace
+       JOIN LATERAL unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord) ON true
+       JOIN pg_attribute att ON att.attrelid = cl.oid AND att.attnum = k.attnum
+       JOIN pg_class ref_cl ON ref_cl.oid = con.confrelid
+       JOIN LATERAL unnest(con.confkey) WITH ORDINALITY AS fk(attnum, ord) ON fk.ord = k.ord
+       JOIN pg_attribute ref_att ON ref_att.attrelid = ref_cl.oid AND ref_att.attnum = fk.attnum
+       WHERE con.contype = 'f' AND n.nspname = COALESCE($1, 'public')
+       ORDER BY cl.relname, con.conname, k.ord`,
+      [schema ?? null]
+    )
+    return res.rows.map((r) => ({
+      table: r.source_table as string,
+      constraintName: r.constraint_name as string,
+      column: r.column_name as string,
+      referencedTable: r.referenced_table as string,
+      referencedColumn: r.referenced_column as string,
+      onDelete: FK_ACTIONS[r.on_delete as string],
+      onUpdate: FK_ACTIONS[r.on_update as string]
     }))
   }
 

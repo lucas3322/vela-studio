@@ -8,6 +8,7 @@ import type {
   IndexInfo,
   QueryRunResult,
   RelationInfo,
+  SchemaRelation,
   StoredConnection,
   TableInfo,
   SavedQuery,
@@ -32,6 +33,7 @@ export const IPC = {
   schemaColumns: 'schema:columns',
   schemaIndexes: 'schema:indexes',
   schemaRelations: 'schema:relations',
+  schemaAllRelations: 'schema:allRelations',
   schemaLoadAll: 'schema:loadAll',
   schemaCreateStatement: 'schema:createStatement',
   schemaDangerStatement: 'schema:dangerStatement',
@@ -77,6 +79,12 @@ export interface VelaApi {
     columns(connectionId: string, table: string, database?: string): Promise<ColumnInfo[]>
     indexes(connectionId: string, table: string, database?: string): Promise<IndexInfo[]>
     relations(connectionId: string, table: string, database?: string): Promise<RelationInfo[]>
+    /**
+     * Todas as FKs do banco numa chamada só — é o que alimenta a modelagem.
+     * Ver `listAllRelations` no driver para o porquê de não usar `relations`
+     * numa laçada.
+     */
+    allRelations(connectionId: string, database?: string): Promise<SchemaRelation[]>
     /** Tabelas + colunas de uma vez: é o que alimenta o autocomplete. */
     loadAll(
       connectionId: string,

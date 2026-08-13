@@ -139,6 +139,29 @@ test('listIndexes agrupa colunas por índice', async () => {
   assert.deepEqual(indexes.find((i) => i.name === 'idx_status').columns, ['status'])
 })
 
+test('listAllRelations traz o mapa inteiro numa consulta só', async () => {
+  // A modelagem precisa de todas as FKs de uma vez: com `listRelations` seriam
+  // 211 idas ao banco só para desenhar a primeira tela.
+  const todas = await driver.listAllRelations()
+  const nossa = todas.filter((r) => r.table === 'pedidos')
+  assert.equal(nossa.length, 1)
+  assert.equal(nossa[0].column, 'cliente_id')
+  assert.equal(nossa[0].referencedTable, 'clientes')
+  assert.equal(nossa[0].referencedColumn, 'id')
+  assert.equal(nossa[0].onDelete, 'CASCADE')
+})
+
+test('listAllRelations diz de qual tabela cada FK sai', async () => {
+  // Sem o campo `table` as relações chegam indistinguíveis e o diagrama não
+  // sabe de onde puxar a linha.
+  const todas = await driver.listAllRelations()
+  assert.ok(todas.length > 0)
+  for (const r of todas) {
+    assert.ok(typeof r.table === 'string' && r.table.length > 0, JSON.stringify(r))
+    assert.ok(typeof r.referencedTable === 'string' && r.referencedTable.length > 0)
+  }
+})
+
 test('listRelations resolve a chave estrangeira', async () => {
   const relations = await driver.listRelations('pedidos')
   assert.equal(relations.length, 1)

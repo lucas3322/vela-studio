@@ -5,6 +5,7 @@ import { useConnectionStore } from '../store/connections'
 import { useTabStore } from '../store/tabs'
 import { ContextMenu, type MenuEntry } from './ContextMenu'
 import { SavedQueries } from './SavedQueries'
+import { SchemaModelList } from './SchemaModelList'
 import { DangerDialog } from './DangerDialog'
 import {
   IconChevronDown,
@@ -34,7 +35,7 @@ interface DangerState {
 
 export function Sidebar(): React.JSX.Element {
   /** Árvore de tabelas ou lista de queries salvas — nunca as duas. */
-  const [modo, setModo] = useState<'tabelas' | 'salvas'>('tabelas')
+  const [modo, setModo] = useState<'tabelas' | 'modelagem' | 'salvas'>('tabelas')
   const openModal = useAppStore((s) => s.openModal)
   const notify = useAppStore((s) => s.notify)
   const {
@@ -396,6 +397,17 @@ export function Sidebar(): React.JSX.Element {
           {isMongo ? 'Coleções' : 'Tabelas'}
         </button>
         <button
+          className={`sidebar__modo ${modo === 'modelagem' ? 'sidebar__modo--ativo' : ''}`}
+          onClick={() => setModo('modelagem')}
+          title={
+            isMongo
+              ? 'O MongoDB não declara ligação entre coleções'
+              : 'Tabelas e as ligações entre elas'
+          }
+        >
+          Modelagem
+        </button>
+        <button
           className={`sidebar__modo ${modo === 'salvas' ? 'sidebar__modo--ativo' : ''}`}
           onClick={() => setModo('salvas')}
           title="Queries que você salvou (⌘S salva a aba atual)"
@@ -405,6 +417,8 @@ export function Sidebar(): React.JSX.Element {
       </div>
 
       {modo === 'salvas' && <SavedQueries />}
+
+      {modo === 'modelagem' && <SchemaModelList />}
 
       {modo === 'tabelas' && (
       <>
