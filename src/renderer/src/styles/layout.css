@@ -2054,3 +2054,10 @@
   overflow-x: auto;
   white-space: nowrap;
 }
+
+/* Crédito de autoria na tela inicial, abaixo da versão. */
+.welcome__autor {
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}

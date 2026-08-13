@@ -530,6 +530,8 @@ h1, h2, h3 { font-family: var(--display); font-weight: 400; line-height: 1.02; l
 .footer__in { display: flex; flex-wrap: wrap; gap: 22px; align-items: center; justify-content: space-between; font-size: 13.5px; color: var(--fog-dim); }
 .footer__links { display: flex; gap: 26px; }
 .footer__links a:hover { color: var(--amber); }
+.footer__autor { color: var(--fog); border-bottom: 1px solid var(--rule); padding-bottom: 1px; transition: color 200ms ease, border-color 200ms ease; }
+.footer__autor:hover { color: var(--amber); border-color: var(--amber); }
 
 /* ── Revelação no scroll ─────────────────────────────────────────── */
 
@@ -949,8 +951,14 @@ LEFT JOIN pedidos p ON p.cliente_id = c.id</div>
 <!-- ── Rodapé ─────────────────────────────────────────────────── -->
 <footer class="footer">
   <div class="wrap footer__in">
-    <span>Vela Studio · licença MIT · código aberto no GitHub</span>
+    <span>
+      Vela Studio · licença MIT · criado por
+      <a class="footer__autor" href="https://www.linkedin.com/in/pardinhodev/" target="_blank" rel="noopener noreferrer">
+        Lucas Pardinho
+      </a>
+    </span>
     <div class="footer__links">
+      <a href="https://www.linkedin.com/in/pardinhodev/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
       <a href="#" data-repo-link>GitHub</a>
       <a href="#" data-repo-link-suffix="/releases">Versões</a>
       <a href="#" data-repo-link-suffix="/issues">Reportar problema</a>

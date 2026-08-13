@@ -89,6 +89,9 @@ export function WelcomeScreen(): React.JSX.Element {
       <div className="welcome__version selectable">
         v{__APP_VERSION__} · {__GIT_SHA__}
       </div>
+
+      {/* Crédito de autoria, sem link: a IDE não manda ninguém para fora. */}
+      <div className="welcome__autor">criado por Lucas Pardinho</div>
     </div>
   )
 }
