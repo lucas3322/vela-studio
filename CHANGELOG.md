@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.20.0 — 2026-08-14
+
+### Novidades
+
+- add comprehensive tests for export functionality and database drivers (aee7951)
+
 ## 0.19.0 — 2026-08-13
 
 ### Novidades
