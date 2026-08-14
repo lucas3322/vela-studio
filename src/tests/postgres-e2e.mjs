@@ -130,6 +130,47 @@ test('listIndexes agrupa colunas por índice', async () => {
   assert.ok(indexes.some((i) => i.primary))
 })
 
+test('streamQuery percorre o cursor até o fim', async () => {
+  const blocos = []
+  await driver.streamQuery('SELECT id, nome FROM clientes ORDER BY id', {}, async (b) => {
+    blocos.push(b)
+  })
+  const linhas = blocos.flatMap((b) => b.rows)
+  assert.equal(linhas.length, 3)
+  assert.deepEqual(blocos[0].columns, ['id', 'nome'])
+})
+
+test('streamQuery ignora a prévia e traz tudo', async () => {
+  await driver.query('DROP TABLE IF EXISTS muitas', { queryId: 'd1' })
+  await driver.query('CREATE TABLE muitas AS SELECT g AS id FROM generate_series(1, 500) g', {
+    queryId: 'd2'
+  })
+
+  const [prevista] = await driver.query('SELECT * FROM muitas', { queryId: 'p' })
+  assert.equal(prevista.rows.length, 100)
+
+  let total = 0
+  await driver.streamQuery('SELECT * FROM muitas', {}, async (b) => {
+    total += b.rows.length
+  })
+  assert.equal(total, 500)
+
+  await driver.query('DROP TABLE muitas', { queryId: 'd3' })
+})
+
+test('o cursor é fechado mesmo quando o consumidor falha', async () => {
+  // Sem fechar, a transação ficaria aberta e a conexão presa no pool — o
+  // sintoma seria a IDE parar de responder consultas depois de um erro.
+  await assert.rejects(
+    driver.streamQuery('SELECT * FROM clientes', {}, async () => {
+      throw new Error('escrita em disco falhou')
+    }),
+    /escrita em disco falhou/
+  )
+  const [depois] = await driver.query('SELECT 1 AS ok', { queryId: 'apos' })
+  assert.equal(Number(depois.rows[0][0]), 1, 'a conexão precisa continuar utilizável')
+})
+
 test('listAllRelations traz o mapa inteiro numa consulta só', async () => {
   const todas = await driver.listAllRelations()
   const nossa = todas.filter((r) => r.table === 'pedidos')

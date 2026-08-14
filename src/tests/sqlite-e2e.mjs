@@ -95,6 +95,16 @@ test('listIndexes encontra o índice declarado', async () => {
   assert.deepEqual(found.columns, ['status'])
 })
 
+test('streamQuery itera o arquivo inteiro, sem prévia', async () => {
+  const blocos = []
+  await driver.streamQuery('SELECT id, nome FROM clientes ORDER BY id', {}, async (b) => {
+    blocos.push(b)
+  })
+  const linhas = blocos.flatMap((b) => b.rows)
+  assert.equal(linhas.length, 3)
+  assert.deepEqual(blocos[0].columns, ['id', 'nome'])
+})
+
 test('listAllRelations percorre todas as tabelas do arquivo', async () => {
   // No SQLite não há catálogo de FK consultável: é um pragma por tabela. O
   // teste garante que o laço não pula nem duplica.

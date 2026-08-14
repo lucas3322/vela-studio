@@ -139,6 +139,55 @@ test('listIndexes agrupa colunas por índice', async () => {
   assert.deepEqual(indexes.find((i) => i.name === 'idx_status').columns, ['status'])
 })
 
+test('streamQuery entrega todas as linhas em blocos', async () => {
+  // É o caminho da exportação. `query` corta de propósito para a grade não
+  // travar; se este também cortasse, o arquivo sairia com um pedaço da tabela
+  // e a IDE diria "salvo" — foi exatamente o bug relatado.
+  const blocos = []
+  await driver.streamQuery('SELECT id, nome FROM clientes ORDER BY id', {}, async (bloco) => {
+    blocos.push(bloco)
+  })
+  const linhas = blocos.flatMap((b) => b.rows)
+  assert.equal(linhas.length, 3)
+  assert.deepEqual(blocos[0].columns, ['id', 'nome'])
+  assert.equal(linhas[0][1], 'Ana')
+})
+
+test('streamQuery não aplica a prévia de 100 linhas', async () => {
+  await driver.query('DROP TABLE IF EXISTS muitas', { queryId: 'd1' })
+  await driver.query('CREATE TABLE muitas (id INT AUTO_INCREMENT PRIMARY KEY)', { queryId: 'd2' })
+  await driver.query(
+    'INSERT INTO muitas () SELECT NULL FROM information_schema.columns LIMIT 500',
+    { queryId: 'd3' }
+  )
+
+  const [prevista] = await driver.query('SELECT * FROM muitas', { queryId: 'p' })
+  assert.equal(prevista.rows.length, 100, 'a grade continua limitada, como deve')
+
+  let total = 0
+  await driver.streamQuery('SELECT * FROM muitas', {}, async (b) => {
+    total += b.rows.length
+  })
+  assert.equal(total, 500, 'a exportação precisa levar tudo')
+
+  await driver.query('DROP TABLE muitas', { queryId: 'd4' })
+})
+
+test('streamQuery aplica contrapressão: espera o consumidor', async () => {
+  // Sem aguardar `aoReceber`, a leitura do banco correria à frente da escrita
+  // em disco e a memória cresceria sem limite — justamente no arquivo gigante.
+  const ordem = []
+  await driver.streamQuery('SELECT id FROM clientes ORDER BY id', {}, async (bloco) => {
+    ordem.push('recebeu ' + bloco.rows.length)
+    await new Promise((r) => setTimeout(r, 20))
+    ordem.push('terminou')
+  })
+  for (let i = 0; i < ordem.length; i += 2) {
+    assert.match(ordem[i], /^recebeu/)
+    assert.equal(ordem[i + 1], 'terminou', 'bloco novo chegou antes do anterior terminar')
+  }
+})
+
 test('listAllRelations traz o mapa inteiro numa consulta só', async () => {
   // A modelagem precisa de todas as FKs de uma vez: com `listRelations` seriam
   // 211 idas ao banco só para desenhar a primeira tela.

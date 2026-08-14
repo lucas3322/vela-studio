@@ -62,6 +62,27 @@ export interface DatabaseDriver {
    */
   listAllRelations(database?: string): Promise<SchemaRelation[]>
 
+  /**
+   * Percorre o resultado em blocos, sem materializar tudo na memória.
+   *
+   * Existe por causa da exportação. O caminho normal (`query`) devolve um
+   * array inteiro e é limitado de propósito, para a grade não travar. Isso
+   * está certo para exibir e **errado para exportar**: numa tabela de 250 mil
+   * linhas, o arquivo saía com 100 e a IDE dizia "salvo" em verde.
+   *
+   * Quem implementa DEVE entregar os blocos conforme o banco entrega, sem
+   * acumular — o ponto todo é conseguir escrever milhões de linhas em disco
+   * com memória constante.
+   *
+   * `aoReceber` é aguardado entre blocos: é assim que a contrapressão da
+   * escrita em disco chega até a leitura do banco.
+   */
+  streamQuery(
+    sql: string,
+    options: { database?: string },
+    aoReceber: (bloco: { columns: string[]; rows: unknown[][] }) => Promise<void>
+  ): Promise<void>
+
   /** DDL de criação da tabela, para o menu de contexto e para documentação. */
   getCreateStatement(table: string, database?: string): Promise<string>
 
@@ -134,6 +155,15 @@ export const PREVIEW_ROWS = 100
  * Respeitamos o que a pessoa pediu até aqui; acima disso o renderer sofre.
  */
 export const DEFAULT_MAX_ROWS = 50_000
+
+/**
+ * Linhas por bloco na exportação em fluxo.
+ *
+ * Grande o bastante para não pagar uma ida ao banco a cada punhado de linhas,
+ * pequeno o bastante para a memória ficar constante: o pico é um bloco, não a
+ * consulta inteira.
+ */
+export const LOTE_EXPORTACAO = 5_000
 
 /** A query já declara quantas linhas quer? */
 export function hasExplicitLimit(sql: string): boolean {

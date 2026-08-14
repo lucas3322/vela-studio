@@ -50,6 +50,7 @@ const api: VelaApi = {
   app: {
     setTheme: (theme) => ipcRenderer.invoke(IPC.appTheme, theme),
     pickFile: (filters) => ipcRenderer.invoke(IPC.appPickFile, filters),
+    exportQuery: (params) => ipcRenderer.invoke(IPC.appExportQuery, params),
     exportResult: (params) => ipcRenderer.invoke(IPC.appExport, params),
     platform: process.platform
   },

@@ -13,6 +13,7 @@ import type {
 import {
   type AlterColumnParams,
   DEFAULT_MAX_ROWS,
+  LOTE_EXPORTACAO,
   PREVIEW_ROWS,
   applyPreviewLimit,
   hasExplicitLimit,
@@ -243,6 +244,46 @@ export class PostgresDriver implements DatabaseDriver {
       onDelete: FK_ACTIONS[r.on_delete as string],
       onUpdate: FK_ACTIONS[r.on_update as string]
     }))
+  }
+
+  async streamQuery(
+    sql: string,
+    options: { database?: string },
+    aoReceber: (bloco: { columns: string[]; rows: unknown[][] }) => Promise<void>
+  ): Promise<void> {
+    // Cursor declarado em SQL em vez de `pg-cursor`: o `pg` sozinho não
+    // transmite em blocos, e resolver isso com uma dependência a mais para um
+    // recurso que o próprio PostgreSQL oferece seria peso sem ganho.
+    const client = await this.require().connect()
+    const nome = 'vela_export'
+    let aberto = false
+    try {
+      if (options.database) {
+        await client.query(`SET search_path TO "${options.database.replace(/"/g, '""')}", public`)
+      }
+      await client.query('BEGIN')
+      await client.query(`DECLARE ${nome} NO SCROLL CURSOR FOR ${sql}`)
+      aberto = true
+
+      for (;;) {
+        const res = await client.query({
+          text: `FETCH ${LOTE_EXPORTACAO} FROM ${nome}`,
+          rowMode: 'array'
+        })
+        if (res.rows.length === 0) break
+        await aoReceber({
+          columns: (res.fields ?? []).map((f) => f.name),
+          rows: res.rows as unknown[][]
+        })
+        if (res.rows.length < LOTE_EXPORTACAO) break
+      }
+    } finally {
+      // O cursor vive dentro da transação; fechá-lo antes do COMMIT evita
+      // deixar a conexão presa se a escrita em disco falhar no meio.
+      if (aberto) await client.query(`CLOSE ${nome}`).catch(() => {})
+      await client.query('COMMIT').catch(() => client.query('ROLLBACK').catch(() => {}))
+      client.release()
+    }
   }
 
   async listAllRelations(schema?: string): Promise<SchemaRelation[]> {

@@ -1,4 +1,5 @@
 import mysql from 'mysql2/promise'
+import type { Connection as ConexaoBruta } from 'mysql2'
 import type {
   ColumnInfo,
   ConnectionConfig,
@@ -13,6 +14,7 @@ import type {
 import {
   type AlterColumnParams,
   DEFAULT_MAX_ROWS,
+  LOTE_EXPORTACAO,
   PREVIEW_ROWS,
   applyPreviewLimit,
   hasExplicitLimit,
@@ -235,6 +237,42 @@ export class MySQLDriver implements DatabaseDriver {
       onDelete: (r.on_delete as string) || undefined,
       onUpdate: (r.on_update as string) || undefined
     }))
+  }
+
+  async streamQuery(
+    sql: string,
+    options: { database?: string },
+    aoReceber: (bloco: { columns: string[]; rows: unknown[][] }) => Promise<void>
+  ): Promise<void> {
+    const conn = await this.require().getConnection()
+    try {
+      if (options.database) await conn.query(`USE \`${options.database.replace(/`/g, '``')}\``)
+
+      // `conn.query` do wrapper de promise devolve uma Promise, e Promise não
+      // tem `.stream()`. O objeto por baixo é a conexão da API de callback,
+      // onde o mysql2 expõe os eventos e o fluxo — o wrapper só o tipa como
+      // ele mesmo, daí a conversão.
+      const bruta = conn.connection as unknown as ConexaoBruta
+      const consulta = bruta.query({ sql, rowsAsArray: true })
+      let columns: string[] = []
+      consulta.on('fields', (campos: mysql.FieldPacket[]) => {
+        columns = campos.map((c) => c.name)
+      })
+
+      let bloco: unknown[][] = []
+      // `for await` sobre o stream aplica contrapressão sozinho: enquanto
+      // estamos escrevendo em disco, o mysql2 para de puxar do socket.
+      for await (const linha of consulta.stream()) {
+        bloco.push(linha as unknown[])
+        if (bloco.length >= LOTE_EXPORTACAO) {
+          await aoReceber({ columns, rows: bloco })
+          bloco = []
+        }
+      }
+      if (bloco.length) await aoReceber({ columns, rows: bloco })
+    } finally {
+      conn.release()
+    }
   }
 
   async getCreateStatement(table: string, database?: string): Promise<string> {

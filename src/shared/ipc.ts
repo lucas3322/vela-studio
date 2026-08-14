@@ -55,6 +55,7 @@ export const IPC = {
   appTheme: 'app:theme',
   appPickFile: 'app:pickFile',
   appExport: 'app:export',
+  appExportQuery: 'app:exportQuery',
 
   updateCheck: 'update:check',
   updateDownload: 'update:download',
@@ -63,6 +64,9 @@ export const IPC = {
 
 /** Evento de progresso do download, emitido pelo main. */
 export const UPDATE_PROGRESS_EVENT = 'app:updateProgress'
+
+/** Andamento da exportação em fluxo, emitido pelo main a cada bloco gravado. */
+export const EXPORT_PROGRESS_EVENT = 'app:exportProgress'
 
 export interface VelaApi {
   connections: {
@@ -140,6 +144,21 @@ export interface VelaApi {
   app: {
     setTheme(theme: 'light' | 'dark' | 'system'): Promise<void>
     pickFile(filters?: { name: string; extensions: string[] }[]): Promise<string | undefined>
+    /**
+     * Exporta o resultado **consultando o banco**, em fluxo, direto para o disco.
+     *
+     * Diferente de `exportResult`, que reembala as linhas já carregadas na
+     * grade: aquele caminho serve para "salvar o que estou vendo" e é limitado
+     * pelo que a grade carregou. Este pega tudo, divide em vários arquivos
+     * quando passa do teto do Excel e nunca traz as linhas para o renderer.
+     */
+    exportQuery(params: {
+      connectionId: string
+      sql: string
+      database?: string
+      format: 'csv' | 'json'
+      suggestedName: string
+    }): Promise<{ arquivos: string[]; linhas: number } | undefined>
     exportResult(params: {
       format: 'csv' | 'json'
       columns: string[]

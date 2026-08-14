@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
+import { exportarEmFluxo } from './export-writer'
 import { writeFileSync } from 'node:fs'
 import { ipcMain, dialog, nativeTheme, BrowserWindow } from 'electron'
-import { IPC, UPDATE_PROGRESS_EVENT } from '../shared/ipc'
+import { IPC, UPDATE_PROGRESS_EVENT , EXPORT_PROGRESS_EVENT } from '../shared/ipc'
 import type {
   ColumnInfo,
   ConnectionConfig,
@@ -305,6 +306,43 @@ export function registerIpcHandlers(manager: ConnectionManager, store: Connectio
 
       writeFileSync(result.filePath, content, 'utf-8')
       return result.filePath
+    }
+  )
+
+  ipcMain.handle(
+    IPC.appExportQuery,
+    async (
+      event,
+      params: {
+        connectionId: string
+        sql: string
+        database?: string
+        format: 'csv' | 'json'
+        suggestedName: string
+      }
+    ) => {
+      const window = BrowserWindow.fromWebContents(event.sender)
+      const escolha = await dialog.showSaveDialog(window!, {
+        defaultPath: `${params.suggestedName}.${params.format}`,
+        filters: [{ name: params.format.toUpperCase(), extensions: [params.format] }]
+      })
+      if (escolha.canceled || !escolha.filePath) return undefined
+
+      const { driver } = manager.get(params.connectionId)
+      return exportarEmFluxo({
+        driver,
+        sql: params.sql,
+        database: params.database,
+        format: params.format,
+        caminho: escolha.filePath,
+        aoProgredir: (linhas, arquivos) => {
+          // Exportação de milhões de linhas leva minutos. Sem andamento, a
+          // única leitura possível da tela é "travou".
+          if (!event.sender.isDestroyed()) {
+            event.sender.send(EXPORT_PROGRESS_EVENT, { linhas, arquivos })
+          }
+        }
+      })
     }
   )
 

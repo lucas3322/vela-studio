@@ -852,9 +852,18 @@
   letter-spacing: -0.01em;
 }
 
+/*
+ * Secundário, não terciário — vale para todo metadado que vive dentro de
+ * `--bg-elevated` (modal, menu de contexto, toast).
+ *
+ * Aquela é a superfície mais clara do tema escuro, e sob `:hover` chega a
+ * #31363d. Um terciário legível ali teria que ficar a 1.18:1 do secundário:
+ * não seria mais um degrau da escala, seria o secundário com outro nome. O
+ * degrau que sobra aqui é tamanho e peso, que estes rótulos já têm.
+ */
 .modal__subtitle {
   font-size: var(--text-sm);
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   margin-top: 2px;
 }
 
@@ -917,9 +926,11 @@
   font-size: var(--text-base);
 }
 
+/* No `:hover` o cartão troca a própria superfície por `--bg-hover`, que compõe
+   sobre o corpo do modal — cai no caso do `.modal__subtitle` acima. */
 .driver-card__family {
   font-size: var(--text-xs);
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
 }
 
 .form-grid {
@@ -1165,13 +1176,14 @@
   line-height: 1.45;
 }
 
+/* Dentro do modal, e a linha ganha `--bg-hover` por cima: ver `.modal__subtitle`. */
 .history-item__meta {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   margin-top: var(--space-2);
   font-size: var(--text-xs);
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
 }
 
 /* ── Guia rápido ─────────────────────────────────────────────────── */
@@ -1296,9 +1308,11 @@
   white-space: nowrap;
 }
 
+/* O atalho é lido justamente com o item sob o cursor, que é o pior fundo do
+   app (#31363d no escuro). Ver `.modal__subtitle`. */
 .context-menu__hint {
   font-size: var(--text-xs);
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   flex-shrink: 0;
 }
 
@@ -1355,12 +1369,18 @@
   min-width: 0;
 }
 
-/* Versão na tela inicial: presente para quem procura, invisível para quem não. */
+/*
+ * Versão na tela inicial: presente para quem procura, discreta para quem não.
+ *
+ * Tinha `opacity: 0.7`, que anulava qualquer valor do token — a cor efetiva
+ * virava #545b64 no escuro (2.59:1) e #9b9fa5 no claro (2.66:1). É justamente
+ * o número que a pessoa vem copiar para reportar um problema. Discrição aqui
+ * é trabalho do terciário, não de uma opacidade por cima dele.
+ */
 .welcome__version {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   color: var(--text-tertiary);
-  opacity: 0.7;
 }
 
 /* ── Campo de senha com botão de revelar ─────────────────────────── */
@@ -1490,8 +1510,9 @@
   color: var(--warning);
 }
 
+/* Modal: ver `.modal__subtitle`. */
 .update__nota {
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   font-size: var(--text-xs);
   line-height: 1.6;
   margin: 0;
@@ -1513,9 +1534,10 @@
   color: var(--text-primary);
 }
 
+/* Modal: ver `.modal__subtitle`. */
 .update__versao-meta {
   font-size: var(--text-xs);
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
 }
 
 /* As notas vêm em markdown cru da release; `pre` preserva as quebras sem
@@ -2358,4 +2380,177 @@
   font-size: var(--text-xs);
   color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Escolha de escopo na exportação ──────────────────────────────── */
+
+.escolha {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/*
+  Cartões em vez de botões numa fileira: cada opção precisa carregar a própria
+  consequência por escrito. Dois botões lado a lado ("Tudo" / "Só a tela")
+  obrigariam a pessoa a adivinhar o que cada um faz, que é exatamente a
+  adivinhação que este diálogo existe para eliminar.
+*/
+.escolha__opcao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  text-align: left;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  transition:
+    border-color var(--duration-fast) var(--ease),
+    background var(--duration-fast) var(--ease);
+}
+
+.escolha__opcao:hover {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.escolha__opcao--principal {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.escolha__titulo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.escolha__detalhe {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+/*
+  Secundário, não terciário: sobre o fundo elevado do rodapé do modal, o
+  terciário não alcança 4.5:1 — e "Formato: CSV" é informação que a pessoa
+  precisa conseguir ler antes de confirmar.
+*/
+.modal__nota {
+  margin-right: auto;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+/*
+  Cabeçalho de grupo dentro da árvore (Views).
+
+  Diferente do cabeçalho da seção, que fica preso no topo: este rola junto com
+  a lista, porque marca onde um grupo termina e outro começa. Fixá-lo faria
+  "Views" pairar sobre as tabelas enquanto a pessoa rola, dizendo que são views.
+*/
+.sidebar__header--grupo {
+  position: static;
+  margin-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--space-3);
+}
+
+.sidebar__header--grupo span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ── Aviso de versão nova ─────────────────────────────────────────── */
+
+/*
+  Canto inferior direito, acima da barra de status.
+
+  Fica até a pessoa responder, ao contrário do toast que existia antes: um
+  aviso que some em quatro segundos é invisível para quem estava lendo uma
+  query naquele instante — e a checagem só voltava a rodar no dia seguinte.
+*/
+.aviso-versao {
+  position: fixed;
+  right: var(--space-4);
+  bottom: calc(var(--statusbar-height) + var(--space-4));
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 320px;
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-lg);
+  animation: aviso-versao-entra var(--duration-base) var(--ease);
+}
+
+@keyframes aviso-versao-entra {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.aviso-versao--saindo {
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity var(--duration-fast) var(--ease),
+    transform var(--duration-fast) var(--ease);
+}
+
+.aviso-versao__texto {
+  padding-right: var(--space-5);
+  font-size: var(--text-base);
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+
+.aviso-versao__versao {
+  margin-left: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--accent-text);
+}
+
+.aviso-versao__acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/*
+  O X é a terceira saída, além de "Not now". Precisa existir porque fechar
+  pelo canto é o gesto que a mão já conhece — mas fica discreto, para o
+  caminho principal continuar sendo os dois botões.
+*/
+.aviso-versao__fechar {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+}
+
+.aviso-versao__fechar:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aviso-versao {
+    animation: none;
+  }
 }

@@ -97,7 +97,21 @@
 
   --text-primary: #e8eaed;
   --text-secondary: #a2a9b5;
-  --text-tertiary: #6e7783;
+  /*
+   * era #6e7783 — reprovava em TODA superfície do tema escuro, não só numa:
+   * 3.91:1 sobre `--bg-app`, 3.68:1 sobre `--bg-sidebar`, 3.48:1 sobre
+   * `--bg-surface`, 3.14:1 sobre `--bg-elevated`. Como o terciário carrega
+   * texto nas quatro, não dava para consertar trocando um uso ou outro.
+   *
+   * A superfície que manda no valor é a barra lateral sob `:hover` (#26292f):
+   * é lá que vivem o tipo e a contagem de cada nó da árvore, e o `--bg-hover`
+   * clareia o fundo justo enquanto a pessoa lê. 4.51:1 ali.
+   *
+   * Nada de terciário sobrevive sobre `--bg-elevated`: o hover daquela
+   * superfície (#31363d) exigiria um cinza a 1.18:1 do secundário, ou seja,
+   * dois tokens com a mesma cara. Aqueles pontos usam `--text-secondary`.
+   */
+  --text-tertiary: #86909f;
   --text-inverse: #16181d;
 
   --accent: hsl(var(--accent-h) var(--accent-s) var(--accent-l-escuro, 60%));
@@ -158,8 +172,20 @@
   --grid-line: rgba(0, 0, 0, 0.14);
 
   --text-primary: #1a1d23;
-  --text-secondary: #5a6472;
-  --text-tertiary: #70767e;   /* era #8a939f, 3.11:1 */
+  /*
+   * era #5a6472, 6.00:1 sobre o branco — contra 7.51:1 do secundário no
+   * escuro. Essa folga menor é parte do "tema claro apagado": aqui o
+   * secundário precisou descer para o terciário caber embaixo dele. A 6.00:1
+   * os dois ficavam a 1.13:1 um do outro, indistinguíveis.
+   */
+  --text-secondary: #4b5462;
+  /*
+   * era #70767e (e antes #8a939f, 3.11:1). #70767e passava sobre o branco,
+   * 4.58:1 — mas o claro tem uma superfície que não é branca: `--bg-sidebar`
+   * (#f6f7f9), onde media 4.28:1, e sob `:hover` (#ecedef), 3.91:1. É onde
+   * fica a árvore de schema. 4.53:1 no pior caso.
+   */
+  --text-tertiary: #666c73;
   --text-inverse: #ffffff;
 
   /* 42% é onde o âmbar cruza 3:1 contra branco — o mínimo para um elemento

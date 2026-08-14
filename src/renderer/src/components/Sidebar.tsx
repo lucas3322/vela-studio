@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DRIVERS, type ColumnInfo, type TableInfo } from '@shared/types'
 import { useAppStore } from '../store/app'
+import { descreverExportacao } from '../editor/export-message'
 import { useConnectionStore } from '../store/connections'
 import { useTabStore } from '../store/tabs'
 import { ContextMenu, type MenuEntry } from './ContextMenu'
@@ -90,6 +91,17 @@ export function Sidebar(): React.JSX.Element {
     })
   }, [schema, filter])
 
+  /**
+   * Tabelas e views em listas separadas.
+   *
+   * Misturadas, uma view parece tabela: você tenta editar uma célula, tentar
+   * `INSERT`, ou conta a view junto no total e conclui que o banco tem mais
+   * entidades do que tem. A distinção existe no catálogo (`type`) desde
+   * sempre — só não estava chegando aos olhos de quem usa.
+   */
+  const tabelas = useMemo(() => tables.filter((t) => t.type !== 'view'), [tables])
+  const views = useMemo(() => tables.filter((t) => t.type === 'view'), [tables])
+
   const startResize = (event: React.MouseEvent): void => {
     event.preventDefault()
     const startX = event.clientX
@@ -161,60 +173,34 @@ export function Sidebar(): React.JSX.Element {
   }
 
   /**
-   * Exporta a tabela inteira para arquivo.
+   * Exporta a tabela inteira.
    *
-   * Antes este item do menu só abria a aba da tabela — não exportava nada.
-   *
-   * O `maxRows` explícito é obrigatório: sem ele o driver aplica a prévia de
-   * 100 linhas e o arquivo sairia truncado sem avisar. Exportação é justamente
-   * o caso em que se quer tudo.
+   * Consulta o banco **em fluxo**, pelo processo principal, em vez de rodar a
+   * query e reempacotar o que voltou. O caminho antigo cortava em 100.000
+   * linhas; o da aba de query cortava na prévia e gravava 100 linhas de uma
+   * tabela de 250.000, com um "Salvo em…" verde na tela. Aqui não há teto: as
+   * linhas nem passam pelo renderer, e acima de um milhão o arquivo é dividido
+   * para continuar abrindo em planilha.
    */
-  const TETO_EXPORTACAO = 100_000
-
   const exportar = async (table: string, formato: 'csv' | 'json'): Promise<void> => {
     if (!activeId) return
 
-    const sql =
-      dialect === 'mongodb'
-        ? `db.${table}.find({})`
-        : `SELECT * FROM ${quote(table)}`
+    const sql = dialect === 'mongodb' ? `db.${table}.find({})` : `SELECT * FROM ${quote(table)}`
 
-    notify(`Lendo ${table}…`, 'info')
+    try {
+      const saida = await window.vela.app.exportQuery({
+        connectionId: activeId,
+        sql,
+        database: activeDatabase ?? undefined,
+        format: formato,
+        suggestedName: table
+      })
 
-    const outcome = await window.vela.query.run({
-      connectionId: activeId,
-      sql,
-      database: activeDatabase ?? undefined,
-      queryId: `export_${Date.now()}`,
-      maxRows: TETO_EXPORTACAO
-    })
-
-    if (outcome.error) {
-      notify(outcome.error.friendly, 'danger')
-      return
+      if (!saida) return // o usuário cancelou o diálogo de salvar
+      notify(descreverExportacao(saida), 'success')
+    } catch (erro) {
+      notify(erro instanceof Error ? erro.message : 'Falha ao exportar.', 'danger')
     }
-
-    const resultado = outcome.results[0]
-    if (!resultado || resultado.columns.length === 0) {
-      notify('Nada para exportar.', 'danger')
-      return
-    }
-
-    const caminho = await window.vela.app.exportResult({
-      format: formato,
-      columns: resultado.columns.map((c) => c.name),
-      rows: resultado.rows,
-      suggestedName: table
-    })
-
-    if (!caminho) return // o usuário cancelou o diálogo de salvar
-
-    notify(
-      resultado.truncatedAt
-        ? `Salvo em ${caminho} — cortado em ${resultado.truncatedAt.toLocaleString('pt-BR')} linhas.`
-        : `${resultado.rowCount.toLocaleString('pt-BR')} linha(s) salva(s) em ${caminho}`,
-      resultado.truncatedAt ? 'info' : 'success'
-    )
   }
 
   const askDanger = async (kind: 'truncate' | 'drop', table: string): Promise<void> => {
@@ -435,7 +421,7 @@ export function Sidebar(): React.JSX.Element {
       <div className="sidebar__header">
         <span>
           {isMongo ? 'Coleções' : 'Tabelas'}
-          {schema ? ` · ${tables.length}` : ''}
+          {schema ? ` · ${tabelas.length}` : ''}
         </span>
         <span style={{ display: 'flex', gap: 2 }}>
           <button
@@ -481,7 +467,35 @@ export function Sidebar(): React.JSX.Element {
           </div>
         )}
 
-        {tables.map((table) => (
+        {tabelas.map((table) => (
+          <TableNode
+            key={table.name}
+            table={table}
+            columns={schema?.columns[table.name] ?? []}
+            expanded={expanded.has(table.name)}
+            filter={filter}
+            onToggle={() => toggle(table.name)}
+            onOpen={() =>
+              activeId &&
+              openTableTab({ connectionId: activeId, database: activeDatabase, table: table.name })
+            }
+            onContextMenu={(event) => {
+              event.preventDefault()
+              setMenu({ x: event.clientX, y: event.clientY, table })
+            }}
+          />
+        ))}
+
+        {views.length > 0 && (
+          <div className="sidebar__header sidebar__header--grupo">
+            <span>
+              <IconView size={12} />
+              Views · {views.length}
+            </span>
+          </div>
+        )}
+
+        {views.map((table) => (
           <TableNode
             key={table.name}
             table={table}

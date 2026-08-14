@@ -14,6 +14,7 @@ import type {
 import {
   type AlterColumnParams,
   DEFAULT_MAX_ROWS,
+  LOTE_EXPORTACAO,
   PREVIEW_ROWS,
   applyPreviewLimit,
   hasExplicitLimit,
@@ -153,6 +154,27 @@ export class SQLiteDriver implements DatabaseDriver {
       onDelete: r.on_delete,
       onUpdate: r.on_update
     }))
+  }
+
+  async streamQuery(
+    sql: string,
+    _options: { database?: string },
+    aoReceber: (bloco: { columns: string[]; rows: unknown[][] }) => Promise<void>
+  ): Promise<void> {
+    const stmt = this.require().prepare(sql)
+    const columns = stmt.columns().map((c) => c.name)
+
+    let bloco: unknown[][] = []
+    // `iterate` lê uma linha por vez do arquivo, em vez de `all()`, que
+    // montaria o array inteiro antes de devolver a primeira linha.
+    for (const linha of stmt.raw().iterate() as Iterable<unknown[]>) {
+      bloco.push(linha)
+      if (bloco.length >= LOTE_EXPORTACAO) {
+        await aoReceber({ columns, rows: bloco })
+        bloco = []
+      }
+    }
+    if (bloco.length) await aoReceber({ columns, rows: bloco })
   }
 
   async listAllRelations(): Promise<SchemaRelation[]> {

@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
 import { useTabStore } from '../store/tabs'
@@ -10,6 +10,8 @@ import { HelpPanel } from './HelpPanel'
 import { TableView } from './TableView'
 import { ModelDiagram } from './ModelDiagram'
 import { WelcomeScreen } from './WelcomeScreen'
+import { ExportChoiceDialog } from './ExportChoiceDialog'
+import { descreverExportacao } from '../editor/export-message'
 import {
   IconClose,
   IconCode,
@@ -137,6 +139,18 @@ function QueryPane({ tabId }: { tabId: string }): React.JSX.Element | null {
   const notify = useAppStore((s) => s.notify)
   const openModal = useAppStore((s) => s.openModal)
   const { cancel } = useRunQuery()
+  /**
+   * Escolha pendente de exportação, quando o resultado veio cortado.
+   * `mostrando` guarda em quantas linhas o corte aconteceu, para o diálogo
+   * poder dizer o número em vez de "algumas".
+   */
+  const [exportacao, setExportacao] = useState<{
+    format: 'csv' | 'json'
+    consulta: string
+    nome: string
+    mostrando: number
+  } | null>(null)
+
   const editorHeight = useAppStore((s) => s.editorHeight)
   const setEditorHeight = useAppStore((s) => s.setEditorHeight)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -168,15 +182,67 @@ function QueryPane({ tabId }: { tabId: string }): React.JSX.Element | null {
 
   const result = tab.results[tab.activeResultIndex]
 
+  /**
+   * Exporta o resultado da aba.
+   *
+   * Quando o resultado veio cortado, exportar o que está na grade grava um
+   * pedaço e chama de sucesso — foi assim que uma tabela de 250.000 linhas
+   * virava um arquivo de 100. Nesse caso a decisão volta para quem está
+   * olhando, em vez de ser tomada em silêncio: refazer a consulta e levar
+   * tudo, ou salvar exatamente o recorte visível.
+   */
   const exportResult = async (format: 'csv' | 'json'): Promise<void> => {
     if (!result || result.columns.length === 0) return
+
+    const consulta = result.statement?.trim() || tab.sql.trim()
+    const nome = tab.title.replace(/[^\w-]/g, '_')
+
+    // Sem corte, o que está na grade **é** o resultado inteiro: exportar
+    // direto evita uma pergunta que só teria uma resposta sensata.
+    if (!result.truncatedAt) {
+      const path = await window.vela.app.exportResult({
+        format,
+        columns: result.columns.map((c) => c.name),
+        rows: result.rows,
+        suggestedName: nome
+      })
+      if (path) notify(descreverExportacao({ arquivos: [path], linhas: result.rows.length }), 'success')
+      return
+    }
+
+    setExportacao({ format, consulta, nome, mostrando: result.truncatedAt })
+  }
+
+  const exportarTudo = async (
+    format: 'csv' | 'json',
+    consulta: string,
+    nome: string
+  ): Promise<void> => {
+    setExportacao(null)
+    try {
+      const saida = await window.vela.app.exportQuery({
+        connectionId: tab.connectionId,
+        sql: consulta,
+        database: tab.database ?? undefined,
+        format,
+        suggestedName: nome
+      })
+      if (saida) notify(descreverExportacao(saida), 'success')
+    } catch (erro) {
+      notify(erro instanceof Error ? erro.message : 'Falha ao exportar.', 'danger')
+    }
+  }
+
+  const exportarVisivel = async (format: 'csv' | 'json', nome: string): Promise<void> => {
+    setExportacao(null)
+    if (!result) return
     const path = await window.vela.app.exportResult({
       format,
       columns: result.columns.map((c) => c.name),
       rows: result.rows,
-      suggestedName: tab.title.replace(/[^\w-]/g, '_')
+      suggestedName: nome
     })
-    if (path) notify(`Salvo em ${path}`, 'success')
+    if (path) notify(descreverExportacao({ arquivos: [path], linhas: result.rows.length }), 'success')
   }
 
   return (
@@ -284,6 +350,16 @@ function QueryPane({ tabId }: { tabId: string }): React.JSX.Element | null {
 
         {!tab.running && result && <ResultsGrid result={result} />}
       </div>
+
+      {exportacao && (
+        <ExportChoiceDialog
+          mostrando={exportacao.mostrando}
+          formato={exportacao.format}
+          onTudo={() => void exportarTudo(exportacao.format, exportacao.consulta, exportacao.nome)}
+          onVisivel={() => void exportarVisivel(exportacao.format, exportacao.nome)}
+          onCancel={() => setExportacao(null)}
+        />
+      )}
     </div>
   )
 }

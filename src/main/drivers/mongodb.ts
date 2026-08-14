@@ -21,6 +21,15 @@ const WRITE_METHODS = new Set([
   'findOneAndUpdate', 'findOneAndDelete', 'findOneAndReplace', 'bulkWrite', 'renameCollection'
 ])
 
+/**
+ * Teto da exportação do MongoDB, em documentos.
+ *
+ * Existe porque este driver não transmite em blocos (ver `streamQuery`). Sem
+ * ele, exportar uma coleção de milhões de documentos derrubaria o processo
+ * principal sem mensagem nenhuma.
+ */
+const TETO_EXPORTACAO_MONGO = 500_000
+
 export class MongoDriver implements DatabaseDriver {
   readonly dialect: Dialect = 'mongodb'
   private client?: MongoClient
@@ -148,6 +157,47 @@ export class MongoDriver implements DatabaseDriver {
    */
   async listAllRelations(): Promise<SchemaRelation[]> {
     return []
+  }
+
+  /**
+   * Exportação do MongoDB.
+   *
+   * Diferente dos drivers SQL, aqui **não há fluxo real**: a consulta do Mongo
+   * é uma expressão avaliada (`db.x.find(...).sort(...)`), e o resultado já
+   * chega materializado do `execute`. Transformar isso em cursor exigiria
+   * reescrever o avaliador inteiro.
+   *
+   * Então o bloco sai de uma vez. A consequência é honesta e precisa ser dita:
+   * exportar uma coleção muito grande daqui consome memória proporcional ao
+   * tamanho dela, ao contrário do MySQL, do PostgreSQL e do SQLite. O teto
+   * existe para o app não morrer sem explicação — quem bater nele recebe aviso,
+   * não um arquivo pela metade.
+   */
+  async streamQuery(
+    source: string,
+    options: { database?: string },
+    aoReceber: (bloco: { columns: string[]; rows: unknown[][] }) => Promise<void>
+  ): Promise<void> {
+    const resultados = await this.query(source, {
+      queryId: `export_${Date.now()}`,
+      database: options.database,
+      maxRows: TETO_EXPORTACAO_MONGO
+    })
+
+    for (const resultado of resultados) {
+      if (resultado.columns.length === 0) continue
+      await aoReceber({
+        columns: resultado.columns.map((c) => c.name),
+        rows: resultado.rows
+      })
+      if (resultado.truncatedAt) {
+        throw new Error(
+          `A coleção passou de ${TETO_EXPORTACAO_MONGO.toLocaleString('pt-BR')} documentos, ` +
+            'que é o teto da exportação do MongoDB. Estreite a consulta com um filtro ' +
+            'ou exporte por partes usando .skip() e .limit().'
+        )
+      }
+    }
   }
 
   /**

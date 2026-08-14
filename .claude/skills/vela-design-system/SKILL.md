@@ -18,6 +18,12 @@ Referência: densidade do Beekeeper Studio, respiro do Linear. Uma IDE de banco
    2.19:1 no claro e 2.92:1 no escuro — o `NULL` aparecia em quase toda linha
    e ninguém conseguia lê-lo. Ao mexer numa cor, calcule a razão.
 
+   **"A superfície onde vive" é no plural.** Um token de texto é declarado uma
+   vez e usado sobre cinco fundos diferentes, cada um com seu `:hover`. Medir
+   contra o mais escuro dá um número bonito e falso — foi assim que o
+   `--text-tertiary` ficou a 3.14:1 sobre `--bg-elevated`. Meça contra o fundo
+   **mais claro** onde aquele token aparece.
+
 ## Tokens
 
 Todos em `src/renderer/src/styles/tokens.css`. Use sempre a custom property,
@@ -50,6 +56,25 @@ obriga a soletrar em vez de reconhecer a palavra.
 
 Terciário é para metadado (tipo de coluna, contagem, timestamp). Nunca para
 conteúdo que o usuário precisa ler.
+
+**Terciário não vale sobre `--bg-elevated`.** Modal, menu de contexto e toast
+usam `--text-secondary` até no metadado. A `--bg-elevated` é a superfície mais
+clara do app e sob `:hover` chega a `#31363d` no escuro — um terciário legível
+ali teria que ficar a 1.18:1 do secundário, ou seja, seria o secundário com
+outro nome. Ali o degrau da hierarquia é tamanho e peso, não cor.
+
+**Ao medir, conte o `:hover`.** `--bg-hover` clareia o fundo por baixo do texto
+justo enquanto a pessoa lê. Quem mandou no valor do terciário não foi nenhuma
+superfície em repouso: foi a barra lateral hovered (`#26292f` no escuro,
+`#ecedef` no claro), onde ficam o tipo e a contagem de cada nó da árvore.
+
+E **o tema claro tem uma superfície que não é branca**: `--bg-sidebar`
+(`#f6f7f9`). Medir só contra `#ffffff` deixou o terciário passar a 4.58:1
+enquanto ele estava a 4.28:1 na árvore de schema, e a 3.91:1 sob o cursor.
+
+`src/tests/contraste-texto.test.ts` trava tudo isso: ele lê `tokens.css`, e uma
+tabela lista cada uso de `--text-tertiary` com a superfície que fica atrás.
+Usou o token num lugar novo? Registre a superfície lá, senão o teste reprova.
 
 ### Acento
 Âmbar, via `--accent-h` / `--accent-s`. Único destaque cromático da interface.

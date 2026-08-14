@@ -113,6 +113,26 @@ test('listIndexes traz o índice implícito de _id', async () => {
   assert.deepEqual(primary.columns, ['_id'])
 })
 
+test('streamQuery entrega os documentos da coleção', async () => {
+  const blocos = []
+  await driver.streamQuery('db.clientes.find({})', {}, async (b) => {
+    blocos.push(b)
+  })
+  const linhas = blocos.flatMap((b) => b.rows)
+  assert.ok(linhas.length >= 3, `veio ${linhas.length}`)
+})
+
+test('streamQuery ignora o limite de prévia do find', async () => {
+  // `query` sem `.limit()` devolve só a prévia. A exportação não pode herdar
+  // isso, senão o arquivo sai com 100 documentos de uma coleção inteira.
+  const [prevista] = await driver.query('db.clientes.find({})', { queryId: 'p' })
+  let total = 0
+  await driver.streamQuery('db.clientes.find({})', {}, async (b) => {
+    total += b.rows.length
+  })
+  assert.ok(total >= prevista.rows.length, 'a exportação não pode trazer menos que a prévia')
+})
+
 test('listAllRelations também devolve vazio, sem inventar ligação', async () => {
   // O MongoDB não declara relação entre coleções. Deduzir aqui, no driver,
   // faria palpite passar por fato do banco — a dedução acontece na camada de
