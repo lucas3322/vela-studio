@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.24.0 — 2026-08-14
+
+### Novidades
+
+- adição de tour de integração com elementos interativos para o primeiro acesso (3d80505)
+
 ## 0.23.1 — 2026-08-14
 
 ### Correções
