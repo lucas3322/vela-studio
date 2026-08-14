@@ -26,8 +26,17 @@ export function HelpPanel(): React.JSX.Element {
   const [filter, setFilter] = useState('')
   const dialect = connection ? DRIVERS[connection.driver].dialect : 'mysql'
 
-  const abasDaConexao = useTabStore((s) =>
-    connectionId ? s.tabs.filter((t) => t.connectionId === connectionId) : []
+  /*
+    O seletor devolve a lista **crua**; o filtro acontece fora dele.
+    Filtrar dentro do seletor cria um array novo a cada chamada, o Zustand
+    compara com `Object.is`, nunca dá igual, e o componente re-renderiza para
+    sempre — a janela fica em branco. Foi o que aconteceu com duas abas de
+    tabela abertas.
+  */
+  const todasAsAbas = useTabStore((s) => s.tabs)
+  const abasDaConexao = useMemo(
+    () => (connectionId ? todasAsAbas.filter((t) => t.connectionId === connectionId) : []),
+    [todasAsAbas, connectionId]
   )
 
   /**

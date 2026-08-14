@@ -63,7 +63,12 @@ Agentes especializados em `.claude/agents/`: `driver-engineer`,
 
 - Comentários e textos de UI em **português**. Código em inglês.
 - Nada de valor mágico em CSS — tudo vem de custom property em `tokens.css`.
-- Zustand sempre com seletor: `useStore((s) => s.campo)`.
+- Zustand sempre com seletor, e o seletor **devolve valor estável**:
+  `useStore((s) => s.tabs)`, nunca `useStore((s) => s.tabs.filter(...))`. O
+  `.filter` cria array novo a cada chamada, a comparação por `Object.is` nunca
+  dá igual e a janela entra em laço de renderização — tela em branco, sem erro
+  no typecheck. Filtre fora do seletor, num `useMemo`. Travado pelo
+  `src/tests/seletores-zustand.test.ts`.
 - Lista longa é virtualizada. O grid aguenta 50.000 linhas.
 - Estado que sobrevive à troca de aba mora no store, não em `useState`.
 - A CI roda macOS, Windows e Linux. Asserção sobre caminho usa `join`,
