@@ -66,6 +66,9 @@ Agentes especializados em `.claude/agents/`: `driver-engineer`,
 - Zustand sempre com seletor: `useStore((s) => s.campo)`.
 - Lista longa é virtualizada. O grid aguenta 50.000 linhas.
 - Estado que sobrevive à troca de aba mora no store, não em `useState`.
+- A CI roda macOS, Windows e Linux. Asserção sobre caminho usa `join`,
+  `dirname` e `basename` — nunca separador escrito à mão. Um `'/tmp/x.csv'`
+  literal passa aqui e reprova só no Windows, onde `path.join` devolve `\`.
 - Módulo do renderer que tem teste importa irmão **com a extensão `.ts`**. O
   `node --experimental-strip-types` não resolve sem ela, e o `tsc` só aceita
   por causa do `allowImportingTsExtensions` em `tsconfig.web.json`.

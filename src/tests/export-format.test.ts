@@ -11,6 +11,7 @@
  */
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { basename, dirname, join } from 'node:path'
 import {
   BOM_UTF8,
   LINHAS_POR_ARQUIVO,
@@ -37,28 +38,45 @@ test('conta quantos arquivos a exportação vai ocupar', () => {
   assert.equal(contarPartes(3_000_000), 3)
 })
 
+/*
+  As expectativas são montadas com `join`, nunca escritas com barra à mão: o
+  `nomearParte` também usa `join`, e no Windows ele devolve `\`. Comparar com
+  um caminho POSIX literal reprovava só no Windows — a suíte passava no Mac e
+  quebrava na CI.
+*/
+const caminhoDeTeste = join('meus', 'dados', 'vendas.csv')
+
 test('um arquivo só mantém exatamente o nome escolhido', () => {
   // Sufixo em exportação de arquivo único é ruído: ninguém quer vendas_1_de_1.
-  assert.equal(nomearParte('/tmp/vendas.csv', 1, 1), '/tmp/vendas.csv')
+  assert.equal(nomearParte(caminhoDeTeste, 1, 1), caminhoDeTeste)
 })
 
 test('várias partes são numeradas e dizem o total', () => {
-  assert.equal(nomearParte('/tmp/vendas.csv', 1, 3), '/tmp/vendas_1_de_3.csv')
-  assert.equal(nomearParte('/tmp/vendas.csv', 3, 3), '/tmp/vendas_3_de_3.csv')
+  assert.equal(nomearParte(caminhoDeTeste, 1, 3), join('meus', 'dados', 'vendas_1_de_3.csv'))
+  assert.equal(nomearParte(caminhoDeTeste, 3, 3), join('meus', 'dados', 'vendas_3_de_3.csv'))
 })
 
 test('a numeração ordena certo no Finder, que ordena por texto', () => {
   // Sem preencher com zero, "parte_10" aparece antes de "parte_2" e a pessoa
   // concatena os arquivos fora de ordem.
-  const nomes = Array.from({ length: 12 }, (_, i) => nomearParte('/tmp/x.csv', i + 1, 12))
+  const nomes = Array.from({ length: 12 }, (_, i) =>
+    nomearParte(join('pasta', 'x.csv'), i + 1, 12)
+  )
   assert.deepEqual([...nomes].sort(), nomes)
   assert.ok(nomes[0].includes('_01_de_12'))
   assert.ok(nomes[11].includes('_12_de_12'))
 })
 
 test('o nome preserva o diretório e a extensão', () => {
-  const nome = nomearParte('/Users/alguem/Documentos/relatório final.csv', 2, 2)
-  assert.equal(nome, '/Users/alguem/Documentos/relatório final_2_de_2.csv')
+  // Verificado por invariante, não por caminho literal: `dirname` e `basename`
+  // acompanham o separador da plataforma, então a asserção vale no macOS, no
+  // Linux e no Windows sem eu ter que acertar a barra na mão. Comparar com
+  // uma string escrita à mão já reprovou só no Windows, com a suíte verde aqui.
+  const original = join('alguem', 'Documentos', 'relatório final.csv')
+  const parte = nomearParte(original, 2, 2)
+
+  assert.equal(dirname(parte), dirname(original), 'o diretório não pode mudar')
+  assert.equal(basename(parte), 'relatório final_2_de_2.csv')
 })
 
 // ── escape de CSV ────────────────────────────────────────────────────

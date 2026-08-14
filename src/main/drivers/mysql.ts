@@ -248,6 +248,22 @@ export class MySQLDriver implements DatabaseDriver {
     try {
       if (options.database) await conn.query(`USE \`${options.database.replace(/`/g, '``')}\``)
 
+      // Exportação é leitura. Recusar aqui resolve dois problemas de uma vez:
+      //
+      // 1. O modo somente-leitura volta a valer. A guarda existia só no
+      //    `query`, e este canal recebe SQL do renderer — a promessa precisa
+      //    valer nos dois caminhos, não em um.
+      // 2. **O travamento.** `.stream()` sobre um comando que não devolve
+      //    conjunto de resultados nunca emite o fim: o `for await` fica
+      //    esperando para sempre, e a exportação pendura sem erro e sem forma
+      //    de cancelar. Verificado contra MySQL real com `CREATE TABLE`.
+      if (isMutation(sql)) {
+        throw new Error(
+          'A exportação só aceita comandos que devolvem linhas. ' +
+            'Este comando altera o banco e não produz resultado para gravar.'
+        )
+      }
+
       // `conn.query` do wrapper de promise devolve uma Promise, e Promise não
       // tem `.stream()`. O objeto por baixo é a conexão da API de callback,
       // onde o mysql2 expõe os eventos e o fluxo — o wrapper só o tipa como

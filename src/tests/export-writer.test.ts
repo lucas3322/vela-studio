@@ -163,18 +163,28 @@ test('o JSON preserva nome de coluna e valor', async () => {
 
 // ── casos de borda ───────────────────────────────────────────────────
 
-test('consulta sem resultado gera arquivo, não silêncio', async () => {
-  // Arquivo nenhum parece falha da exportação. Um CSV só com cabeçalho diz
-  // claramente "a consulta rodou e não achou nada".
+test('consulta sem resultado grava o cabeçalho, não uma linha em branco', async () => {
+  // Arquivo nenhum parece falha da exportação. Mas o primeiro conserto só
+  // criava o arquivo: as colunas eram guardadas depois da saída por bloco
+  // vazio, então o cabeçalho saía em branco e não dava para distinguir
+  // "não achou nada" de "a exportação quebrou".
   const dir = pasta()
+  const semLinhas = {
+    async streamQuery(_s: string, _o: unknown, aoReceber: (b: unknown) => Promise<void>) {
+      await aoReceber({ columns: ['id', 'nome'], rows: [] })
+    }
+  } as unknown as DatabaseDriver
+
   const r = await exportarEmFluxo({
-    driver: driverFalso(0),
+    driver: semLinhas,
     sql: 'q',
     format: 'csv',
     caminho: join(dir, 'vazio.csv')
   })
+
   assert.equal(r.linhas, 0)
   assert.equal(r.arquivos.length, 1)
+  assert.deepEqual(linhasDe(r.arquivos[0]), ['id,nome'], 'o cabeçalho precisa nomear as colunas')
   rmSync(dir, { recursive: true, force: true })
 })
 

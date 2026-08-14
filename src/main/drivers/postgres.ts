@@ -251,6 +251,17 @@ export class PostgresDriver implements DatabaseDriver {
     options: { database?: string },
     aoReceber: (bloco: { columns: string[]; rows: unknown[][] }) => Promise<void>
   ): Promise<void> {
+    // Exportação é leitura: comando de escrita não produz linhas para gravar,
+    // e deixá-lo passar também fura a promessa do modo somente-leitura, cuja
+    // guarda vive no `query`. Ver o comentário equivalente no driver do MySQL,
+    // onde isto além de tudo evitava um travamento.
+    if (isMutation(sql)) {
+      throw new Error(
+        'A exportação só aceita comandos que devolvem linhas. ' +
+          'Este comando altera o banco e não produz resultado para gravar.'
+      )
+    }
+
     // Cursor declarado em SQL em vez de `pg-cursor`: o `pg` sozinho não
     // transmite em blocos, e resolver isso com uma dependência a mais para um
     // recurso que o próprio PostgreSQL oferece seria peso sem ganho.

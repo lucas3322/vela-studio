@@ -139,6 +139,27 @@ test('listIndexes agrupa colunas por índice', async () => {
   assert.deepEqual(indexes.find((i) => i.name === 'idx_status').columns, ['status'])
 })
 
+test('streamQuery recusa comando de escrita em vez de pendurar', async () => {
+  // `.stream()` sobre um comando que não devolve conjunto de resultados nunca
+  // emite o fim: o `for await` esperava para sempre e a exportação ficava
+  // pendurada, sem erro e sem cancelar. A recusa também devolve validade ao
+  // modo somente-leitura, cuja guarda só existia no `query`.
+  const comLimite = (p, ms) =>
+    Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('TRAVOU')), ms))])
+
+  for (const comando of ['CREATE TABLE zz_ex (id INT)', 'DELETE FROM clientes', 'DROP TABLE zz_ex']) {
+    await assert.rejects(
+      comLimite(driver.streamQuery(comando, {}, async () => {}), 4000),
+      /só aceita comandos que devolvem linhas/,
+      comando
+    )
+  }
+
+  // E o banco continua intacto: nenhum dos comandos chegou a rodar.
+  const [conferencia] = await driver.query('SELECT COUNT(*) AS n FROM clientes', { queryId: 'chk' })
+  assert.equal(Number(conferencia.rows[0][0]), 3)
+})
+
 test('streamQuery entrega todas as linhas em blocos', async () => {
   // É o caminho da exportação. `query` corta de propósito para a grade não
   // travar; se este também cortasse, o arquivo sairia com um pedaço da tabela

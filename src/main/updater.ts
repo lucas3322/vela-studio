@@ -193,6 +193,26 @@ export async function baixarAtualizacao(
   return destino
 }
 
+/**
+ * Encerra o app depois de abrir o instalador — só no macOS.
+ *
+ * No macOS a instalação é arrastar o app novo para Aplicativos, e o Finder
+ * **recusa** substituir um app que está rodando: "o item está em uso". A pessoa
+ * precisava descobrir sozinha que faltava fechar a IDE, voltar ao DMG e
+ * arrastar de novo. Fechar aqui tira esse passo invisível do caminho.
+ *
+ * O atraso existe para o DMG terminar de montar e aparecer na tela antes de a
+ * janela sumir; fechar antes disso faria a IDE simplesmente desaparecer, o que
+ * lê como travamento em vez de "agora arraste".
+ *
+ * No Windows e no Linux o instalador cuida da substituição sozinho, então
+ * fechar seria atrapalhar.
+ */
+function encerrarParaTrocarNoMac(): void {
+  if (process.platform !== 'darwin') return
+  setTimeout(() => app.quit(), 1500)
+}
+
 /** Abre o instalador baixado (monta o DMG, roda o setup). */
 export async function abrirArquivo(caminho: string): Promise<void> {
   const erro = await shell.openPath(caminho)
@@ -200,6 +220,8 @@ export async function abrirArquivo(caminho: string): Promise<void> {
     shell.showItemInFolder(caminho)
     throw new Error(`Não consegui abrir o instalador: ${erro}`)
   }
+
+  encerrarParaTrocarNoMac()
 }
 
 export async function abrirPaginaDaRelease(): Promise<void> {

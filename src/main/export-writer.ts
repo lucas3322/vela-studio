@@ -104,8 +104,12 @@ export async function exportarEmFluxo({
 
   try {
     await driver.streamQuery(sql, { database }, async (bloco) => {
+      // As colunas são guardadas ANTES da saída por bloco vazio. Sair antes
+      // fazia uma consulta sem resultado gravar um cabeçalho em branco: o
+      // arquivo saía com uma linha vazia em vez de `id,nome`, e não dava para
+      // distinguir "não achou nada" de "a exportação quebrou".
+      if (bloco.columns.length > 0) colunas = bloco.columns
       if (bloco.rows.length === 0) return
-      colunas = bloco.columns
 
       for (const linha of bloco.rows) {
         if (!stream || linhasNoArquivo >= linhasPorArquivo) {
