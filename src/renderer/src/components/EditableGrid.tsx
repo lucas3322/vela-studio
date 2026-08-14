@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ColumnInfo, QueryResult } from '@shared/types'
+import { mesmoValor, paraEdicao } from '../editor/cell-value'
 import { CellEditorModal } from './CellEditorModal'
 import { ContextMenu, type MenuEntry } from './ContextMenu'
 import { TruncationNotice } from './TruncationNotice'
@@ -281,7 +282,7 @@ export function EditableGrid({
         return
       }
       const atual = valorDe(linha, coluna)
-      setEditing({ row: linha, col: coluna, valor: atual === null ? '' : String(atual) })
+      setEditing({ row: linha, col: coluna, valor: paraEdicao(atual) })
     },
     [podeEditar, motivoSemEdicao, onNotify, valorDe]
   )
@@ -317,7 +318,10 @@ export function EditableGrid({
         // anterior: editar a mesma célula duas vezes e descartar precisa voltar
         // ao original, não ao passo intermediário.
         const original = atuais[marca]?.anterior ?? result.rows[linha]?.[coluna]
-        if (novo === original) {
+        // Comparação por texto: numa coluna JSON o original é objeto e o novo
+        // é string, então `===` nunca casaria e abrir a célula sem mexer em
+        // nada já a marcaria como alterada.
+        if (mesmoValor(novo, original)) {
           // Voltou ao valor de origem: deixa de ser alteração.
           const copia = { ...atuais }
           delete copia[marca]

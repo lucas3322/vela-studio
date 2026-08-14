@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { QueryColumn } from '@shared/types'
+import { paraEdicao } from '../editor/cell-value'
 import { IconCheck, IconCode, IconWarning } from './Icons'
 
 /**
@@ -48,7 +49,10 @@ function pareceJson(texto: string): boolean {
 }
 
 export function CellEditorModal({ coluna, valor, onConfirm, onCancel }: Props): React.JSX.Element {
-  const original = valor === null || valor === undefined ? '' : String(valor)
+  // Ver `paraEdicao`: coluna JSON chega como objeto, e `String()` nele daria
+  // "[object Object]" — foi assim que a janela abriu dizendo que um JSON
+  // perfeitamente válido era inválido.
+  const original = paraEdicao(valor)
   const [texto, setTexto] = useState(original)
   const area = useRef<HTMLTextAreaElement>(null)
 
