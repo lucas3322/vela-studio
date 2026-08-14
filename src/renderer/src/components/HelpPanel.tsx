@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { DRIVERS } from '@shared/types'
 import { CATEGORY_LABELS, fillRecipe, recipesFor, type Recipe } from '../editor/snippets'
+import { tabelaEmFoco } from '../editor/tabela-em-foco'
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
 import { useTabStore } from '../store/tabs'
@@ -25,8 +26,32 @@ export function HelpPanel(): React.JSX.Element {
   const [filter, setFilter] = useState('')
   const dialect = connection ? DRIVERS[connection.driver].dialect : 'mysql'
 
-  // A tabela da aba aberta, ou a primeira do schema: melhor um chute útil que `{tabela}`.
-  const suggestedTable = activeTab?.table ?? schema?.tables[0]?.name
+  const abasDaConexao = useTabStore((s) =>
+    connectionId ? s.tabs.filter((t) => t.connectionId === connectionId) : []
+  )
+
+  /**
+   * Tabela escolhida à mão, quando a pessoa troca no seletor.
+   *
+   * Estado local de propósito: o painel some ao fechar, e a escolha morre
+   * junto. Uma preferência que sobrevive ao fechamento ficaria velha sem
+   * ninguém perceber — que é o problema que este seletor existe para resolver.
+   */
+  const [tabelaEscolhida, setTabelaEscolhida] = useState<string | null>(null)
+
+  const detectada = useMemo(
+    () =>
+      tabelaEmFoco({
+        ativa: activeTab,
+        abas: abasDaConexao,
+        tabelas: schema?.tables.map((t) => t.name) ?? []
+      }),
+    [activeTab, abasDaConexao, schema]
+  )
+
+  // A escolha explícita vence a detecção. Sem nenhuma das duas, a receita sai
+  // com `nome_da_tabela` — marcador visível em vez de tabela errada.
+  const suggestedTable = tabelaEscolhida ?? detectada
   const suggestedColumn = suggestedTable
     ? schema?.columns[suggestedTable]?.[0]?.name
     : undefined
@@ -53,9 +78,29 @@ export function HelpPanel(): React.JSX.Element {
       <div className="help-panel__header">
         <div>
           <div style={{ fontWeight: 600, fontSize: 'var(--text-base)' }}>Receitas</div>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
-            {suggestedTable ? `usando ${suggestedTable}` : 'consultas prontas'}
-          </div>
+          {/*
+            Seletor, não rótulo. Com duas abas de tabela abertas e uma query em
+            foco, nenhuma regra sabe qual delas você quer — e adivinhar produz
+            uma consulta executável sobre a tabela errada. Aqui a escolha fica
+            à vista e trocável, com a detecção como padrão.
+          */}
+          <label className="help-panel__alvo">
+            <span>usando</span>
+            <select
+              className="input"
+              value={suggestedTable ?? ''}
+              onChange={(e) => setTabelaEscolhida(e.target.value || null)}
+              disabled={!schema || schema.tables.length === 0}
+              title="Tabela que as receitas vão preencher"
+            >
+              <option value="">escolha a tabela…</option>
+              {schema?.tables.map((t) => (
+                <option key={t.name} value={t.name}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
         <button className="icon-btn" onClick={toggleHelpPanel}>
           <IconClose />

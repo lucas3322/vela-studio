@@ -2617,3 +2617,27 @@
 .modal__espaco {
   flex: 1;
 }
+
+/* ── Seletor de tabela das receitas ───────────────────────────────── */
+
+/*
+  O alvo da receita fica no cabeçalho do painel, como controle e não como
+  rótulo. Antes era texto morto ("usando X") e o X vinha de um chute: com uma
+  aba de query em foco, a regra caía na primeira tabela do catálogo em ordem
+  alfabética, e a receita saía consultando outra tabela sem nada avisar.
+*/
+.help-panel__alvo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.help-panel__alvo select {
+  height: 24px;
+  max-width: 190px;
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+}

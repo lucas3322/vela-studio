@@ -219,7 +219,6 @@ const USOS: Uso[] = [
   { seletor: '.btn--acento:disabled', arquivo: GLOBAL, token: 'tertiary', fundos: ['bg-sidebar'], tipo: 'texto' },
 
   // ── estilo inline em componentes ──────────────────────────────────────
-  { seletor: 'HelpPanel · subtítulo', arquivo: 'components/HelpPanel.tsx', token: 'tertiary', fundos: ['bg-sidebar'], tipo: 'texto' },
   { seletor: 'Sidebar · chevron da conexão', arquivo: 'components/Sidebar.tsx', token: 'tertiary', fundos: ['bg-surface'], tipo: 'interface' },
   { seletor: 'Sidebar · "sem colunas carregadas"', arquivo: 'components/Sidebar.tsx', token: 'tertiary', fundos: ['bg-sidebar'], tipo: 'texto' },
   { seletor: 'TableView · comentário da coluna', arquivo: 'components/TableView.tsx', token: 'tertiary', fundos: ['bg-app'], tipo: 'texto' },
