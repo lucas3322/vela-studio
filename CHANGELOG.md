@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.22.1 — 2026-08-14
+
+### Correções
+
+- ajuste na  conversão e comparação de valores de células JSON (16ac37d)
+
 ## 0.22.0 — 2026-08-14
 
 ### Novidades
