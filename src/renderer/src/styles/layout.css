@@ -2216,7 +2216,7 @@
 
 .modelo__caixa {
   fill: var(--bg-surface);
-  stroke: var(--model-card-line);
+  stroke: var(--contorno-objeto);
   stroke-width: 1;
   transition: stroke var(--duration-fast) var(--ease);
 }
@@ -2553,4 +2553,67 @@
   .aviso-versao {
     animation: none;
   }
+}
+
+/* ── Edição de célula em janela ────────────────────────────────────── */
+
+.editor-celula__barra {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.editor-celula__medida {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+  Monoespaçada e alta. Altura em `vh` para acompanhar a janela: numa tela
+  pequena, uma altura fixa em pixels ou estoura para fora ou desperdiça
+  espaço na tela grande.
+*/
+.editor-celula__area {
+  width: 100%;
+  /* Ver `--contorno-objeto`: no tema claro a caixa e o modal são ambos
+     brancos, e a borda padrão do `.input` mede 1.28:1 — numa área de 460px
+     de altura isso deixa a região de código sem fronteira visível. */
+  border-color: var(--contorno-objeto);
+  height: min(46vh, 460px);
+  padding: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  line-height: 1.55;
+  resize: vertical;
+  white-space: pre;
+  overflow: auto;
+  tab-size: 2;
+}
+
+.editor-celula__area--erro {
+  border-color: var(--danger);
+}
+
+.editor-celula__erro {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--danger);
+}
+
+.editor-celula__erro svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--danger);
+}
+
+/* Empurra Cancelar/Confirmar para a direita, deixando o NULL isolado. */
+.modal__espaco {
+  flex: 1;
 }

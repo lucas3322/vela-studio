@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ColumnInfo, QueryResult } from '@shared/types'
+import { CellEditorModal } from './CellEditorModal'
 import { ContextMenu, type MenuEntry } from './ContextMenu'
 import { TruncationNotice } from './TruncationNotice'
 import { IconCopy, IconTrash, IconWarning } from './Icons'
@@ -110,6 +111,12 @@ export function EditableGrid({
   const [widths, setWidths] = useState<number[]>([])
   const [selecao, setSelecao] = useState<Selecao>(null)
   const [editing, setEditing] = useState<{ row: number; col: number; valor: string } | null>(null)
+  /**
+   * Célula aberta na janela de edição. Separado de `editing` de propósito:
+   * são dois caminhos para a mesma alteração pendente, e misturá-los faria
+   * a caixa da linha e a janela disputarem o foco.
+   */
+  const [edicaoAmpla, setEdicaoAmpla] = useState<{ linha: number; coluna: number } | null>(null)
   const [aplicando, setAplicando] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; row: number; col: number } | null>(null)
 
@@ -279,6 +286,18 @@ export function EditableGrid({
     [podeEditar, motivoSemEdicao, onNotify, valorDe]
   )
 
+  const abrirEdicaoAmpla = useCallback(
+    (linha: number, coluna: number) => {
+      if (!podeEditar) {
+        if (motivoSemEdicao) onNotify?.(`Edição indisponível: ${motivoSemEdicao}.`, 'info')
+        return
+      }
+      setEditing(null)
+      setEdicaoAmpla({ linha, coluna })
+    },
+    [podeEditar, motivoSemEdicao, onNotify]
+  )
+
   /**
    * Registra a alteração como pendente. Nada vai para o banco aqui.
    *
@@ -429,12 +448,15 @@ export function EditableGrid({
 
       if (evento.key === 'Enter' && selecao.tipo === 'celula') {
         evento.preventDefault()
-        abrirEdicao(selecao.linha, selecao.coluna)
+        // ⇧↵ abre na janela: é o caminho para JSON e texto longo, onde a caixa
+        // da linha tem altura de uma linha só.
+        if (evento.shiftKey) abrirEdicaoAmpla(selecao.linha, selecao.coluna)
+        else abrirEdicao(selecao.linha, selecao.coluna)
       }
     }
     window.addEventListener('keydown', aoTeclar)
     return () => window.removeEventListener('keydown', aoTeclar)
-  }, [selecao, editing, valorDe, abrirEdicao, result.columns, onNotify])
+  }, [selecao, editing, valorDe, abrirEdicao, abrirEdicaoAmpla, result.columns, onNotify])
 
   const iniciarRedimensionamento = (indice: number) => (evento: React.MouseEvent) => {
     evento.preventDefault()
@@ -476,6 +498,12 @@ export function EditableGrid({
         hint: '↵',
         disabled: !podeEditar,
         onSelect: () => abrirEdicao(linha, coluna)
+      },
+      {
+        label: 'Editar na janela',
+        hint: '⇧↵',
+        disabled: !podeEditar,
+        onSelect: () => abrirEdicaoAmpla(linha, coluna)
       },
       {
         label: 'Definir como NULL',
@@ -728,6 +756,18 @@ export function EditableGrid({
           y={menu.y}
           items={itensDoMenu(menu.row, menu.col)}
           onClose={() => setMenu(null)}
+        />
+      )}
+
+      {edicaoAmpla && (
+        <CellEditorModal
+          coluna={result.columns[edicaoAmpla.coluna]}
+          valor={valorDe(edicaoAmpla.linha, edicaoAmpla.coluna)}
+          onConfirm={(bruto) => {
+            encaixar(edicaoAmpla.linha, edicaoAmpla.coluna, bruto)
+            setEdicaoAmpla(null)
+          }}
+          onCancel={() => setEdicaoAmpla(null)}
         />
       )}
     </>

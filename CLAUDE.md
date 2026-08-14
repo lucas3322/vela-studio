@@ -105,9 +105,10 @@ Cada uma tem teste que a trava.
    brancos.** A elevação ali é feita por sombra, não por cor de superfície.
    Quem desenha um objeto flutuante com `fill: var(--bg-surface)` e
    `stroke: var(--border-default)` produz cartão branco sobre fundo branco com
-   contorno de 1.28:1 — invisível. O contorno do cartão da modelagem tem token
-   próprio (`--model-card-line`, 3.10:1 nos dois temas) pelo mesmo motivo que
-   o `--grid-line` tem o dele.
+   contorno de 1.28:1 — invisível. Objeto grande cuja superfície tem a cor do fundo usa
+   `--contorno-objeto` (3.10:1 nos dois temas) — o cartão da modelagem e a
+   área de edição de célula —, pelo mesmo motivo que o `--grid-line` existe
+   separado do `--border-subtle`.
 9. **Chave estrangeira declarada é minoria em banco real.** Muito sistema
    legado mantém a integridade na aplicação. Ler só o catálogo faz a
    modelagem abrir vazia — o que não é neutro, é uma afirmação falsa sobre o
