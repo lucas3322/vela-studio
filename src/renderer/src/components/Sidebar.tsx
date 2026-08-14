@@ -350,6 +350,7 @@ export function Sidebar(): React.JSX.Element {
             <button
               className="icon-btn"
               onClick={() => void handleDisconnect()}
+              data-tour="desconectar"
               title="Desconectar deste banco"
             >
               <IconEject size={15} />
@@ -408,7 +409,7 @@ export function Sidebar(): React.JSX.Element {
 
       {modo === 'tabelas' && (
       <>
-      <div className="sidebar__search">
+      <div className="sidebar__search" data-tour="busca">
         <IconSearch size={13} />
         <input
           className="input"

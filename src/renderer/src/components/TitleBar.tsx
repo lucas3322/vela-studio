@@ -46,6 +46,7 @@ export function TitleBar(): React.JSX.Element {
         <button
           className="icon-btn"
           onClick={() => openModal('history')}
+          data-tour="historico"
           title="Histórico de queries (⌘⇧H)"
         >
           <IconHistory />
@@ -53,6 +54,7 @@ export function TitleBar(): React.JSX.Element {
         <button
           className={`icon-btn ${helpPanelVisible ? 'icon-btn--active' : ''}`}
           onClick={toggleHelpPanel}
+          data-tour="receitas"
           title="Painel de receitas (⌘J)"
         >
           <IconHelp />
@@ -60,6 +62,7 @@ export function TitleBar(): React.JSX.Element {
         <button
           className="icon-btn"
           onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+          data-tour="tema"
           title={resolvedTheme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
         >
           {resolvedTheme === 'dark' ? <IconSun /> : <IconMoon />}
@@ -67,6 +70,7 @@ export function TitleBar(): React.JSX.Element {
         <button
           className="icon-btn"
           onClick={() => openModal('preferences')}
+          data-tour="preferencias"
           title="Preferências (⌘,)"
         >
           <IconSettings />

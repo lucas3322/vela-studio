@@ -1,10 +1,12 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import type { QueryResult } from '@shared/types'
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
-import { useTabStore } from '../store/tabs'
+import { useTabStore, type Tab } from '../store/tabs'
 import { useRunQuery } from '../hooks/useRunQuery'
 import { QueryEditor, triggerEditorAction } from './QueryEditor'
-import { ResultsGrid } from './ResultsGrid'
+import { EditableGrid } from './EditableGrid'
+import { origemEditavel } from '../editor/origem-editavel'
 import { ErrorPanel } from './ErrorPanel'
 import { HelpPanel } from './HelpPanel'
 import { TableView } from './TableView'
@@ -129,6 +131,95 @@ export function Workspace(): React.JSX.Element {
         {helpPanelVisible && <HelpPanel />}
       </div>
     </div>
+  )
+}
+
+/**
+ * A grade do resultado de uma consulta.
+ *
+ * Quando dá para saber de onde a linha veio, usa a mesma grade editável da aba
+ * de tabela — com edição na célula, na janela e exclusão. Quando não dá, usa a
+ * mesma grade mesmo assim, só que bloqueada e **dizendo o porquê**: "a consulta
+ * junta mais de uma tabela" ensina mais do que uma grade inerte sem explicação.
+ *
+ * A decisão de quando dá vive em `origemEditavel`, e é deliberadamente
+ * conservadora: gravar na tabela errada custa o dado, recusar custa um clique.
+ */
+function GradeDoResultado({ tab, result }: { tab: Tab; result: QueryResult }): React.JSX.Element {
+  const schema = useConnectionStore((s) => s.currentSchema())
+  const conexao = useConnectionStore((s) => s.saved.find((c) => c.id === tab.connectionId))
+  const notify = useAppStore((s) => s.notify)
+  const { run } = useRunQuery()
+
+  const origem = useMemo(
+    () =>
+      origemEditavel({
+        // O statement do resultado, não o texto inteiro do editor: quem rodou
+        // ⌘↵ com o cursor numa consulta editou aquela, não as outras do arquivo.
+        sql: result.statement?.trim() || tab.sql,
+        colunasDoResultado: result.columns.map((c) => c.name),
+        tabelasDoBanco: schema?.tables.map((t) => t.name) ?? [],
+        colunasPorTabela: Object.fromEntries(
+          Object.entries(schema?.columns ?? {}).map(([t, cols]) => [
+            t,
+            cols.map((c) => c.name)
+          ])
+        )
+      }),
+    [result, tab.sql, schema]
+  )
+
+  return (
+    <EditableGrid
+      result={result}
+      table={origem.tabela}
+      schemaColumns={origem.tabela ? schema?.columns[origem.tabela] : undefined}
+      readOnly={!!conexao?.readOnly}
+      motivoExterno={origem.motivo}
+      onNotify={notify}
+      /*
+        Reconsulta depois de gravar. O banco pode ter guardado algo diferente
+        do que foi digitado — trigger, coerção de tipo, um varchar que truncou
+        — e a tela seguiria mostrando o texto do usuário como se fosse o valor
+        real.
+
+        `reloadTab` não serve aqui: ele incrementa um contador que só a aba de
+        tabela escuta, então numa aba de query não acontecia nada. Era este o
+        bug: o dado ia para o banco e a grade continuava mostrando o de antes.
+
+        Reexecuta **só o statement que produziu esta grade**, nunca o texto
+        inteiro do editor. Se houver um INSERT ou UPDATE em outra linha do
+        arquivo, rodar tudo de novo o executaria uma segunda vez — recarregar a
+        tela não pode ter efeito colateral no banco.
+      */
+      onApplied={() => void run(result.statement?.trim() || tab.sql)}
+      onEditCell={
+        origem.tabela
+          ? async ({ column, value, keys }) => {
+              await window.vela.data.updateCell({
+                connectionId: tab.connectionId,
+                table: origem.tabela as string,
+                database: tab.database ?? undefined,
+                column,
+                value,
+                keys
+              })
+            }
+          : undefined
+      }
+      onDeleteRow={
+        origem.tabela
+          ? async (keys) => {
+              await window.vela.data.deleteRow({
+                connectionId: tab.connectionId,
+                table: origem.tabela as string,
+                database: tab.database ?? undefined,
+                keys
+              })
+            }
+          : undefined
+      }
+    />
   )
 }
 
@@ -348,7 +439,7 @@ function QueryPane({ tabId }: { tabId: string }): React.JSX.Element | null {
           </div>
         )}
 
-        {!tab.running && result && <ResultsGrid result={result} />}
+        {!tab.running && result && <GradeDoResultado tab={tab} result={result} />}
       </div>
 
       {exportacao && (

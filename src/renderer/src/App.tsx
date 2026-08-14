@@ -1,5 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { TitleBar } from './components/TitleBar'
+import { CHAVE_DO_TOUR, jaViuOTour } from './editor/tour'
+import { Tour } from './components/Tour'
 import { UpdateBanner } from './components/UpdateBanner'
 import { Sidebar } from './components/Sidebar'
 import { Workspace } from './components/Workspace'
@@ -43,6 +45,23 @@ export function App(): React.JSX.Element {
     if (!hasTabs) openQueryTab({ connectionId, database })
   }, [connectionId, database, tabs, openQueryTab])
 
+  /*
+    Tour na primeira conexão, uma vez só.
+    Antes de conectar, metade do que ele aponta não existe — não há tabelas
+    para buscar nem botão de desconectar. Por isso o gatilho é a conexão, não
+    a abertura do app.
+
+    O atraso deixa a barra lateral terminar de montar: medir um elemento que
+    ainda não existe destacaria o canto da tela.
+  */
+  const [mostrarTour, setMostrarTour] = useState(false)
+  useEffect(() => {
+    if (!connectionId) return
+    if (jaViuOTour(localStorage.getItem(CHAVE_DO_TOUR))) return
+    const agendado = setTimeout(() => setMostrarTour(true), 900)
+    return () => clearTimeout(agendado)
+  }, [connectionId])
+
   // O SO pode trocar de tema no meio da sessão (agendamento noturno do macOS).
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)')
@@ -62,6 +81,8 @@ export function App(): React.JSX.Element {
       <StatusBar />
 
       <UpdateBanner />
+
+      {mostrarTour && <Tour aoFechar={() => setMostrarTour(false)} />}
 
       {modal === 'connection' && <ConnectionModal />}
       {modal === 'history' && <HistoryModal />}

@@ -19,6 +19,15 @@ interface Props {
   /** Colunas do schema — é daqui que sai a chave primária. */
   schemaColumns?: ColumnInfo[]
   readOnly?: boolean
+  /**
+   * Motivo, vindo de quem chama, para a edição estar bloqueada.
+   *
+   * A grade sabe dizer "sem chave primária" e "conexão somente leitura", mas
+   * não sabe que a consulta tinha um JOIN — quem monta o resultado é que sabe.
+   * Sem isto, um resultado de query aparecia como "só em abas de tabela", que
+   * deixou de ser verdade e não explicava nada.
+   */
+  motivoExterno?: string
   /** Grava a célula. Deve rejeitar quando o banco recusar. */
   onEditCell?: (params: {
     column: string
@@ -98,6 +107,7 @@ export function EditableGrid({
   table,
   schemaColumns,
   readOnly,
+  motivoExterno,
   onEditCell,
   onDeleteRow,
   onNotify,
@@ -175,15 +185,17 @@ export function EditableGrid({
   const podeEditar = !!table && !readOnly && !!indicesDaChave && !!onEditCell
 
   /** Por que a edição está indisponível — texto mostrado no menu. */
-  const motivoSemEdicao = !table
-    ? 'só em abas de tabela'
-    : readOnly
-      ? 'conexão somente leitura'
-      : chavesPrimarias.length === 0
-        ? 'tabela sem chave primária'
-        : !indicesDaChave
-          ? 'a chave primária não está no resultado'
-          : undefined
+  const motivoSemEdicao = motivoExterno
+    ? motivoExterno
+    : !table
+      ? 'a origem da linha não foi identificada'
+      : readOnly
+        ? 'conexão somente leitura'
+        : chavesPrimarias.length === 0
+          ? 'tabela sem chave primária'
+          : !indicesDaChave
+            ? 'a chave primária não está no resultado'
+            : undefined
 
   const chaveDaLinha = useCallback(
     (linha: number): Record<string, unknown> | null => {
