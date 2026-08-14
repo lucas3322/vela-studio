@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.23.1 — 2026-08-14
+
+### Correções
+
+- corrigir seletor do Zustand para evitar laço de renderização (f8fe147)
+
 ## 0.23.0 — 2026-08-14
 
 ### Novidades
