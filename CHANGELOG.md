@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.22.0 — 2026-08-14
+
+### Novidades
+
+- adicionar modal de edição de célula para valores longos e JSON (7c114f2)
+
 ## 0.21.0 — 2026-08-14
 
 ### Novidades
