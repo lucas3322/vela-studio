@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.21.0 — 2026-08-14
+
+### Novidades
+
+- implementar validação de comandos de escrita na exportação e ajustes em testes (70c0cc8)
+
 ## 0.20.0 — 2026-08-14
 
 ### Novidades
