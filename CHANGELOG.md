@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.23.0 — 2026-08-14
+
+### Novidades
+
+- implementar seletor de tabela no painel de ajuda e lógica de escolha de tabela para receitas (c5b8a10)
+
 ## 0.22.1 — 2026-08-14
 
 ### Correções
