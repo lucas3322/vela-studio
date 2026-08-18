@@ -59,6 +59,19 @@ interface AppState {
    * sua própria cópia do diálogo.
    */
   confirmacaoDeEscrita: { comandos: string[]; aoConfirmar: () => void } | null
+  /**
+   * Alterações esperando confirmação, por aba.
+   *
+   * Mora no store porque quem tem as pendências (a grade de uma aba) e quem
+   * precisa saber delas (a execução de query, em qualquer aba) não se
+   * enxergam. Sem isto, rodar uma consulta descartava em silêncio o que a
+   * pessoa tinha acabado de digitar noutra aba.
+   */
+  pendenciasDeEdicao: Record<string, number>
+  /** Contador que manda as grades jogarem fora o que está pendente. */
+  pedidoDeDescarte: number
+  /** Pergunta pendente: descartar as edições para poder executar? */
+  confirmacaoDeDescarte: { quantas: number; aoConfirmar: () => void } | null
 
   setTheme: (theme: ThemeMode) => void
   applySystemTheme: (theme: 'light' | 'dark') => void
@@ -74,6 +87,11 @@ interface AppState {
   closeModal: () => void
   notify: (message: string, tone?: 'info' | 'success' | 'danger') => void
   pedirConfirmacaoDeEscrita: (comandos: string[], aoConfirmar: () => void) => void
+  registrarPendencias: (abaId: string, quantas: number) => void
+  descartarPendencias: () => void
+  pedirDescarteDeEdicoes: (quantas: number, aoConfirmar: () => void) => void
+  fecharDescarteDeEdicoes: () => void
+  totalDePendencias: () => number
   fecharConfirmacaoDeEscrita: () => void
 }
 
@@ -178,6 +196,9 @@ export const useAppStore = create<AppState>((set, get) => {
     editingConnectionId: null,
     toast: null,
     confirmacaoDeEscrita: null,
+    pendenciasDeEdicao: {},
+    pedidoDeDescarte: 0,
+    confirmacaoDeDescarte: null,
 
     setTheme: (theme) => {
       localStorage.setItem(STORAGE_KEY, theme)
@@ -237,6 +258,32 @@ export const useAppStore = create<AppState>((set, get) => {
       set({ confirmacaoDeEscrita: { comandos, aoConfirmar } }),
 
     fecharConfirmacaoDeEscrita: () => set({ confirmacaoDeEscrita: null }),
+
+    registrarPendencias: (abaId, quantas) =>
+      set((estado) => {
+        if ((estado.pendenciasDeEdicao[abaId] ?? 0) === quantas) return estado
+        const proximo = { ...estado.pendenciasDeEdicao }
+        // Zero não fica guardado: um mapa que só cresce faria o total contar
+        // aba fechada e a IDE avisaria de alteração que não existe mais.
+        if (quantas === 0) delete proximo[abaId]
+        else proximo[abaId] = quantas
+        return { pendenciasDeEdicao: proximo }
+      }),
+
+    pedirDescarteDeEdicoes: (quantas, aoConfirmar) =>
+      set({ confirmacaoDeDescarte: { quantas, aoConfirmar } }),
+
+    fecharDescarteDeEdicoes: () => set({ confirmacaoDeDescarte: null }),
+
+    descartarPendencias: () =>
+      set((estado) => ({
+        pendenciasDeEdicao: {},
+        pedidoDeDescarte: estado.pedidoDeDescarte + 1,
+        confirmacaoDeDescarte: null
+      })),
+
+    totalDePendencias: () =>
+      Object.values(get().pendenciasDeEdicao).reduce((soma, n) => soma + n, 0),
 
     notify: (message, tone = 'info') => {
       clearTimeout(toastTimer)

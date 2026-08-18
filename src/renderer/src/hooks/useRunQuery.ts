@@ -35,6 +35,23 @@ export function useRunQuery(): {
       if (!sql) return
       if (tab.running) return
 
+      /*
+        Alteração de célula esperando confirmação, em qualquer aba.
+
+        Executar uma consulta recarrega grades e pode remontar o resultado por
+        baixo — o que faz o que a pessoa digitou desaparecer sem nunca ter ido
+        ao banco. A pergunta vem antes, e ela decide: descartar e executar, ou
+        voltar e terminar o que começou.
+      */
+      const pendentes = useAppStore.getState().totalDePendencias()
+      if (pendentes > 0 && !jaConfirmado) {
+        useAppStore.getState().pedirDescarteDeEdicoes(pendentes, () => {
+          useAppStore.getState().descartarPendencias()
+          void run(sql, true)
+        })
+        return
+      }
+
       // UPDATE/DELETE sem WHERE atinge a tabela inteira e não tem desfazer.
       // A confirmação fica aqui, no caminho único de execução, para valer
       // igual pelo atalho, pelo botão e pelo menu.
