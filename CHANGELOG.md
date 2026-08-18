@@ -3,6 +3,14 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.25.0 — 2026-08-18
+
+### Novidades
+
+- adicionar diálogo de confirmação para descartar edições e registrar pendências nas abas (270b06d)
+- adicionar lógica de confirmação para descartar edições antes de executar consultas (2851d69)
+- adicionar diálogos de confirmação para descartar alterações e testes de contagem de pendências (40e7deb)
+
 ## 0.24.0 — 2026-08-14
 
 ### Novidades
