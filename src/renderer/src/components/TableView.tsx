@@ -271,6 +271,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
               // banco, que ordena a tabela inteira antes de cortar a página.
               // E volta para a primeira página — a linha 250 de outra ordenação
               // não é a mesma linha, então continuar na página 3 não faria sentido.
+              abaId={tab.id}
               onPendingChange={setPendencias}
               // Reconsulta depois de gravar. O banco pode ter guardado algo
               // diferente do que foi digitado — trigger, coerção de tipo, um

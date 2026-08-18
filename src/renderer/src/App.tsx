@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { TitleBar } from './components/TitleBar'
 import { CHAVE_DO_TOUR, jaViuOTour } from './editor/tour'
+import { DiscardEditsDialog } from './components/DiscardEditsDialog'
 import { Tour } from './components/Tour'
 import { UpdateBanner } from './components/UpdateBanner'
 import { Sidebar } from './components/Sidebar'
@@ -54,6 +55,9 @@ export function App(): React.JSX.Element {
     O atraso deixa a barra lateral terminar de montar: medir um elemento que
     ainda não existe destacaria o canto da tela.
   */
+  const confirmacaoDeDescarte = useAppStore((s) => s.confirmacaoDeDescarte)
+  const fecharDescarteDeEdicoes = useAppStore((s) => s.fecharDescarteDeEdicoes)
+
   const [mostrarTour, setMostrarTour] = useState(false)
   useEffect(() => {
     if (!connectionId) return
@@ -83,6 +87,14 @@ export function App(): React.JSX.Element {
       <UpdateBanner />
 
       {mostrarTour && <Tour aoFechar={() => setMostrarTour(false)} />}
+
+      {confirmacaoDeDescarte && (
+        <DiscardEditsDialog
+          quantas={confirmacaoDeDescarte.quantas}
+          onDescartar={confirmacaoDeDescarte.aoConfirmar}
+          onCancel={fecharDescarteDeEdicoes}
+        />
+      )}
 
       {modal === 'connection' && <ConnectionModal />}
       {modal === 'history' && <HistoryModal />}

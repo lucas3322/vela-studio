@@ -174,6 +174,7 @@ function GradeDoResultado({ tab, result }: { tab: Tab; result: QueryResult }): R
       result={result}
       table={origem.tabela}
       schemaColumns={origem.tabela ? schema?.columns[origem.tabela] : undefined}
+      abaId={tab.id}
       readOnly={!!conexao?.readOnly}
       motivoExterno={origem.motivo}
       onNotify={notify}

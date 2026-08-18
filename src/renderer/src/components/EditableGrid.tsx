@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ColumnInfo, QueryResult } from '@shared/types'
+import { useAppStore } from '../store/app'
 import { mesmoValor, paraEdicao } from '../editor/cell-value'
+import { digitandoEmCampo, focoAtual } from '../editor/foco'
 import { CellEditorModal } from './CellEditorModal'
 import { ContextMenu, type MenuEntry } from './ContextMenu'
 import { TruncationNotice } from './TruncationNotice'
@@ -56,6 +58,8 @@ interface Props {
    * voltaria achando que gravou.
    */
   onPendingChange?: (quantidade: number) => void
+  /** Identificador da aba, para o store saber de quem são as pendências. */
+  abaId?: string
   /**
    * Chamado quando **tudo** foi gravado sem falha.
    *
@@ -114,6 +118,7 @@ export function EditableGrid({
   sort,
   onSort,
   onPendingChange,
+  abaId,
   onApplied
 }: Props): React.JSX.Element {
   const scroller = useRef<HTMLDivElement>(null)
@@ -149,8 +154,34 @@ export function EditableGrid({
   const [excluidas, setExcluidas] = useState<Set<number>>(new Set())
 
   useEffect(() => {
-    onPendingChange?.(Object.keys(pendentes).length + exclusoesPendentes.size)
-  }, [pendentes, exclusoesPendentes, onPendingChange])
+    const quantas = Object.keys(pendentes).length + exclusoesPendentes.size
+    onPendingChange?.(quantas)
+    // Também no store: quem executa uma consulta precisa saber que há
+    // alteração pendente aqui, e não tem como enxergar o estado local desta
+    // grade.
+    if (abaId) useAppStore.getState().registrarPendencias(abaId, quantas)
+  }, [pendentes, exclusoesPendentes, onPendingChange, abaId])
+
+  // Ao sair, a aba deixa de ter pendências — senão o total contaria para sempre
+  // uma grade que não existe mais.
+  useEffect(() => {
+    return () => {
+      if (abaId) useAppStore.getState().registrarPendencias(abaId, 0)
+    }
+  }, [abaId])
+
+  /*
+    Descarte pedido de fora: a pessoa mandou rodar outra consulta e confirmou
+    que podia jogar fora o que estava pendente.
+  */
+  const pedidoDeDescarte = useAppStore((s) => s.pedidoDeDescarte)
+  const primeiroDescarte = useRef(pedidoDeDescarte)
+  useEffect(() => {
+    if (pedidoDeDescarte === primeiroDescarte.current) return
+    primeiroDescarte.current = pedidoDeDescarte
+    setPendentes({})
+    setExclusoesPendentes(new Set())
+  }, [pedidoDeDescarte])
 
   /**
    * Tipo real de cada coluna, vindo do catálogo.
@@ -239,12 +270,26 @@ export function EditableGrid({
       const amostra = result.rows.slice(0, 60)
       setWidths(
         result.columns.map((coluna, indice) => {
-          const cabecalho = coluna.name.length * 7 + 40
+          /*
+            O cabeçalho desenha nome **e** tipo, lado a lado. Medindo só o nome,
+            uma coluna de dados curtos ficava estreita demais e era o **nome**
+            que sumia em reticências — a pessoa via `p.  decimal(10,2)` e não
+            tinha como saber que coluna era aquela. O tipo sai em fonte menor,
+            daí o fator diferente.
+          */
+          const tipo = tiposReais[coluna.name] ?? coluna.type
+          const chave = chavesPrimarias.includes(coluna.name) ? 18 : 0
+          const cabecalho = coluna.name.length * 7 + tipo.length * 5.5 + 44 + chave
+
           const conteudo = amostra.reduce((max, linha) => {
             const texto = formatarCelula(linha[indice])
             return Math.max(max, Math.min(texto.length, 60) * 7 + 20)
           }, 0)
-          return Math.min(420, Math.max(90, cabecalho, conteudo))
+
+          // O teto vale para o conteúdo, não para o cabeçalho: uma coluna com
+          // nome longo precisa caber inteira mesmo que os dados sejam curtos —
+          // ou vazios, que é justamente quando o nome é a única pista.
+          return Math.max(90, cabecalho, Math.min(420, conteudo))
         })
       )
     }
@@ -444,6 +489,11 @@ export function EditableGrid({
     const aoTeclar = (evento: KeyboardEvent): void => {
       if (editing) return
       if (!selecao) return
+      // Este listener é no `window`, então vale na tela inteira. Sem esta
+      // guarda, uma célula selecionada fazia o Enter do editor de SQL abrir o
+      // editor da célula — e o `preventDefault` abaixo comia a quebra de linha
+      // da consulta. O ⌘C copiava a célula no lugar do SQL selecionado.
+      if (digitandoEmCampo(focoAtual(document.activeElement))) return
 
       if (evento.key === 'Escape') {
         setSelecao(null)
