@@ -3,7 +3,7 @@ import { ConnectionRow } from './ConnectionRow'
 import { DRIVERS, type ConnectionConfig, type DriverId, type TestResult } from '@shared/types'
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
-import { CORES_DE_CONEXAO, proximaCorLivre } from '../styles/connection-colors'
+import { CORES_DE_CONEXAO, corDaConexao, proximaCorLivre } from '../styles/connection-colors'
 import {
   IconCheck,
   IconClose,
@@ -287,7 +287,7 @@ export function ConnectionModal(): React.JSX.Element {
                       key={cor.id}
                       type="button"
                       className={`cores-conexao__opcao ${config.color === cor.id ? 'cores-conexao__opcao--ativa' : ''}`}
-                      style={{ background: resolvedTheme === 'dark' ? cor.escuro : cor.claro }}
+                      style={{ background: corDaConexao(cor.id, resolvedTheme) }}
                       onClick={() => update({ color: cor.id })}
                       title={cor.nome}
                       aria-label={cor.nome}
@@ -296,7 +296,8 @@ export function ConnectionModal(): React.JSX.Element {
                   ))}
                 </div>
                 <span className="field__hint">
-                  Aparece na lista de conexões, na barra lateral e numa faixa no topo da janela.
+                  Pinta a IDE inteira enquanto esta conexão estiver aberta. Sem cor, vale o
+                  padrão das Preferências.
                 </span>
               </div>
 

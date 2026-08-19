@@ -30,7 +30,11 @@ export function registerIpcHandlers(manager: ConnectionManager, store: Connectio
   })
 
   ipcMain.handle(IPC.connectionsTest, async (_e, config: ConnectionConfig) => {
-    const resultado = await manager.test(config)
+    // Também resolve a senha guardada. Sem isto, "Testar" dentro do modal de
+    // edição sempre falhava: o formulário abre com o campo de senha vazio de
+    // propósito (a senha nunca vai para o renderer), então o teste ia ao banco
+    // sem credencial nenhuma — enquanto conectar pela lista funcionava.
+    const resultado = await manager.test(comSenhaGuardada(config, store))
     if (resultado.ok) return resultado
     // O driver devolve a mensagem crua; traduzimos aqui, onde sabemos o driver.
     const traduzido = translateError(new Error(resultado.message), { driver: config.driver })
@@ -41,9 +45,7 @@ export function registerIpcHandlers(manager: ConnectionManager, store: Connectio
   })
 
   ipcMain.handle(IPC.connectionsOpen, async (_e, config: ConnectionConfig) => {
-    // Conexão salva sem senha no payload: buscamos a cifrada no store.
-    const resolved =
-      config.password === undefined ? store.resolve(config.id) ?? config : config
+    const resolved = comSenhaGuardada(config, store)
     try {
       await manager.open(resolved)
     } catch (error) {
@@ -393,6 +395,29 @@ export function registerIpcHandlers(manager: ConnectionManager, store: Connectio
   })
 
   ipcMain.handle(IPC.updateOpenPage, () => abrirPaginaDaRelease())
+}
+
+/**
+ * Completa a configuração com a senha guardada, quando o renderer não mandou uma.
+ *
+ * O formulário de edição abre com o campo de senha **vazio** de propósito: a
+ * senha cifrada nunca viaja para o renderer. Isso significa que "campo vazio"
+ * quer dizer "não digitei", não "a senha é vazia".
+ *
+ * A versão anterior só cobria `undefined`, e o modal manda string vazia. O
+ * efeito: editar uma conexão e clicar em Testar ou Conectar ia ao banco sem
+ * credencial e voltava "Nenhuma senha foi enviada para o banco. Esta conexão
+ * foi salva sem senha" — uma mensagem falsa, porque a senha estava salva; só
+ * não tinha sido enviada. Conectar pela lista funcionava, o que fazia o defeito
+ * parecer coisa de outro mundo.
+ */
+function comSenhaGuardada(config: ConnectionConfig, store: ConnectionStore): ConnectionConfig {
+  if (config.password) return config
+  const guardada = store.resolve(config.id)
+  if (!guardada?.password) return config
+  // Só a senha vem do disco: o resto é o que está no formulário agora, senão
+  // uma edição de host ou de porta seria descartada ao testar.
+  return { ...config, password: guardada.password }
 }
 
 function toCsv(columns: string[], rows: unknown[][]): string {

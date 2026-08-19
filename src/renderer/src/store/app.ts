@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { PALETA_PADRAO, aplicarPaleta } from '../styles/palettes'
+import { paletaEmVigor } from '../styles/connection-colors'
 
 export type ThemeMode = 'light' | 'dark' | 'system'
 
@@ -34,8 +35,23 @@ interface AppState {
    * incompleto sem saber. O que muda é o volume do aviso, não a verdade dele.
    */
   limiteAviso: number
-  /** Acento da interface. Ver `styles/palettes.ts` para o porquê da lista fechada. */
+  /**
+   * Acento **preferido**, escolhido nas Preferências e guardado em disco.
+   * É o que vale quando a conexão aberta não tem cor própria.
+   */
   paleta: string
+  /**
+   * Acento realmente aplicado agora.
+   *
+   * Deriva de duas fontes: a cor da conexão aberta manda; sem ela, vale a
+   * preferência. Fica no store porque o editor Monaco também precisa segui-lo
+   * — as regras de tema dele só aceitam hex literal, então ele redefine os
+   * temas sempre que este valor muda. Sem um ponto único, a interface trocava
+   * de cor e o editor ficava na anterior.
+   */
+  paletaEfetiva: string
+  /** Cor da conexão aberta, lembrada para recalcular ao trocar a preferência. */
+  corDaConexaoAberta: string | undefined
   /**
    * Se o diagrama deduz ligações que o banco não declara.
    *
@@ -81,6 +97,8 @@ interface AppState {
   setTamanhoPaginaPadrao: (linhas: number) => void
   setLimiteAviso: (linhas: number) => void
   setPaleta: (id: string) => void
+  /** Recalcula o acento a partir da cor da conexão aberta. */
+  aplicarAcentoDaConexao: (corDaConexao: string | undefined) => void
   setInferirRelacoes: (valor: 'auto' | 'sim' | 'nao') => void
   toggleHelpPanel: () => void
   openModal: (modal: AppState['modal'], connectionId?: string) => void
@@ -190,6 +208,8 @@ export const useAppStore = create<AppState>((set, get) => {
     tamanhoPaginaPadrao: prefs.tamanhoPaginaPadrao,
     limiteAviso: prefs.limiteAviso,
     paleta: prefs.paleta,
+    paletaEfetiva: prefs.paleta,
+    corDaConexaoAberta: undefined,
     inferirRelacoes: prefs.inferirRelacoes,
     helpPanelVisible: false,
     modal: null,
@@ -240,9 +260,18 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     setPaleta: (id) => {
-      aplicarPaleta(id)
+      // Guarda a preferência e reaplica passando pela mesma regra: se a
+      // conexão aberta tem cor, ela continua mandando, e trocar a preferência
+      // aqui não deve arrancar a cor do banco debaixo dos pés.
       set({ paleta: id })
       gravarPrefs({ ...prefsAtuais(get), paleta: id })
+      get().aplicarAcentoDaConexao(get().corDaConexaoAberta)
+    },
+
+    aplicarAcentoDaConexao: (corDaConexao) => {
+      const emVigor = paletaEmVigor(corDaConexao, get().paleta)
+      aplicarPaleta(emVigor)
+      set({ paletaEfetiva: emVigor, corDaConexaoAberta: corDaConexao })
     },
 
     setInferirRelacoes: (valor) => {

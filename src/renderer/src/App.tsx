@@ -66,6 +66,24 @@ export function App(): React.JSX.Element {
     return () => clearTimeout(agendado)
   }, [connectionId])
 
+  /*
+    A cor da conexão pinta a IDE inteira.
+
+    É o sinal mais forte de "em qual banco eu estou": não é um ponto num canto,
+    é a tela toda. Conexão sem cor cai no acento das Preferências, que sai de
+    fábrica em âmbar — a cor da logo.
+
+    O seletor devolve só a string da cor, não o objeto da conexão: valor
+    estável, sem risco do laço de renderização que já derrubou a janela uma vez.
+  */
+  const corDaConexaoAtiva = useConnectionStore(
+    (s) => s.saved.find((c) => c.id === s.activeId)?.color
+  )
+  const aplicarAcentoDaConexao = useAppStore((s) => s.aplicarAcentoDaConexao)
+  useEffect(() => {
+    aplicarAcentoDaConexao(corDaConexaoAtiva)
+  }, [corDaConexaoAtiva, aplicarAcentoDaConexao])
+
   // O SO pode trocar de tema no meio da sessão (agendamento noturno do macOS).
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)')

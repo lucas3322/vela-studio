@@ -27,7 +27,9 @@ export function QueryEditor({ tabId }: { tabId: string }): React.JSX.Element {
   const container = useRef<HTMLDivElement>(null)
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor>()
   const resolvedTheme = useAppStore((s) => s.resolvedTheme)
-  const paleta = useAppStore((s) => s.paleta)
+  // A paleta **em vigor**, não a preferida: com a conexão pintando a IDE, o
+  // editor precisa seguir a mesma cor ou fica na anterior.
+  const paleta = useAppStore((s) => s.paletaEfetiva)
   const connection = useConnectionStore((s) => s.saved.find((c) => c.id === s.activeId))
   const schema = useConnectionStore((s) => s.currentSchema())
   const updateTab = useTabStore((s) => s.updateTab)
@@ -45,7 +47,7 @@ export function QueryEditor({ tabId }: { tabId: string }): React.JSX.Element {
     if (!container.current) return
 
     if (!providersRegistered) {
-      defineThemes(useAppStore.getState().paleta)
+      defineThemes(useAppStore.getState().paletaEfetiva)
       registerSqlCompletion(() => schemaRef.current)
       registerMongoCompletion(() => schemaRef.current)
       registerHover(() => schemaRef.current, 'sql')
