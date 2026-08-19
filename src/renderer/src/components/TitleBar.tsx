@@ -1,5 +1,6 @@
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
+import { corDaConexao } from '../styles/connection-colors'
 import {
   IconHelp,
   IconHistory,
@@ -23,8 +24,20 @@ export function TitleBar(): React.JSX.Element {
   const connection = useConnectionStore((s) => s.saved.find((c) => c.id === s.activeId))
   const database = useConnectionStore((s) => s.activeDatabase)
 
+  const cor = corDaConexao(connection?.color, resolvedTheme)
+
   return (
     <header className="titlebar drag-region">
+      {/*
+        Faixa da cor da conexão, atravessando o topo.
+
+        É o único sinal que fica visível o tempo todo, em qualquer aba e com
+        qualquer painel aberto. O nome do banco também está aqui ao lado, mas
+        nome se lê e cor se percebe — e quem vai rodar um DELETE às pressas não
+        está lendo.
+      */}
+      {cor && <span className="titlebar__faixa" style={{ background: cor }} aria-hidden />}
+
       <div className="titlebar__brand no-drag">
         <IconSail size={15} />
         Vela

@@ -2733,3 +2733,75 @@
     transition: none;
   }
 }
+
+/* ── Cor de identificação da conexão ──────────────────────────────── */
+
+/*
+  A cor entra por `--cor-conexao`, definida no elemento pelo componente. Assim
+  a borda e o realce puxam do mesmo lugar, e uma conexão sem cor simplesmente
+  não define a variável — sem ramo condicional espalhado pela marcação.
+*/
+.conexao--colorida {
+  border-left: 3px solid var(--cor-conexao);
+}
+
+.conexao--colorida:hover {
+  background: color-mix(in srgb, var(--cor-conexao) 8%, transparent);
+}
+
+/*
+  Faixa no topo da janela: o único sinal visível o tempo todo, em qualquer aba
+  e com qualquer painel aberto. Fina de propósito — ela precisa ser percebida
+  pelo canto do olho, não competir com o conteúdo.
+*/
+.titlebar__faixa {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  pointer-events: none;
+}
+
+/* ── Seletor de cor no modal de conexão ───────────────────────────── */
+
+.cores-conexao {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.cores-conexao__opcao {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  color: var(--text-secondary);
+  transition:
+    transform var(--duration-fast) var(--ease),
+    border-color var(--duration-fast) var(--ease);
+}
+
+.cores-conexao__opcao:hover {
+  transform: scale(1.12);
+}
+
+/*
+  A seleção é marcada por um anel afastado, não pela cor de dentro: um anel da
+  própria cor sumiria contra ela, e o "sem cor" não teria como se marcar.
+*/
+.cores-conexao__opcao--ativa {
+  border-color: var(--text-primary);
+  box-shadow: 0 0 0 2px var(--bg-elevated) inset;
+}
+
+/* O "sem cor" é o único com contorno próprio — ele não tem preenchimento. */
+.cores-conexao__opcao:first-child {
+  border: 1px dashed var(--contorno-objeto);
+}
+
+.cores-conexao__opcao:first-child.cores-conexao__opcao--ativa {
+  border: 2px solid var(--text-primary);
+}

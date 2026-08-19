@@ -3,6 +3,7 @@ import { ConnectionRow } from './ConnectionRow'
 import { DRIVERS, type ConnectionConfig, type DriverId, type TestResult } from '@shared/types'
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
+import { CORES_DE_CONEXAO, proximaCorLivre } from '../styles/connection-colors'
 import {
   IconCheck,
   IconClose,
@@ -27,12 +28,17 @@ function emptyConfig(driver: DriverId = 'mysql'): ConnectionConfig {
 }
 
 export function ConnectionModal(): React.JSX.Element {
-  const { closeModal, editingConnectionId, notify } = useAppStore()
+  const { closeModal, editingConnectionId, notify, resolvedTheme } = useAppStore()
   const { saved, connect, removeConnection, refreshSaved } = useConnectionStore()
 
   const existing = saved.find((c) => c.id === editingConnectionId)
   const [config, setConfig] = useState<ConnectionConfig>(
-    existing ? { ...existing, password: '' } : emptyConfig()
+    existing
+      ? { ...existing, password: '' }
+      : // Conexão nova já nasce com uma cor livre. Nascendo sem, a pessoa só
+        // descobriria o recurso por acaso — e ele serve justamente para quando
+        // existe mais de um banco na lista.
+        { ...emptyConfig(), color: proximaCorLivre(saved.map((c) => c.color)) }
   )
   const [savePassword, setSavePassword] = useState(true)
   const [testing, setTesting] = useState(false)
@@ -254,6 +260,44 @@ export function ConnectionModal(): React.JSX.Element {
                   onChange={(e) => update({ name: e.target.value })}
                   autoFocus
                 />
+              </div>
+
+              {/*
+                A cor identifica o banco de relance — vale principalmente para
+                separar produção de local, que é onde o engano custa caro. Os
+                nomes das cores ficam no `title` de cada botão: sete matizes
+                não são sete sinais para quem não os distingue, e o nome
+                escrito é o que restabelece a diferença.
+              */}
+              <div className="field">
+                <span className="field__label">Cor</span>
+                <div className="cores-conexao" role="group" aria-label="Cor da conexão">
+                  <button
+                    type="button"
+                    className={`cores-conexao__opcao ${!config.color ? 'cores-conexao__opcao--ativa' : ''}`}
+                    onClick={() => update({ color: undefined })}
+                    title="Sem cor"
+                    aria-label="Sem cor"
+                    aria-pressed={!config.color}
+                  >
+                    <IconClose size={12} />
+                  </button>
+                  {CORES_DE_CONEXAO.map((cor) => (
+                    <button
+                      key={cor.id}
+                      type="button"
+                      className={`cores-conexao__opcao ${config.color === cor.id ? 'cores-conexao__opcao--ativa' : ''}`}
+                      style={{ background: resolvedTheme === 'dark' ? cor.escuro : cor.claro }}
+                      onClick={() => update({ color: cor.id })}
+                      title={cor.nome}
+                      aria-label={cor.nome}
+                      aria-pressed={config.color === cor.id}
+                    />
+                  ))}
+                </div>
+                <span className="field__hint">
+                  Aparece na lista de conexões, na barra lateral e numa faixa no topo da janela.
+                </span>
               </div>
 
               {shows('connectionString') && (

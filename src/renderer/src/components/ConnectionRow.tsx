@@ -1,4 +1,6 @@
 import { DRIVERS, type StoredConnection } from '@shared/types'
+import { useAppStore } from '../store/app'
+import { corDaConexao } from '../styles/connection-colors'
 import { IconDatabase, IconEdit, IconTrash } from './Icons'
 
 interface Props {
@@ -30,6 +32,8 @@ export function ConnectionRow({
   disabled
 }: Props): React.JSX.Element {
   const temAcoes = !!onEdit || !!onRemove
+  const tema = useAppStore((s) => s.resolvedTheme)
+  const cor = corDaConexao(connection.color, tema)
   const destino =
     connection.filePath ??
     `${connection.host ?? 'localhost'}${connection.port ? `:${connection.port}` : ''}${
@@ -37,9 +41,22 @@ export function ConnectionRow({
     }`
 
   return (
-    <div className={`conexao ${temAcoes ? 'conexao--com-acoes' : ''}`}>
+    /*
+      A faixa colorida entra como variável CSS, não como cor no elemento: assim
+      a borda, o ícone e o realce de hover puxam do mesmo lugar, e uma conexão
+      sem cor simplesmente não define a variável — caindo no valor neutro do
+      CSS, sem nenhum ramo condicional espalhado pela marcação.
+    */
+    <div
+      className={`conexao ${temAcoes ? 'conexao--com-acoes' : ''} ${cor ? 'conexao--colorida' : ''}`}
+      style={cor ? ({ '--cor-conexao': cor } as React.CSSProperties) : undefined}
+    >
       <button className="conexao__abrir" onClick={onOpen} disabled={disabled}>
-        <IconDatabase size={17} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+        <IconDatabase
+          size={17}
+          style={{ color: cor ?? 'var(--accent)', flexShrink: 0 }}
+          aria-hidden
+        />
         <span className="conexao__corpo">
           <span className="conexao__nome">{connection.name}</span>
           <span className="conexao__destino">{destino}</span>

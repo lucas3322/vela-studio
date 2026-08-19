@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DRIVERS, type ColumnInfo, type TableInfo } from '@shared/types'
 import { useAppStore } from '../store/app'
+import { corDaConexao } from '../styles/connection-colors'
 import { descreverExportacao } from '../editor/export-message'
 import { useConnectionStore } from '../store/connections'
 import { useTabStore } from '../store/tabs'
@@ -49,6 +50,8 @@ export function Sidebar(): React.JSX.Element {
     loadingSchema
   } = useConnectionStore()
   const connection = useConnectionStore((s) => s.saved.find((c) => c.id === s.activeId))
+  const temaAtual = useAppStore((s) => s.resolvedTheme)
+  const corAtiva = corDaConexao(connection?.color, temaAtual)
   const schema = useConnectionStore((s) => s.currentSchema())
   const { openTableTab, openQueryTab } = useTabStore()
 
@@ -330,8 +333,14 @@ export function Sidebar(): React.JSX.Element {
             onClick={() => openModal('connection')}
             title="Trocar de conexão"
           >
+            {/*
+              O ponto usa a cor da conexão quando ela tem uma. O verde de
+              "conectado" continua sendo o padrão: quem não pinta nada não
+              perde o sinal de estado que já existia.
+            */}
             <span
               className={`sidebar__connection-dot ${activeId ? 'sidebar__connection-dot--on' : ''}`}
+              style={corAtiva && activeId ? { background: corAtiva } : undefined}
             />
             <span className="sidebar__connection-text">
               <div className="sidebar__connection-name">
