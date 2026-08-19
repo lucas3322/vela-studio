@@ -3,6 +3,17 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.26.0 — 2026-08-19
+
+### Novidades
+
+- implementar lógica para usar senha guardada ao testar conexões e adicionar suporte a paletas de cores para a interface (950ea92)
+- adicionar sistema de cores para identificação de conexões (94b32ab)
+
+### Correções
+
+- melhorar descrição da lista de cores no modal de preferências (ee47591)
+
 ## 0.25.0 — 2026-08-18
 
 ### Novidades
