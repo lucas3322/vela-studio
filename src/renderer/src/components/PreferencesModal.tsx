@@ -87,8 +87,9 @@ export function PreferencesModal(): React.JSX.Element {
               ))}
             </div>
             <span className="field__hint">
-              A lista é fechada de propósito: cada cor foi conferida nos dois temas para o texto
-              continuar legível. Um seletor livre desfaria isso num clique.
+              Vale quando a conexão aberta não tem cor própria — a cor da conexão sempre manda,
+              para você saber em qual banco está. A lista é fechada de propósito: cada cor foi
+              conferida nos dois temas para o texto continuar legível.
             </span>
           </div>
 
