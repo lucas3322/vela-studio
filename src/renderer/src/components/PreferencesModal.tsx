@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { PALETAS } from '../styles/palettes'
 import { useAppStore, type ThemeMode } from '../store/app'
+import { useConnectionStore } from '../store/connections'
 import { IconClose } from './Icons'
 
 const TEMAS: Array<{ id: ThemeMode; rotulo: string }> = [
@@ -29,6 +30,18 @@ export function PreferencesModal(): React.JSX.Element {
     limiteAviso,
     setLimiteAviso
   } = useAppStore()
+
+  /*
+    A conexão aberta e a cor dela. Os seletores devolvem string, não o objeto
+    da conexão: valor estável, sem risco do laço de renderização.
+  */
+  const corDaConexaoAtiva = useConnectionStore(
+    (s) => s.saved.find((c) => c.id === s.activeId)?.color
+  )
+  const nomeDaConexaoAtiva = useConnectionStore(
+    (s) => s.saved.find((c) => c.id === s.activeId)?.name
+  )
+  const nomeDaCorAtiva = PALETAS.find((p) => p.id === corDaConexaoAtiva)?.nome
 
   useEffect(() => {
     const aoTeclar = (evento: KeyboardEvent): void => {
@@ -83,14 +96,37 @@ export function PreferencesModal(): React.JSX.Element {
                     style={{ background: `hsl(${item.h} ${item.s}% 50%)` }}
                   />
                   {item.nome}
+                  {/*
+                    Marca a cor que está de fato pintando a tela agora.
+
+                    Sem isto, escolher Âmbar com uma conexão azul aberta
+                    deixava o seletor com Âmbar marcado e a interface azul —
+                    e o controle parecia quebrado. A precedência estava certa;
+                    quem mentia era a tela.
+                  */}
+                  {corDaConexaoAtiva === item.id && (
+                    <span className="paleta__em-uso" title="Em uso pela conexão aberta">
+                      em uso
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
-            <span className="field__hint">
-              Vale quando a conexão aberta não tem cor própria — a cor da conexão sempre manda,
-              para você saber em qual banco está. A lista é fechada de propósito: cada cor foi
-              conferida nos dois temas para o texto continuar legível.
-            </span>
+
+            {corDaConexaoAtiva ? (
+              <span className="field__hint">
+                A conexão <strong>{nomeDaConexaoAtiva}</strong> está pintando a IDE de{' '}
+                <strong>{nomeDaCorAtiva}</strong> agora — é assim que você sabe em qual banco
+                está. A escolha acima passa a valer quando você abrir uma conexão sem cor, ou
+                tirar a cor desta em Editar conexão.
+              </span>
+            ) : (
+              <span className="field__hint">
+                Vale enquanto a conexão aberta não tiver cor própria — a cor da conexão sempre
+                manda. A lista é fechada de propósito: cada cor foi conferida nos dois temas para
+                o texto continuar legível.
+              </span>
+            )}
           </div>
 
           <div className="field">

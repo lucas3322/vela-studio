@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { ColumnInfo, Dialect } from '@shared/types'
 import {
   OPERADORES,
@@ -46,11 +46,21 @@ export function TableFilterBar({
   }
 
   const prontas = condicoes.filter(condicaoUsavel)
+
+  /*
+    O tipo de cada campo, vindo do schema. No Mongo isso decide se o valor vai
+    como texto ou como número — a igualdade lá é tipada, e procurar um MSISDN
+    de texto usando número devolve zero documento sem reclamar de nada.
+  */
+  const tiposPorCampo = useMemo(
+    () => Object.fromEntries(columns.map((c) => [c.name, c.type])),
+    [columns]
+  )
   const previa =
     prontas.length === 0
       ? ''
       : dialect === 'mongodb'
-        ? montarFiltroMongo(prontas)
+        ? montarFiltroMongo(prontas, tiposPorCampo)
         : montarWhere(prontas, dialect)
 
   const aplicar = (): void => onAplicar(prontas)

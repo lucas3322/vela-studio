@@ -13,6 +13,7 @@ import {
   condicaoUsavel,
   montarFiltroMongo,
   montarWhere,
+  valorParaMongo,
   type Condicao
 } from '../renderer/src/editor/filter-builder.ts'
 
@@ -148,4 +149,70 @@ test('Mongo: caractere de regex no valor é escapado', () => {
 test('Mongo: aspas no valor não quebram o objeto', () => {
   const filtro = montarFiltroMongo([c('nome', 'igual', 'diz "oi"')])
   assert.doesNotThrow(() => JSON.parse(filtro))
+})
+
+// ── tipo do campo no Mongo ───────────────────────────────────────────
+
+test('campo de texto é citado, mesmo quando o valor parece número', () => {
+  // O bug relatado: MSISDN guardado como texto, filtro montado com número, e
+  // o Mongo devolvendo zero documento sem reclamar. Um MSISDN, um CPF, um CEP
+  // sem hífen — tudo isso parece número e é guardado como texto.
+  const filtro = montarFiltroMongo([c('MSISDN', 'igual', '5519983017492')], {
+    MSISDN: 'string'
+  })
+  assert.equal(filtro, '{ "MSISDN": "5519983017492" }')
+})
+
+test('campo numérico continua indo como número', () => {
+  const filtro = montarFiltroMongo([c('PARENT_ID', 'igual', '10000')], {
+    PARENT_ID: 'number'
+  })
+  assert.equal(filtro, '{ "PARENT_ID": 10000 }')
+})
+
+test('campo numérico com valor de texto não vira número inválido', () => {
+  const filtro = montarFiltroMongo([c('PARENT_ID', 'igual', 'abc')], { PARENT_ID: 'number' })
+  assert.equal(filtro, '{ "PARENT_ID": "abc" }')
+})
+
+test('campo misto procura pelos dois tipos', () => {
+  // Coleção migrada no meio da vida: documentos antigos com número, novos com
+  // texto. Procurar por um só acha metade, e é a metade errada com igual
+  // probabilidade. `$in` continua usando o índice.
+  const filtro = montarFiltroMongo([c('MSISDN', 'igual', '5519983017492')], {
+    MSISDN: 'string | number'
+  })
+  assert.match(filtro, /\$in/)
+  assert.ok(filtro.includes('5519983017492'), filtro)
+  assert.ok(filtro.includes('"5519983017492"'), filtro)
+})
+
+test('campo misto na negação usa $nin, não $ne', () => {
+  // `$ne` com um tipo só deixaria passar os documentos do outro tipo —
+  // exatamente os que a pessoa queria excluir.
+  const filtro = montarFiltroMongo([c('MSISDN', 'diferente', '55199')], {
+    MSISDN: 'string | number'
+  })
+  assert.match(filtro, /\$nin/)
+})
+
+test('sem informação de tipo, mantém o comportamento antigo', () => {
+  // Coleção vazia, ou campo que não apareceu na amostra: sem schema não há o
+  // que consultar, e o formato do texto é o único palpite disponível.
+  assert.equal(montarFiltroMongo([c('x', 'igual', '42')]), '{ "x": 42 }')
+  assert.equal(montarFiltroMongo([c('x', 'igual', 'ana')]), '{ "x": "ana" }')
+})
+
+test('o tipo não atrapalha os operadores de nulo', () => {
+  assert.equal(
+    montarFiltroMongo([c('MSISDN', 'vazio')], { MSISDN: 'string' }),
+    '{ "MSISDN": null }'
+  )
+})
+
+test('valorParaMongo decide sozinho, e é testável à parte', () => {
+  assert.equal(valorParaMongo('123', 'string'), '"123"')
+  assert.equal(valorParaMongo('123', 'number'), '123')
+  assert.equal(valorParaMongo('123', 'ObjectId'), '123')
+  assert.equal(valorParaMongo('  123  ', 'string'), '"123"', 'precisa aparar o espaço')
 })

@@ -92,7 +92,17 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
       const limite = tamanhoPagina + 1
       const sql =
         dialect === 'mongodb'
-          ? montarFind(table, ordemEfetiva, limite, salto, montarFiltroMongo(filtro))
+          ? montarFind(
+              table,
+              ordemEfetiva,
+              limite,
+              salto,
+              // Os tipos vêm do schema. Sem eles, a igualdade tipada do Mongo
+              // procura número onde o documento guarda texto e volta vazia —
+              // aqui é o caminho que **executa**, então errar aqui é pior do
+              // que errar na prévia.
+              montarFiltroMongo(filtro, Object.fromEntries(columns.map((c) => [c.name, c.type])))
+            )
           : montarSelect(table, dialect, ordemEfetiva, limite, salto, montarWhere(filtro, dialect))
 
       try {

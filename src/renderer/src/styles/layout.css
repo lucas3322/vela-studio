@@ -2805,3 +2805,20 @@
 .cores-conexao__opcao:first-child.cores-conexao__opcao--ativa {
   border: 2px solid var(--text-primary);
 }
+
+/*
+  Marca "em uso" na cor que a conexão aberta está aplicando.
+
+  Sem ela, escolher Âmbar com uma conexão azul aberta deixava Âmbar marcado no
+  seletor e a interface azul — o controle parecia quebrado. A precedência
+  estava certa; quem mentia era a tela.
+*/
+.paleta__em-uso {
+  margin-left: var(--space-2);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}

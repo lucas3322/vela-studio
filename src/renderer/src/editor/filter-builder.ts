@@ -148,8 +148,56 @@ export function montarWhere(condicoes: Condicao[], dialect: Dialect): string {
   return `WHERE ${usaveis.map((c) => expressao(c, dialect)).join(' AND ')}`
 }
 
+/**
+ * O valor de uma condição, no tipo que o campo do Mongo realmente guarda.
+ *
+ * ## Por que o tipo do campo importa aqui, e não no SQL
+ *
+ * A igualdade do MongoDB é **tipada**: `{ MSISDN: 5519983017492 }` não casa com
+ * o documento que guarda `"5519983017492"`. O SQL converte sozinho e perdoa;
+ * o Mongo devolve zero documento e não reclama de nada.
+ *
+ * Era esse o defeito: adivinhar o tipo pelo formato do texto. Um MSISDN, um
+ * CPF, um CEP sem hífen — tudo isso *parece* número e é guardado como texto.
+ * A busca voltava vazia e a IDE dizia "executado com sucesso", o que se lê
+ * como "esse registro não existe" quando na verdade é "procurei do jeito
+ * errado".
+ *
+ * O driver já amostra os documentos e sabe o tipo de cada campo. Usar isso é a
+ * própria tese do produto: a IDE conhece o schema e usa o que conhece.
+ */
+export function valorParaMongo(bruto: string, tipoDoCampo?: string): string {
+  const limpo = bruto.trim()
+  const tipos = (tipoDoCampo ?? '').split('|').map((t) => t.trim().toLowerCase())
+  const temTexto = tipos.includes('string')
+  const temNumero = tipos.includes('number')
+
+  // Campo declaradamente de texto: cita sempre, mesmo parecendo número. É o
+  // caso do MSISDN que motivou tudo.
+  if (temTexto && !temNumero) return JSON.stringify(limpo)
+  if (temNumero && !temTexto) return ehNumero(limpo) ? limpo : JSON.stringify(limpo)
+
+  // Sem informação de tipo, ou tipo misto: cai no formato do texto.
+  return ehNumero(limpo) ? limpo : JSON.stringify(limpo)
+}
+
+/**
+ * O campo guarda os dois tipos na amostra?
+ *
+ * Coleção que foi migrada no meio da vida costuma ter documentos antigos com
+ * número e novos com texto. Procurar por um só tipo acha metade — e é a
+ * metade errada com igual probabilidade.
+ */
+function tipoMisto(tipoDoCampo: string | undefined, bruto: string): boolean {
+  const tipos = (tipoDoCampo ?? '').split('|').map((t) => t.trim().toLowerCase())
+  return tipos.includes('string') && tipos.includes('number') && ehNumero(bruto.trim())
+}
+
 /** Filtro equivalente para o MongoDB, já como texto do `find()`. */
-export function montarFiltroMongo(condicoes: Condicao[]): string {
+export function montarFiltroMongo(
+  condicoes: Condicao[],
+  tiposPorCampo: Record<string, string> = {}
+): string {
   const usaveis = condicoes.filter(condicaoUsavel)
   if (usaveis.length === 0) return '{}'
 
@@ -157,13 +205,21 @@ export function montarFiltroMongo(condicoes: Condicao[]): string {
   const partes = usaveis.map((c) => {
     const chave = JSON.stringify(c.coluna)
     const bruto = c.valor.trim()
-    const valor = ehNumero(bruto) ? bruto : JSON.stringify(bruto)
+    const tipo = tiposPorCampo[c.coluna]
+    const valor = valorParaMongo(bruto, tipo)
+
+    // Campo com os dois tipos na amostra: procura pelos dois. Um `$in` continua
+    // usando o índice, então não custa desempenho — e achar metade dos
+    // documentos seria pior do que demorar um pouco mais.
+    const ambos = `{ $in: [${bruto}, ${JSON.stringify(bruto)}] }`
 
     switch (c.operador) {
       case 'igual':
-        return `${chave}: ${valor}`
+        return tipoMisto(tipo, bruto) ? `${chave}: ${ambos}` : `${chave}: ${valor}`
       case 'diferente':
-        return `${chave}: { $ne: ${valor} }`
+        return tipoMisto(tipo, bruto)
+          ? `${chave}: { $nin: [${bruto}, ${JSON.stringify(bruto)}] }`
+          : `${chave}: { $ne: ${valor} }`
       case 'maior':
         return `${chave}: { $gt: ${valor} }`
       case 'menor':

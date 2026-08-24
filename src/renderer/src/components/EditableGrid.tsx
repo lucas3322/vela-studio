@@ -606,16 +606,39 @@ export function EditableGrid({
   }
 
   if (result.columns.length === 0) {
+    /*
+      Sem coluna nenhuma, dois casos muito diferentes chegam aqui, e dizer a
+      mesma coisa nos dois engana:
+
+      - um comando de escrita, que de fato não devolve colunas;
+      - uma busca que **não achou nada** — no Mongo, `toGrid([])` não produz
+        coluna alguma.
+
+      A segunda dizia "Comando executado com sucesso", que se lê como "deu
+      certo, o registro não existe". Foi o que apareceu quando o filtro
+      procurava um MSISDN de texto usando número: a busca estava errada, e a
+      tela dava um atestado de que estava certa.
+
+      `affectedRows` é o que separa: só comando de escrita o traz.
+    */
+    const foiEscrita = result.affectedRows != null
+
     return (
       <div className="results__empty">
-        <IconWarning size={22} style={{ color: 'var(--success)' }} />
+        <IconWarning size={22} style={{ color: foiEscrita ? 'var(--success)' : undefined }} />
         <div>
-          Comando executado com sucesso.
-          {result.affectedRows != null && (
+          {foiEscrita ? (
             <>
+              Comando executado com sucesso.
               <br />
-              <strong>{numberFormat.format(result.affectedRows)}</strong> linha(s) afetada(s) em{' '}
-              {numberFormat.format(result.durationMs)} ms.
+              <strong>{numberFormat.format(result.affectedRows as number)}</strong> linha(s)
+              afetada(s) em {numberFormat.format(result.durationMs)} ms.
+            </>
+          ) : (
+            <>
+              Nenhum registro encontrado.
+              <br />
+              A consulta rodou em {numberFormat.format(result.durationMs)} ms e não trouxe nada.
             </>
           )}
         </div>
