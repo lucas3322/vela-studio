@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.26.1 — 2026-08-24
+
+### Correções
+
+- aprimorar lógica de filtro para MongoDB com suporte a tipos de campo e adicionar testes correspondentes (e1ba895)
+
 ## 0.26.0 — 2026-08-19
 
 ### Novidades
