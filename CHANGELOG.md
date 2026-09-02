@@ -3,6 +3,13 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.28.0 — 2026-09-02
+
+### Novidades
+
+- implementar execução de comandos em lote com feedback de progresso e tratamento de erros (09ef522)
+- implementar busca na grade com suporte a navegação e destaque de colunas e células feat: adicionar funcionalidade de rolagem para coluna escolhida na barra de filtro feat: integrar busca na grade com a tabela, permitindo abrir relações filtradas fix: ajustar estilo de célula de chave estrangeira para melhor usabilidade test: adicionar testes para a nova funcionalidade de busca na grade e navegação (24f5ac8)
+
 ## 0.27.0 — 2026-09-02
 
 ### Novidades
