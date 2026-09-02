@@ -3,6 +3,13 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.28.1 — 2026-09-02
+
+### Outras mudanças
+
+- remover tipo Redis e simplificar funções de consulta (a015a47)
+- BREAKING CHANGE: add Redis support to the application (44f7e9e)
+
 ## 0.28.0 — 2026-09-02
 
 ### Novidades
