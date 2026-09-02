@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 0.27.0 — 2026-09-02
+
+### Novidades
+
+- implementar funcionalidade de inserção de linhas em diferentes bancos de dados e adicionar diálogo para inserção (0975301)
+
 ## 0.26.1 — 2026-08-24
 
 ### Correções
