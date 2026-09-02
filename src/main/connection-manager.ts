@@ -4,6 +4,7 @@ import { MySQLDriver } from './drivers/mysql'
 import { PostgresDriver } from './drivers/postgres'
 import { SQLiteDriver } from './drivers/sqlite'
 import { MongoDriver } from './drivers/mongodb'
+import { RedisDriver } from './drivers/redis'
 
 function createDriver(id: DriverId): DatabaseDriver {
   switch (id) {
@@ -11,6 +12,7 @@ function createDriver(id: DriverId): DatabaseDriver {
     case 'postgres': return new PostgresDriver()
     case 'sqlite': return new SQLiteDriver()
     case 'mongodb': return new MongoDriver()
+    case 'redis': return new RedisDriver()
     default: throw new Error(`Driver desconhecido: ${id}`)
   }
 }

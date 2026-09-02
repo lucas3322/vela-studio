@@ -4,6 +4,7 @@ import { monaco, defineThemes, editorOptions } from '../editor/monaco-setup'
 import {
   registerHover,
   registerMongoCompletion,
+  registerRedisCompletion,
   registerSqlCompletion,
   type SchemaProvider
 } from '../editor/completion'
@@ -36,7 +37,11 @@ export function QueryEditor({ tabId }: { tabId: string }): React.JSX.Element {
   const { run } = useRunQuery()
 
   const dialect = connection ? DRIVERS[connection.driver].dialect : 'mysql'
-  const language = dialect === 'mongodb' ? 'javascript' : 'sql'
+  // Redis não tem SQL: colorir e validar como SQL em cima de comandos como
+  // `HGETALL` seria mostrar sintaxe que não existe, pior do que não colorir
+  // nada. `redis` é uma linguagem própria e mínima, registrada em
+  // `monaco-setup.ts`, que só reconhece nomes de comando e string.
+  const language = dialect === 'mongodb' ? 'javascript' : dialect === 'redis' ? 'redis' : 'sql'
 
   // Mantém a referência do schema em dia para o provider já registrado.
   useEffect(() => {
@@ -50,8 +55,10 @@ export function QueryEditor({ tabId }: { tabId: string }): React.JSX.Element {
       defineThemes(useAppStore.getState().paletaEfetiva)
       registerSqlCompletion(() => schemaRef.current)
       registerMongoCompletion(() => schemaRef.current)
+      registerRedisCompletion(() => schemaRef.current)
       registerHover(() => schemaRef.current, 'sql')
       registerHover(() => schemaRef.current, 'javascript')
+      registerHover(() => schemaRef.current, 'redis')
       providersRegistered = true
     }
 

@@ -25,8 +25,9 @@
     "test:mysql": "esbuild src/main/drivers/mysql.ts --bundle --format=esm --platform=node --target=node20 --external:mysql2 --external:electron --outfile=src/tests/.mysql-bundle.mjs --log-level=error && node --test src/tests/mysql-e2e.mjs",
     "test:postgres": "esbuild src/main/drivers/postgres.ts --bundle --format=esm --platform=node --target=node20 --external:pg --external:electron --outfile=src/tests/.postgres-bundle.mjs --log-level=error && node --test src/tests/postgres-e2e.mjs",
     "test:mongo": "esbuild src/main/drivers/mongodb.ts --bundle --format=esm --platform=node --target=node20 --external:mongodb --external:electron --outfile=src/tests/.mongo-bundle.mjs --log-level=error && node --test src/tests/mongo-e2e.mjs",
+    "test:redis": "esbuild src/main/drivers/redis.ts --bundle --format=esm --platform=node --target=node20 --external:ioredis --external:electron --outfile=src/tests/.redis-bundle.mjs --log-level=error && node --test src/tests/redis-e2e.mjs",
     "test:sqlite": "esbuild src/main/drivers/sqlite.ts --bundle --format=esm --platform=node --target=node20 --external:better-sqlite3 --external:electron --outfile=src/tests/.sqlite-bundle.mjs --log-level=error && npm rebuild better-sqlite3 --silent && node --test src/tests/sqlite-e2e.mjs; electron-builder install-app-deps",
-    "test:db": "docker compose -f src/tests/docker-compose.yml up -d --wait && npm run test:mysql && npm run test:postgres && npm run test:mongo && npm run test:sqlite",
+    "test:db": "docker compose -f src/tests/docker-compose.yml up -d --wait && npm run test:mysql && npm run test:postgres && npm run test:mongo && npm run test:redis && npm run test:sqlite",
     "icons": "node scripts/build-icons.mjs",
     "mac": "npm run build && node scripts/clean-dmg-mounts.mjs && electron-builder --mac --config electron-builder.yml --publish never --arm64 --config.dmg.title=\"Vela Studio arm64\" && node scripts/clean-dmg-mounts.mjs && electron-builder --mac --config electron-builder.yml --publish never --x64 --config.dmg.title=\"Vela Studio x64\"",
     "win": "npm run build && electron-builder --win --config electron-builder.yml --publish never",
@@ -40,6 +41,7 @@
   },
   "dependencies": {
     "better-sqlite3": "^11.7.0",
+    "ioredis": "^6.0.0",
     "mongodb": "^6.12.0",
     "mysql2": "^3.12.0",
     "pg": "^8.13.1"

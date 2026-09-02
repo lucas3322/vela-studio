@@ -3,10 +3,10 @@
  * Se um tipo atravessa o IPC, ele mora aqui.
  */
 
-export type DriverId = 'mysql' | 'postgres' | 'sqlite' | 'mongodb'
+export type DriverId = 'mysql' | 'postgres' | 'sqlite' | 'mongodb' | 'redis'
 
 /** Dialeto usado pelo editor para escolher keywords, funções e regras de citação. */
-export type Dialect = 'mysql' | 'postgres' | 'sqlite' | 'mongodb'
+export type Dialect = 'mysql' | 'postgres' | 'sqlite' | 'mongodb' | 'redis'
 
 export interface ConnectionConfig {
   id: string
@@ -208,6 +208,17 @@ export const DRIVERS: Record<DriverId, DriverMeta> = {
     family: 'nosql',
     fields: ['connectionString', 'host', 'port', 'user', 'password', 'database'],
     accent: '#00ed64'
+  },
+  redis: {
+    id: 'redis',
+    label: 'Redis',
+    dialect: 'redis',
+    defaultPort: 6379,
+    family: 'nosql',
+    // `database` aqui é o índice numérico do banco Redis (0-15), não um nome —
+    // o formulário precisa rotular o campo de forma diferente para este driver.
+    fields: ['connectionString', 'host', 'port', 'user', 'password', 'database', 'ssl'],
+    accent: '#dc382d'
   }
 }
 

@@ -145,7 +145,13 @@ export function HelpPanel(): React.JSX.Element {
         ))}
 
         {grouped.length === 0 && (
-          <div className="tree-empty">Nenhuma receita encontrada para "{filter}".</div>
+          <div className="tree-empty">
+            {filter.trim()
+              ? `Nenhuma receita encontrada para "${filter}".`
+              : dialect === 'redis'
+                ? 'Ainda não temos receitas prontas para Redis — use o guia rápido abaixo.'
+                : 'Nenhuma receita disponível para este banco ainda.'}
+          </div>
         )}
 
         <div style={{ padding: 'var(--space-3)' }}>
@@ -154,7 +160,7 @@ export function HelpPanel(): React.JSX.Element {
             style={{ width: '100%' }}
             onClick={() => openModal('cheatsheet')}
           >
-            Guia rápido de SQL
+            Guia rápido de {dialect === 'redis' ? 'Redis' : dialect === 'mongodb' ? 'MongoDB' : 'SQL'}
           </button>
         </div>
       </div>

@@ -1,7 +1,7 @@
 import type { ColumnInfo, Dialect, TableInfo } from '@shared/types'
 import { monaco } from './monaco-setup'
 import { analyze, resolveQualifier, type SqlContext } from './sql-context'
-import { SQL_DOCS, MONGO_DOCS, lookupDoc } from './sql-docs'
+import { SQL_DOCS, MONGO_DOCS, REDIS_COMMANDS, REDIS_DOCS, lookupDoc } from './sql-docs'
 
 export interface SchemaProvider {
   tables: TableInfo[]
@@ -265,9 +265,13 @@ function functionItems(range: monaco.IRange): monaco.languages.CompletionItem[] 
   })
 }
 
-function renderDoc(term: string, doc: { detail: string; example?: string; gotcha?: string }): string {
+function renderDoc(
+  term: string,
+  doc: { detail: string; example?: string; gotcha?: string },
+  exampleLang = 'sql'
+): string {
   const parts = [doc.detail]
-  if (doc.example) parts.push('', '```sql', doc.example, '```')
+  if (doc.example) parts.push('', '```' + exampleLang, doc.example, '```')
   if (doc.gotcha) parts.push('', `⚠️ ${doc.gotcha}`)
   return parts.join('\n')
 }
@@ -388,6 +392,47 @@ export function registerMongoCompletion(getSchema: SchemaAccessor): monaco.IDisp
   })
 }
 
+/**
+ * Autocomplete para o console de comandos Redis.
+ *
+ * Bem mais simples que SQL: não há cláusula nem qualificador, o statement é
+ * um comando por vez. Uma lista de nomes de comando por prefixo já cobre a
+ * maior parte do valor — sem sensibilidade a posição de argumento nesta
+ * primeira versão.
+ */
+export function registerRedisCompletion(getSchema: SchemaAccessor): monaco.IDisposable {
+  return monaco.languages.registerCompletionItemProvider('redis', {
+    triggerCharacters: [' '],
+
+    provideCompletionItems(model, position) {
+      const schema = getSchema()
+      if (!schema || schema.dialect !== 'redis') return { suggestions: [] }
+
+      const word = model.getWordUntilPosition(position)
+      const range: monaco.IRange = {
+        startLineNumber: position.lineNumber,
+        endLineNumber: position.lineNumber,
+        startColumn: word.startColumn,
+        endColumn: word.endColumn
+      }
+
+      return {
+        suggestions: REDIS_COMMANDS.map((command, i) => {
+          const doc = REDIS_DOCS[command]
+          return {
+            label: { label: command, description: doc?.summary ?? 'comando Redis' },
+            kind: monaco.languages.CompletionItemKind.Function,
+            insertText: command,
+            range,
+            sortText: String(i).padStart(3, '0'),
+            documentation: doc ? { value: renderDoc(command, doc, '') } : undefined
+          }
+        })
+      }
+    }
+  })
+}
+
 /** Hover: passar o mouse em qualquer palavra explica o que ela faz. */
 export function registerHover(getSchema: SchemaAccessor, language: string): monaco.IDisposable {
   return monaco.languages.registerHoverProvider(language, {
@@ -396,7 +441,16 @@ export function registerHover(getSchema: SchemaAccessor, language: string): mona
       if (!word) return null
 
       const schema = getSchema()
-      const dialect = schema?.dialect ?? 'mysql'
+      /**
+       * A linguagem do modelo já determina o dialeto sem ambiguidade para
+       * Redis e Mongo — `language` nunca é 'redis' nem 'javascript' fora
+       * desses dois casos. Não confiamos só no `schema?.dialect` aqui: ele
+       * pode estar um passo atrás (schema ainda carregando) e, se caísse no
+       * padrão `mysql`, um hover em `SET` num documento Redis mostraria a
+       * explicação do `SET` do SQL — exatamente o tipo de informação errada
+       * que este hover existe para evitar.
+       */
+      const dialect = language === 'redis' ? 'redis' : language === 'javascript' ? 'mongodb' : (schema?.dialect ?? 'mysql')
       const line = model.getLineContent(position.lineNumber)
 
       // Palavras compostas primeiro: "GROUP BY" vale mais que "GROUP".
@@ -404,11 +458,12 @@ export function registerHover(getSchema: SchemaAccessor, language: string): mona
       const doc = lookupDoc(compound ?? word.word, dialect)
 
       if (doc) {
+        const fenceLang = dialect === 'redis' ? '' : dialect === 'mongodb' ? 'javascript' : 'sql'
         const contents: monaco.IMarkdownString[] = [
           { value: `**${compound ?? word.word.toUpperCase()}** — ${doc.summary}` },
           { value: doc.detail }
         ]
-        if (doc.example) contents.push({ value: '```sql\n' + doc.example + '\n```' })
+        if (doc.example) contents.push({ value: '```' + fenceLang + '\n' + doc.example + '\n```' })
         if (doc.gotcha) contents.push({ value: `⚠️ **Atenção:** ${doc.gotcha}` })
         return { contents }
       }

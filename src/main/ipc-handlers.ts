@@ -209,7 +209,13 @@ export function registerIpcHandlers(manager: ConnectionManager, store: Connectio
         // bloqueia é qualquer escrita. Com o predicado antigo, um
         // `UPDATE ... WHERE id = 1` passava por aqui — os drivers ainda
         // barravam, mas a checagem dizia outra coisa do que fazia.
-        if (config.readOnly && config.driver !== 'mongodb') {
+        //
+        // Mongo e Redis ficam de fora: `isMutation` reconhece a *forma* do
+        // SQL (INSERT/UPDATE/DELETE…), e nenhum dos dois fala SQL. Sem essa
+        // exclusão, todo comando dos dois passaria batido aqui — não porque
+        // fosse seguro, mas porque a checagem estaria fazendo a pergunta
+        // errada. A guarda de verdade para esses dois vive no próprio driver.
+        if (config.readOnly && config.driver !== 'mongodb' && config.driver !== 'redis') {
           for (const statement of splitStatements(params.sql)) {
             if (isMutation(statement)) {
               throw new Error('Conexão em modo somente-leitura: comandos de escrita estão bloqueados.')

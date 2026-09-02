@@ -506,10 +506,175 @@ export const MONGO_DOCS: Record<string, SqlDoc> = {
   countDocuments: { category: 'funcao', summary: 'Conta documentos', detail: 'Contagem exata que respeita o filtro.', example: 'db.pedidos.countDocuments({ status: "pago" })' }
 }
 
+/**
+ * Nomes de comando Redis para autocomplete — lista fechada, sem sensibilidade
+ * a posição de argumento. Cobre a maior parte do valor de um autocomplete
+ * neste console, que aceita um comando bruto por statement.
+ */
+export const REDIS_COMMANDS = [
+  'GET', 'SET', 'DEL', 'EXISTS', 'EXPIRE', 'PERSIST', 'TTL', 'PTTL', 'TYPE',
+  'KEYS', 'SCAN', 'HGET', 'HSET', 'HGETALL', 'HDEL', 'HKEYS', 'HVALS',
+  'LPUSH', 'RPUSH', 'LRANGE', 'LLEN', 'SADD', 'SREM', 'SMEMBERS', 'SCARD',
+  'ZADD', 'ZRANGE', 'ZSCORE', 'ZREM', 'INCR', 'DECR', 'RENAME'
+]
+
+/**
+ * Documentação dos comandos Redis mais usados, no mesmo espírito do
+ * `SQL_DOCS`. Não é exaustiva — cobre os comandos com pegadinha real ou que
+ * aparecem toda hora. Comando sem entrada aqui simplesmente não tem hover,
+ * o que é melhor do que herdar por engano a explicação de uma palavra-chave
+ * SQL de mesmo nome (`SET`, por exemplo, existe nos dois mundos).
+ */
+export const REDIS_DOCS: Record<string, SqlDoc> = {
+  GET: {
+    category: 'funcao',
+    summary: 'Lê o valor de uma chave string',
+    detail: 'Devolve o valor associado à chave, ou nulo se ela não existir.',
+    example: 'GET sessao:abc123',
+    gotcha: 'Contra uma chave de outro tipo (hash, lista, set) devolve erro `WRONGTYPE` em vez de nulo.'
+  },
+  SET: {
+    category: 'funcao',
+    summary: 'Grava o valor de uma chave string',
+    detail: 'Cria ou substitui o valor da chave, apagando qualquer TTL anterior por padrão.',
+    example: 'SET sessao:abc123 "valor com espaço"',
+    gotcha: 'Sobrescreve o TTL existente, a não ser que você use `KEEPTTL`. Um `SET` "inofensivo" pode tornar uma chave permanente sem querer.'
+  },
+  DEL: {
+    category: 'funcao',
+    summary: 'Remove uma ou mais chaves',
+    detail: 'Apaga as chaves informadas, de qualquer tipo. Chave inexistente é ignorada, sem erro.',
+    example: 'DEL sessao:abc123 sessao:def456',
+    gotcha: 'Não há confirmação nem desfazer — a chave some na hora.'
+  },
+  EXISTS: {
+    category: 'funcao',
+    summary: 'Verifica se a chave existe',
+    detail: 'Devolve quantas das chaves informadas existem no banco atual.',
+    example: 'EXISTS sessao:abc123'
+  },
+  EXPIRE: {
+    category: 'funcao',
+    summary: 'Define o TTL de uma chave, em segundos',
+    detail: 'A chave é apagada automaticamente depois do tempo informado.',
+    example: 'EXPIRE sessao:abc123 3600',
+    gotcha: 'Um `SET` posterior na mesma chave remove esse TTL, a menos que use `KEEPTTL`.'
+  },
+  PERSIST: {
+    category: 'funcao',
+    summary: 'Remove o TTL de uma chave',
+    detail: 'A chave deixa de expirar e passa a durar até ser apagada explicitamente.',
+    example: 'PERSIST sessao:abc123'
+  },
+  TTL: {
+    category: 'funcao',
+    summary: 'Tempo restante até a chave expirar, em segundos',
+    detail: 'Devolve o TTL da chave.',
+    example: 'TTL sessao:abc123',
+    gotcha: '`-1` significa chave sem expiração; `-2` significa que a chave não existe. Os dois são fáceis de confundir com "zero segundos restantes".'
+  },
+  PTTL: {
+    category: 'funcao',
+    summary: 'Igual a TTL, mas em milissegundos',
+    detail: 'Mesma semântica do `TTL`, com mais precisão.',
+    example: 'PTTL sessao:abc123'
+  },
+  TYPE: {
+    category: 'funcao',
+    summary: 'Tipo de dado armazenado na chave',
+    detail: 'Devolve `string`, `hash`, `list`, `set`, `zset` ou `none` se a chave não existir.',
+    example: 'TYPE sessao:abc123'
+  },
+  KEYS: {
+    category: 'funcao',
+    summary: 'Lista chaves que casam com um padrão',
+    detail: 'Percorre todo o espaço de chaves do banco atual procurando o padrão informado.',
+    example: 'KEYS sessao:*',
+    gotcha: 'Bloqueia o servidor inteiro enquanto roda — em produção, com muitas chaves, é um comando perigoso. Prefira `SCAN`, que varre em lotes sem travar o Redis.'
+  },
+  SCAN: {
+    category: 'funcao',
+    summary: 'Percorre as chaves em lotes, sem travar o servidor',
+    detail: 'Devolve um cursor e um lote de chaves; repita com o cursor devolvido até ele voltar a `0`.',
+    example: 'SCAN 0 MATCH sessao:* COUNT 100',
+    gotcha: 'Como a varredura é incremental, uma chave pode aparecer mais de uma vez ou nenhuma se o banco mudar durante o scan — não é uma foto instantânea.'
+  },
+  HGETALL: {
+    category: 'funcao',
+    summary: 'Todos os campos e valores de um hash',
+    detail: 'Devolve o hash inteiro como pares campo/valor.',
+    example: 'HGETALL usuario:42',
+    gotcha: 'Contra um hash muito grande, prefira `HSCAN` para não bloquear o servidor com uma resposta enorme de uma vez.'
+  },
+  HSET: {
+    category: 'funcao',
+    summary: 'Define um ou mais campos de um hash',
+    detail: 'Cria o hash se não existir, e sobrescreve os campos informados sem afetar os demais.',
+    example: 'HSET usuario:42 nome "Ana" ativo "true"'
+  },
+  LPUSH: {
+    category: 'funcao',
+    summary: 'Insere no início de uma lista',
+    detail: 'Cria a lista se não existir. `RPUSH` insere no fim.',
+    example: 'LPUSH fila:emails "novo@exemplo.com"'
+  },
+  LRANGE: {
+    category: 'funcao',
+    summary: 'Lê um intervalo de uma lista',
+    detail: 'Índices começam em `0`; `-1` é o último elemento.',
+    example: 'LRANGE fila:emails 0 -1',
+    gotcha: '`LRANGE chave 0 -1` lê a lista inteira — em uma lista muito grande, isso pode ser uma resposta pesada.'
+  },
+  SADD: {
+    category: 'funcao',
+    summary: 'Adiciona membros a um set',
+    detail: 'Cria o set se não existir. Membros repetidos são ignorados silenciosamente — um set não tem duplicata.',
+    example: 'SADD tags:post42 "sql" "redis"'
+  },
+  SMEMBERS: {
+    category: 'funcao',
+    summary: 'Todos os membros de um set',
+    detail: 'Devolve o set inteiro, em ordem não garantida.',
+    example: 'SMEMBERS tags:post42'
+  },
+  ZADD: {
+    category: 'funcao',
+    summary: 'Adiciona membros a um sorted set, com pontuação',
+    detail: 'A pontuação (`score`) define a ordem. Membro repetido tem a pontuação atualizada, em vez de duplicar.',
+    example: 'ZADD ranking 100 "jogador1"'
+  },
+  ZRANGE: {
+    category: 'funcao',
+    summary: 'Lê um intervalo de um sorted set, por posição',
+    detail: 'Ordena por pontuação crescente. Use `REV` para decrescente.',
+    example: 'ZRANGE ranking 0 -1 WITHSCORES'
+  },
+  INCR: {
+    category: 'funcao',
+    summary: 'Incrementa uma chave numérica em 1',
+    detail: 'Cria a chave com valor `1` se ela ainda não existir.',
+    example: 'INCR visualizacoes:post42',
+    gotcha: 'Contra uma chave que não guarda um inteiro, devolve erro em vez de tratar como zero.'
+  },
+  RENAME: {
+    category: 'funcao',
+    summary: 'Renomeia uma chave',
+    detail: 'A chave nova recebe o valor e o TTL da chave antiga.',
+    example: 'RENAME sessao:antiga sessao:nova',
+    gotcha: 'Se o novo nome já existir, ele é sobrescrito sem aviso.'
+  }
+}
+
 /** Busca a doc de um termo, tolerando maiúsculas e palavras compostas. */
 export function lookupDoc(word: string, dialect: string): SqlDoc | undefined {
   if (dialect === 'mongodb') {
     return MONGO_DOCS[word] ?? MONGO_DOCS[word.toLowerCase()]
+  }
+  if (dialect === 'redis') {
+    // Nunca cai no SQL_DOCS: `SET`, por exemplo, existe nos dois dicionários
+    // com sentidos diferentes, e mostrar a explicação errada é pior que não
+    // mostrar nenhuma.
+    return REDIS_DOCS[word.toUpperCase()]
   }
   return SQL_DOCS[word.toUpperCase()]
 }

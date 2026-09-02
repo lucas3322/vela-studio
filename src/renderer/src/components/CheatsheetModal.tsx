@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { DRIVERS } from '@shared/types'
-import { MONGO_DOCS, SQL_DOCS, type SqlDoc } from '../editor/sql-docs'
+import { MONGO_DOCS, REDIS_DOCS, SQL_DOCS, type SqlDoc } from '../editor/sql-docs'
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
 import { IconClose, IconSearch, IconWarning } from './Icons'
@@ -22,13 +22,17 @@ const CATEGORY_LABELS: Record<SqlDoc['category'], string> = {
 export function CheatsheetModal(): React.JSX.Element {
   const closeModal = useAppStore((s) => s.closeModal)
   const connection = useConnectionStore((s) => s.saved.find((c) => c.id === s.activeId))
-  const isMongo = connection ? DRIVERS[connection.driver].dialect === 'mongodb' : false
+  const dialeto = connection ? DRIVERS[connection.driver].dialect : undefined
+  const isMongo = dialeto === 'mongodb'
+  const isRedis = dialeto === 'redis'
 
   const [filter, setFilter] = useState('')
-  const [source, setSource] = useState<'sql' | 'mongo'>(isMongo ? 'mongo' : 'sql')
+  const [source, setSource] = useState<'sql' | 'mongo' | 'redis'>(
+    isRedis ? 'redis' : isMongo ? 'mongo' : 'sql'
+  )
 
   const entries = useMemo(() => {
-    const dictionary = source === 'mongo' ? MONGO_DOCS : SQL_DOCS
+    const dictionary = source === 'mongo' ? MONGO_DOCS : source === 'redis' ? REDIS_DOCS : SQL_DOCS
     const term = filter.trim().toLowerCase()
     const list = Object.entries(dictionary).filter(
       ([term_, doc]) =>
@@ -54,7 +58,9 @@ export function CheatsheetModal(): React.JSX.Element {
           <div>
             <div className="modal__title">Guia rápido</div>
             <div className="modal__subtitle">
-              Todo comando explicado em português, com exemplo e a pegadinha de cada um.
+              {source === 'redis'
+                ? 'Todo comando explicado em português, com exemplo e a pegadinha de cada um. Vários comandos no editor se separam por ";", um por statement.'
+                : 'Todo comando explicado em português, com exemplo e a pegadinha de cada um.'}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
@@ -64,6 +70,9 @@ export function CheatsheetModal(): React.JSX.Element {
               </button>
               <button data-active={source === 'mongo'} onClick={() => setSource('mongo')}>
                 MongoDB
+              </button>
+              <button data-active={source === 'redis'} onClick={() => setSource('redis')}>
+                Redis
               </button>
             </div>
             <button className="icon-btn" onClick={closeModal}>

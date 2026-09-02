@@ -123,15 +123,18 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
 
   const dialect = connection ? DRIVERS[connection.driver].dialect : 'mysql'
 
-  // SQLite não tem ALTER COLUMN e o Mongo não tem tipo de coluna. Em vez de
-  // oferecer e falhar no clique, o campo já vem desabilitado com o motivo.
+  // SQLite não tem ALTER COLUMN, e Mongo e Redis não têm tipo de coluna. Em
+  // vez de oferecer e falhar no clique, o campo já vem desabilitado com o
+  // motivo.
   const motivoSemAlterar = connection?.readOnly
     ? 'conexão somente leitura'
     : dialect === 'sqlite'
       ? 'o SQLite não altera tipo de coluna'
       : dialect === 'mongodb'
         ? 'o MongoDB não tem tipo de coluna'
-        : undefined
+        : dialect === 'redis'
+          ? 'o Redis não tem tipo de coluna'
+          : undefined
   const podeAlterarTipo = !motivoSemAlterar
 
   useEffect(() => {
@@ -166,7 +169,11 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
               // que errar na prévia.
               montarFiltroMongo(filtro, Object.fromEntries(columns.map((c) => [c.name, c.type])))
             )
-          : montarSelect(table, dialect, ordemEfetiva, limite, salto, montarWhere(filtro, dialect))
+          : dialect === 'redis'
+            ? // O único filtro é a `key`: FiltroDeChaveRedis sempre manda uma
+              // condição única com `coluna: 'key'`, cujo `valor` é o padrão glob.
+              montarScanRedis(table, filtro[0]?.valor ?? '', limite, salto)
+            : montarSelect(table, dialect, ordemEfetiva, limite, salto, montarWhere(filtro, dialect))
 
       try {
         const [outcome, cols, idx, rels] = await Promise.all([
@@ -369,6 +376,14 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
                 // Reordenar remonta o resultado e levaria as pendências junto.
                 if (pendencias > 0) {
                   notify('Confirme ou descarte as alterações antes de reordenar.', 'danger')
+                  return
+                }
+                // O SCAN do Redis não tem ORDER BY equivalente: a ordem das
+                // chaves não é estável nem escolhível. Sem esta guarda, a
+                // seta de ordenação ficaria acesa no cabeçalho sem que os
+                // dados realmente mudassem de ordem — um "ordenado" que mente.
+                if (dialect === 'redis') {
+                  notify('O Redis não ordena chaves: o SCAN não garante nem aceita ordem.', 'info')
                   return
                 }
                 setOrdem(nova)
@@ -583,7 +598,12 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
         <InsertRowDialog
           tabela={table}
           colunas={columns}
-          semSchema={dialect === 'mongodb'}
+          semSchema={dialect === 'mongodb' || dialect === 'redis'}
+          avisoSemSchema={
+            dialect === 'redis'
+              ? 'O Redis não declara schema, mas estas 3 colunas são fixas: key, value (texto puro em "strings"; JSON da estrutura nas demais pseudo-tabelas) e ttl (segundos até expirar, ou vazio para nunca expirar).'
+              : undefined
+          }
           onCancel={() => setInserindo(false)}
           onInserir={async (valores) => {
             if (!connectionId) return
@@ -652,6 +672,12 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
                 <>
                   <br />
                   O MongoDB não declara relações — elas ficam na aplicação.
+                </>
+              )}
+              {dialect === 'redis' && (
+                <>
+                  <br />
+                  O Redis não tem relação entre chaves.
                 </>
               )}
             </div>
@@ -733,6 +759,35 @@ function montarFind(
     : ''
   const pulo = salto > 0 ? `.skip(${salto})` : ''
   return `db.${table}.find(${filtro})${ordenacao}${pulo}.limit(${limite})`
+}
+
+/** Tipo Redis correspondente a cada pseudo-tabela sintetizada pelo driver. */
+const TIPO_REDIS_POR_PSEUDOTABELA: Record<string, string> = {
+  strings: 'string',
+  hashes: 'hash',
+  lists: 'list',
+  sets: 'set',
+  'sorted-sets': 'zset'
+}
+
+/**
+ * Comando Redis equivalente ao `SELECT` paginado dos outros drivers.
+ *
+ * O Redis não tem `OFFSET` de verdade: `SCAN` devolve um cursor opaco, não
+ * uma posição, e a ordem das chaves não é estável entre chamadas. Como a
+ * grade desta IDE pagina por página+tamanho fixos — igual aos drivers SQL —,
+ * pedimos ao driver os primeiros `salto + limite` resultados a partir do
+ * cursor `0`; cabe a ele cortar a página em vista, do mesmo jeito que o
+ * `LIMIT/OFFSET` de SQL corta depois do `ORDER BY`. É uma aproximação sabida
+ * como imperfeita: sem um cursor real chegando ao renderer, não existe forma
+ * de pedir "a próxima leva" sem reler tudo desde o início. `TYPE` restringe
+ * ao tipo Redis desta pseudo-tabela; `MATCH` é o único filtro que o Redis
+ * aceita aqui, porque não há índice secundário por campo.
+ */
+function montarScanRedis(table: string, padraoDeChave: string, limite: number, salto: number): string {
+  const tipo = TIPO_REDIS_POR_PSEUDOTABELA[table] ?? table
+  const padrao = padraoDeChave.trim() || '*'
+  return `SCAN 0 MATCH ${padrao} TYPE ${tipo} COUNT ${salto + limite}`
 }
 
 /**

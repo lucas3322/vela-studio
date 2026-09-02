@@ -69,6 +69,20 @@ export function SchemaModelList(): React.JSX.Element {
     )
   }
 
+  // Chave do Redis não referencia outra chave — não existe FK declarada nem
+  // um nome de campo plausível para deduzir ligação, porque as 3 colunas das
+  // pseudo-tabelas (key, value, ttl) são sempre as mesmas em todas elas. Rodar
+  // a inferência aqui só produziria ruído, então a aba nem chega a montar o
+  // grafo: diz de saída que não há o que modelar, em vez de abrir vazia.
+  if (conexao?.driver === 'redis') {
+    return (
+      <div className="modelo-lista__nota">
+        <IconWarning size={13} />
+        <span>O Redis não tem relação entre chaves — não há o que modelar aqui.</span>
+      </div>
+    )
+  }
+
   const semLigacao = grafo ? grafo.arestas.length === 0 : true
 
   return (

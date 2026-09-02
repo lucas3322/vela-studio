@@ -162,6 +162,34 @@ const rules: Rule[] = [
       friendly: `O MongoDB rejeitou o operador usado: ${e.message}`,
       hint: 'Operadores começam com $ e vão dentro do objeto de filtro: { idade: { $gt: 18 } }.'
     })
+  },
+  {
+    match: (e) => /NOAUTH/i.test(e.message),
+    translate: () => ({
+      friendly: 'O Redis exige autenticação e nenhuma senha foi enviada.',
+      hint: 'Abra a conexão, informe a senha (ou o `requirepass` do servidor) e marque "Salvar senha".'
+    })
+  },
+  {
+    match: (e) => /WRONGTYPE/i.test(e.message),
+    translate: () => ({
+      friendly: 'O comando não combina com o tipo de dado guardado nessa chave.',
+      hint: 'Confira o tipo com `TYPE chave` antes de operar — `GET` só funciona em string, `HGET` só em hash, e assim por diante.'
+    })
+  },
+  {
+    match: (e) => /ERR wrong number of arguments/i.test(e.message),
+    translate: (e) => ({
+      friendly: 'Faltam ou sobram argumentos para esse comando Redis.',
+      hint: `Confira a sintaxe do comando: ${e.message.replace(/^ERR\s*/i, '')}`
+    })
+  },
+  {
+    match: (e) => /ERR unknown command/i.test(e.message),
+    translate: (e) => ({
+      friendly: `O Redis não reconhece esse comando: ${extractQuoted(e.message) ?? e.message}`,
+      hint: 'Confira a grafia — comandos Redis não diferenciam maiúsculas de minúsculas, mas precisam existir na versão do servidor.'
+    })
   }
 ]
 

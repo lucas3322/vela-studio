@@ -78,5 +78,8 @@ const TIPOS: Record<string, string[]> = {
   postgres: POSTGRES,
   sqlite: SQLITE,
   // MongoDB não tem tipo de coluna: o tipo vive em cada documento.
-  mongodb: []
+  mongodb: [],
+  // Redis também não: as 3 colunas das pseudo-tabelas (key, value, ttl) são
+  // fixas, mas sem tipo declarado para alterar.
+  redis: []
 }

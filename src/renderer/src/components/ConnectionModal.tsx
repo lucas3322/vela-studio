@@ -244,7 +244,11 @@ export function ConnectionModal(): React.JSX.Element {
                     >
                       <span className="driver-card__name">{driver.label}</span>
                       <span className="driver-card__family">
-                        {driver.family === 'sql' ? 'relacional' : 'documentos'}
+                        {driver.family === 'sql'
+                          ? 'relacional'
+                          : driver.id === 'redis'
+                            ? 'chave-valor'
+                            : 'documentos'}
                       </span>
                     </button>
                   ))}
@@ -311,13 +315,17 @@ export function ConnectionModal(): React.JSX.Element {
                     placeholder={
                       config.driver === 'mongodb'
                         ? 'mongodb+srv://usuario:senha@cluster.mongodb.net'
-                        : 'postgresql://usuario:senha@host:5432/banco'
+                        : config.driver === 'redis'
+                          ? 'redis://usuario:senha@host:6379/0'
+                          : 'postgresql://usuario:senha@host:5432/banco'
                     }
                     value={config.connectionString ?? ''}
                     onChange={(e) => update({ connectionString: e.target.value })}
                   />
                   <span className="field__hint">
-                    Preenchendo aqui, os campos abaixo são ignorados.
+                    {config.driver === 'redis'
+                      ? 'Preenchendo aqui, os campos abaixo são ignorados. Use rediss:// para TLS.'
+                      : 'Preenchendo aqui, os campos abaixo são ignorados.'}
                   </span>
                 </div>
               )}
@@ -409,11 +417,13 @@ export function ConnectionModal(): React.JSX.Element {
               {shows('database') && (
                 <div className="field">
                   <span className="field__label">
-                    Banco {config.driver === 'mongodb' ? '' : 'padrão'}
+                    {config.driver === 'redis'
+                      ? 'Índice do banco (0–15)'
+                      : `Banco ${config.driver === 'mongodb' ? '' : 'padrão'}`}
                   </span>
                   <input
                     className="input"
-                    placeholder="deixe vazio para escolher depois"
+                    placeholder={config.driver === 'redis' ? '0' : 'deixe vazio para escolher depois'}
                     value={config.database ?? ''}
                     onChange={(e) => update({ database: e.target.value })}
                   />

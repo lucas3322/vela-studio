@@ -12,6 +12,14 @@ import { splitStatements, isMutation, isUnboundedMutation } from '../shared/sql-
 import { translateError, nearest } from '../main/error-translator.ts'
 import { parseMongoCommand, splitMongoCommands } from '../main/drivers/mongo-parser.ts'
 import {
+  extractMatchPattern,
+  isPseudoTableName,
+  isRedisWrite,
+  redisTypeForTable,
+  tableForRedisType,
+  tokenizeRedisCommand
+} from '../main/drivers/redis-parser.ts'
+import {
   analyze,
   extractTables,
   resolveQualifier,
@@ -155,6 +163,19 @@ test('mantém a mensagem crua quando não reconhece o erro', () => {
   assert.equal(result.raw, 'algo muito específico')
 })
 
+test('traduz NOAUTH do Redis', () => {
+  const result = translateError(new Error('NOAUTH Authentication required.'), { driver: 'redis' })
+  assert.match(result.friendly, /autenticação/)
+})
+
+test('traduz WRONGTYPE do Redis', () => {
+  const result = translateError(
+    new Error('WRONGTYPE Operation against a key holding the wrong kind of value'),
+    { driver: 'redis' }
+  )
+  assert.match(result.friendly, /tipo de dado/)
+})
+
 test('só sugere nome quando está de fato próximo', () => {
   assert.equal(nearest('contract', ['contracts', 'accounts']), 'contracts')
   assert.equal(nearest('zzzzzz', ['contracts', 'accounts']), undefined)
@@ -209,6 +230,95 @@ test('recusa comando que não começa em db', () => {
 test('separa múltiplos comandos mongo', () => {
   const commands = splitMongoCommands('db.a.find({});\ndb.b.countDocuments({})')
   assert.deepEqual(commands, ['db.a.find({})', 'db.b.countDocuments({})'])
+})
+
+// ── parser do Redis ──────────────────────────────────────────────────
+
+test('tokeniza comando simples por espaço', () => {
+  assert.deepEqual(tokenizeRedisCommand('SET foo bar'), ['SET', 'foo', 'bar'])
+})
+
+test('tokeniza argumento entre aspas duplas com espaço', () => {
+  assert.deepEqual(tokenizeRedisCommand('SET "minha chave" "hello world"'), [
+    'SET',
+    'minha chave',
+    'hello world'
+  ])
+})
+
+test('tokeniza argumento entre aspas simples', () => {
+  assert.deepEqual(tokenizeRedisCommand("SET 'minha chave' 'valor com espaço'"), [
+    'SET',
+    'minha chave',
+    'valor com espaço'
+  ])
+})
+
+test('aspa escapada por barra invertida não fecha o token', () => {
+  assert.deepEqual(tokenizeRedisCommand('SET k "a\\"b"'), ['SET', 'k', 'a"b'])
+})
+
+test('ignora espaço múltiplo entre tokens', () => {
+  assert.deepEqual(tokenizeRedisCommand('  GET    foo  '), ['GET', 'foo'])
+})
+
+test('comando vazio tokeniza para lista vazia', () => {
+  assert.deepEqual(tokenizeRedisCommand('   '), [])
+})
+
+test('classifica comandos de leitura conhecidos', () => {
+  for (const cmd of ['GET', 'get', 'HGETALL', 'SMEMBERS', 'SCAN', 'TTL', 'PING', 'ZRANGE']) {
+    assert.equal(isRedisWrite(cmd), false, cmd)
+  }
+})
+
+test('classifica comandos de escrita conhecidos', () => {
+  for (const cmd of ['SET', 'DEL', 'HSET', 'RPUSH', 'SADD', 'ZADD', 'EXPIRE', 'PERSIST', 'FLUSHDB']) {
+    assert.equal(isRedisWrite(cmd), true, cmd)
+  }
+})
+
+test('comando desconhecido é tratado como escrita por padrão', () => {
+  // A escolha do produto: bloquear por engano um comando seguro incomoda;
+  // deixar passar uma escrita disfarçada corrompe dado. O viés é sempre
+  // para o lado que avisa.
+  assert.equal(isRedisWrite('COMANDO_FUTURO_QUE_NAO_EXISTE_AINDA'), true)
+})
+
+test('CONFIG é escrita mesmo que o subcomando seja GET', () => {
+  // A classificação olha só o primeiro token — CONFIG SET é escrita e
+  // CONFIG GET é leitura, mas o classificador não vê o segundo argumento,
+  // então o lado seguro é tratar CONFIG inteiro como escrita.
+  assert.equal(isRedisWrite('CONFIG'), true)
+})
+
+test('mapeia pseudo-tabela para o tipo Redis correspondente', () => {
+  assert.equal(redisTypeForTable('strings'), 'string')
+  assert.equal(redisTypeForTable('hashes'), 'hash')
+  assert.equal(redisTypeForTable('lists'), 'list')
+  assert.equal(redisTypeForTable('sets'), 'set')
+  assert.equal(redisTypeForTable('sorted-sets'), 'zset')
+})
+
+test('nome de pseudo-tabela não diferencia caixa', () => {
+  assert.equal(redisTypeForTable('Strings'), 'string')
+  assert.equal(isPseudoTableName('HASHES'), true)
+})
+
+test('pseudo-tabela desconhecida lança erro explicando as opções', () => {
+  assert.throws(() => redisTypeForTable('tabelas'), /não é uma pseudo-tabela/)
+})
+
+test('mapeia tipo Redis de volta para a pseudo-tabela', () => {
+  assert.equal(tableForRedisType('zset'), 'sorted-sets')
+  assert.equal(tableForRedisType('string'), 'strings')
+  assert.equal(tableForRedisType('stream'), undefined)
+})
+
+test('extractMatchPattern acha o padrão depois de MATCH', () => {
+  assert.equal(extractMatchPattern(['MATCH', 'user:*']), 'user:*')
+  assert.equal(extractMatchPattern(['match', 'foo*']), 'foo*')
+  assert.equal(extractMatchPattern(['COUNT', '10']), undefined)
 })
 
 // ── formatador ───────────────────────────────────────────────────────

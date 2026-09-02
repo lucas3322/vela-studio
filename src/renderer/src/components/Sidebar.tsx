@@ -29,6 +29,15 @@ import {
 
 const numberFormat = new Intl.NumberFormat('pt-BR', { notation: 'compact' })
 
+/** Tipo Redis correspondente a cada pseudo-tabela sintetizada pelo driver. */
+const TIPO_REDIS_POR_PSEUDOTABELA: Record<string, string> = {
+  strings: 'string',
+  hashes: 'hash',
+  lists: 'list',
+  sets: 'set',
+  'sorted-sets': 'zset'
+}
+
 interface DangerState {
   kind: 'truncate' | 'drop'
   table: string
@@ -64,6 +73,7 @@ export function Sidebar(): React.JSX.Element {
 
   const dialect = connection ? DRIVERS[connection.driver].dialect : 'mysql'
   const isMongo = dialect === 'mongodb'
+  const isRedis = dialect === 'redis'
 
   // Trocar de conexão zera o que estava aberto — os nomes não valem mais.
   useEffect(() => {
@@ -137,6 +147,20 @@ export function Sidebar(): React.JSX.Element {
   const quote = (name: string): string =>
     dialect === 'mysql' ? `\`${name}\`` : `"${name}"`
 
+  /**
+   * `SCAN` equivalente ao `SELECT * FROM tabela LIMIT 100` das outras abas.
+   *
+   * Cada pseudo-tabela Redis representa um tipo (`strings`, `hashes`…), e o
+   * driver espera comandos brutos no console — não há um "nome de tabela"
+   * real para citar. `MATCH *` traz qualquer chave; `TYPE` restringe ao tipo
+   * desta pseudo-tabela, e `COUNT` é só uma dica de tamanho de lote, não um
+   * limite garantido — o Redis pode devolver menos, nunca mais que existir.
+   */
+  const comandoScanPseudoTabela = (pseudoTabela: string): string => {
+    const tipo = TIPO_REDIS_POR_PSEUDOTABELA[pseudoTabela] ?? pseudoTabela
+    return `SCAN 0 MATCH * TYPE ${tipo} COUNT 100`
+  }
+
   const openInEditor = (sql: string, title?: string): void => {
     if (!activeId) return
     openQueryTab({ connectionId: activeId, database: activeDatabase, sql, title })
@@ -188,7 +212,12 @@ export function Sidebar(): React.JSX.Element {
   const exportar = async (table: string, formato: 'csv' | 'json'): Promise<void> => {
     if (!activeId) return
 
-    const sql = dialect === 'mongodb' ? `db.${table}.find({})` : `SELECT * FROM ${quote(table)}`
+    const sql =
+      dialect === 'mongodb'
+        ? `db.${table}.find({})`
+        : dialect === 'redis'
+          ? comandoScanPseudoTabela(table)
+          : `SELECT * FROM ${quote(table)}`
 
     try {
       const saida = await window.vela.app.exportQuery({
@@ -235,9 +264,9 @@ export function Sidebar(): React.JSX.Element {
 
   const buildMenu = (table: TableInfo): MenuEntry[] => {
     const readOnly = !!connection?.readOnly
-    const label = isMongo ? 'coleção' : 'tabela'
+    const label = isMongo ? 'coleção' : isRedis ? 'pseudo-tabela' : 'tabela'
 
-    return [
+    const entries: MenuEntry[] = [
       {
         label: 'Ver dados',
         icon: <IconTable size={14} />,
@@ -262,25 +291,38 @@ export function Sidebar(): React.JSX.Element {
             initialPanel: 'colunas'
           })
       },
-      'separator',
+      'separator'
+    ]
+
+    // O Redis não tem DDL: a pseudo-tabela não é um objeto de schema que se
+    // possa criar de novo, é uma leitura sintética por TYPE. Oferecer "gerar
+    // CREATE" aqui não teria o que gerar.
+    if (!isRedis) {
+      entries.push(
+        {
+          label: isMongo ? 'Gerar script de criação' : 'Gerar SQL CREATE',
+          icon: <IconStructure size={14} />,
+          onSelect: () => void generateCreate(table.name)
+        },
+        {
+          label: isMongo ? 'Copiar script de criação' : 'Copiar SQL CREATE',
+          icon: <IconCopy size={14} />,
+          onSelect: () => void copyCreate(table.name)
+        }
+      )
+    }
+
+    entries.push(
       {
-        label: isMongo ? 'Gerar script de criação' : 'Gerar SQL CREATE',
-        icon: <IconStructure size={14} />,
-        onSelect: () => void generateCreate(table.name)
-      },
-      {
-        label: isMongo ? 'Copiar script de criação' : 'Copiar SQL CREATE',
-        icon: <IconCopy size={14} />,
-        onSelect: () => void copyCreate(table.name)
-      },
-      {
-        label: isMongo ? 'Gerar consulta' : 'Gerar SELECT',
+        label: isMongo ? 'Gerar consulta' : isRedis ? 'Gerar comando' : 'Gerar SELECT',
         icon: <IconStructure size={14} />,
         onSelect: () =>
           openInEditor(
             isMongo
               ? `db.${table.name}.find({}).limit(100)`
-              : `SELECT *\nFROM ${quote(table.name)}\nLIMIT 100;`,
+              : isRedis
+                ? comandoScanPseudoTabela(table.name)
+                : `SELECT *\nFROM ${quote(table.name)}\nLIMIT 100;`,
             `Query ${table.name}`
           )
       },
@@ -306,22 +348,31 @@ export function Sidebar(): React.JSX.Element {
       },
       'separator',
       {
-        label: isMongo ? 'Esvaziar coleção…' : 'Esvaziar (TRUNCATE)…',
+        label: isMongo ? 'Esvaziar coleção…' : isRedis ? 'Excluir todas as chaves…' : 'Esvaziar (TRUNCATE)…',
         icon: <IconTrash size={14} />,
         danger: true,
         disabled: readOnly,
         hint: readOnly ? 'somente leitura' : undefined,
         onSelect: () => void askDanger('truncate', table.name)
-      },
-      {
+      }
+    )
+
+    // "Apagar" pressupõe um objeto de schema que deixa de existir. A
+    // pseudo-tabela Redis não é isso — ela é o tipo `strings`/`hashes`/…, e
+    // continua existindo (vazia) enquanto o tipo for válido. "Esvaziar" já
+    // cobre o único destino possível aqui: excluir as chaves que ela lista.
+    if (!isRedis) {
+      entries.push({
         label: isMongo ? 'Apagar coleção…' : 'Apagar tabela (DROP)…',
         icon: <IconTrash size={14} />,
         danger: true,
         disabled: readOnly,
         hint: readOnly ? 'somente leitura' : undefined,
         onSelect: () => void askDanger('drop', table.name)
-      }
-    ]
+      })
+    }
+
+    return entries
   }
 
   return (
@@ -390,7 +441,7 @@ export function Sidebar(): React.JSX.Element {
           className={`sidebar__modo ${modo === 'tabelas' ? 'sidebar__modo--ativo' : ''}`}
           onClick={() => setModo('tabelas')}
         >
-          {isMongo ? 'Coleções' : 'Tabelas'}
+          {isMongo ? 'Coleções' : isRedis ? 'Tipos' : 'Tabelas'}
         </button>
         <button
           className={`sidebar__modo ${modo === 'modelagem' ? 'sidebar__modo--ativo' : ''}`}
@@ -398,7 +449,9 @@ export function Sidebar(): React.JSX.Element {
           title={
             isMongo
               ? 'O MongoDB não declara ligação entre coleções'
-              : 'Tabelas e as ligações entre elas'
+              : isRedis
+                ? 'O Redis não tem relação entre chaves'
+                : 'Tabelas e as ligações entre elas'
           }
         >
           Modelagem
@@ -422,7 +475,13 @@ export function Sidebar(): React.JSX.Element {
         <IconSearch size={13} />
         <input
           className="input"
-          placeholder={isMongo ? 'Filtrar coleções e campos' : 'Filtrar tabelas e colunas'}
+          placeholder={
+            isMongo
+              ? 'Filtrar coleções e campos'
+              : isRedis
+                ? 'Filtrar tipos'
+                : 'Filtrar tabelas e colunas'
+          }
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
@@ -430,7 +489,7 @@ export function Sidebar(): React.JSX.Element {
 
       <div className="sidebar__header">
         <span>
-          {isMongo ? 'Coleções' : 'Tabelas'}
+          {isMongo ? 'Coleções' : isRedis ? 'Tipos' : 'Tabelas'}
           {schema ? ` · ${tabelas.length}` : ''}
         </span>
         <span style={{ display: 'flex', gap: 2 }}>

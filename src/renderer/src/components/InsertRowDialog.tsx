@@ -26,8 +26,16 @@ import { IconCheck, IconClose, IconKey, IconWarning } from './Icons'
 interface Props {
   tabela: string
   colunas: ColumnInfo[]
-  /** MongoDB não tem schema: os campos são digitados livremente. */
+  /** MongoDB e Redis não têm schema fixo declarado no catálogo. */
   semSchema?: boolean
+  /**
+   * Texto do aviso mostrado quando `semSchema` é `true`.
+   *
+   * Varia por driver: o Mongo não tem nenhuma coluna garantida, mas o Redis
+   * tem exatamente três (`key`, `value`, `ttl`) sempre — dizer a mesma frase
+   * do Mongo para o Redis seria uma afirmação falsa sobre o schema dele.
+   */
+  avisoSemSchema?: string
   onInserir: (valores: Record<string, unknown>) => Promise<void>
   onCancel: () => void
 }
@@ -47,6 +55,7 @@ export function InsertRowDialog({
   tabela,
   colunas,
   semSchema,
+  avisoSemSchema,
   onInserir,
   onCancel
 }: Props): React.JSX.Element {
@@ -121,8 +130,8 @@ export function InsertRowDialog({
             <div className="modelo__nota">
               <IconWarning size={14} />
               <span>
-                O MongoDB não declara schema. Os campos abaixo vieram de uma amostra dos
-                documentos — o novo documento nasce com exatamente o que você preencher.
+                {avisoSemSchema ??
+                  'O MongoDB não declara schema. Os campos abaixo vieram de uma amostra dos documentos — o novo documento nasce com exatamente o que você preencher.'}
               </span>
             </div>
           )}

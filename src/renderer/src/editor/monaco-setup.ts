@@ -5,6 +5,7 @@
  */
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
 import { PALETA_PADRAO, coresDoEditor } from '../styles/palettes'
+import { REDIS_COMMANDS } from './sql-docs'
 
 // Contribuições do editor: cada import liga um recurso da UI.
 import 'monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController'
@@ -41,6 +42,27 @@ self.MonacoEnvironment = {
     return new EditorWorker()
   }
 }
+
+/**
+ * Redis não tem SQL nem gramática pronta no Monaco. Em vez de herdar o
+ * highlighting de SQL — que coloriria `HGETALL` como se fosse uma tabela e
+ * mostraria uma sintaxe que não existe em Redis —, registramos uma
+ * linguagem própria e mínima: só reconhece nomes de comando e string. Não é
+ * um parser, é vocabulário; a tolerância continua sendo a regra aqui.
+ */
+monaco.languages.register({ id: 'redis' })
+monaco.languages.setMonarchTokensProvider('redis', {
+  ignoreCase: true,
+  keywords: REDIS_COMMANDS,
+  tokenizer: {
+    root: [
+      [/[A-Za-z_][\w.]*/, { cases: { '@keywords': 'keyword', '@default': 'identifier' } }],
+      [/"([^"\\]|\\.)*"/, 'string'],
+      [/'([^'\\]|\\.)*'/, 'string'],
+      [/-?\d+(\.\d+)?/, 'number']
+    ]
+  }
+})
 
 /**
  * Temas próprios em vez de vs-dark/vs.

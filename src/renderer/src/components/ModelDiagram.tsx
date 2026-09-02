@@ -141,6 +141,38 @@ export function ModelDiagram({ tab }: { tab: Tab }): React.JSX.Element {
     return <Aviso icone="carregando" titulo="Procurando as ligações entre as tabelas…" />
   }
 
+  // Chave do Redis não referencia outra chave, declarada ou deduzida: as
+  // pseudo-tabelas sempre têm as mesmas 3 colunas (key, value, ttl), então
+  // não há nome de campo que aponte para outra pseudo-tabela. Em vez de abrir
+  // um diagrama vazio com os controles de dedução e profundidade — que aqui
+  // não teriam efeito nenhum —, a aba diz de saída que não há o que desenhar.
+  if (conexao?.driver === 'redis') {
+    return (
+      <div className="modelo">
+        <div className="modelo__barra">
+          <span className="modelo__titulo">
+            <IconLink size={13} />
+            Mapa do banco
+          </span>
+        </div>
+        <div className="modelo__nota">
+          <IconWarning size={14} />
+          <span>
+            O Redis <strong>não tem relação entre chaves</strong> — cada chave é independente,
+            sem integridade referencial com nenhuma outra.
+          </span>
+        </div>
+        <div className="modelo__palco">
+          <Aviso
+            icone="vazio"
+            titulo="Nada para modelar"
+            detalhe="Abra uma pseudo-tabela e use o padrão de chave para explorar os dados."
+          />
+        </div>
+      </div>
+    )
+  }
+
   const focoValido = tab.modelFocus && grafo.nos.has(tab.modelFocus)
   const provaveis = grafo.arestas.filter((a) => a.origem === 'provavel').length
 
