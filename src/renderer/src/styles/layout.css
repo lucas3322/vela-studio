@@ -2822,3 +2822,64 @@
   font-size: var(--text-xs);
   white-space: nowrap;
 }
+
+/* ── Formulário de nova linha ─────────────────────────────────────── */
+
+/*
+  Uma coluna por linha, com o rótulo à esquerda e largura fixa: numa tabela de
+  84 colunas, nomes de tamanhos diferentes fariam os campos dançarem na
+  vertical e a leitura viraria um zigue-zague.
+*/
+.insercao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: min(52vh, 520px);
+  overflow-y: auto;
+  padding-right: var(--space-2);
+}
+
+.insercao__linha {
+  display: grid;
+  grid-template-columns: minmax(160px, 240px) 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.insercao__rotulo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-base);
+  color: var(--text-primary);
+}
+
+.insercao__rotulo svg {
+  flex-shrink: 0;
+  color: var(--accent-text);
+}
+
+.insercao__tipo {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.insercao__valor {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.insercao__nulo {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Coluna que não aceita nulo: a caixa fica visível mas apagada, para a regra
+   do schema ficar aparente em vez de a opção simplesmente sumir. */
+.insercao__nulo--indisponivel {
+  opacity: 0.4;
+}

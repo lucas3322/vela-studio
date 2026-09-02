@@ -32,7 +32,8 @@ const api: VelaApi = {
   },
   data: {
     updateCell: (params) => ipcRenderer.invoke(IPC.dataUpdateCell, params),
-    deleteRow: (params) => ipcRenderer.invoke(IPC.dataDeleteRow, params)
+    deleteRow: (params) => ipcRenderer.invoke(IPC.dataDeleteRow, params),
+    insertRow: (params) => ipcRenderer.invoke(IPC.dataInsertRow, params)
   },
   query: {
     run: (params) => ipcRenderer.invoke(IPC.queryRun, params),

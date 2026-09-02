@@ -9,7 +9,8 @@ import { AlterColumnDialog } from './AlterColumnDialog'
 import { TableFilterBar } from './TableFilterBar'
 import { montarFiltroMongo, montarWhere, type Condicao } from '../editor/filter-builder'
 import { ErrorPanel } from './ErrorPanel'
-import { IconKey, IconLink, IconRefresh } from './Icons'
+import { IconKey, IconLink, IconPlus, IconRefresh } from './Icons'
+import { InsertRowDialog } from './InsertRowDialog'
 
 type Panel = 'dados' | 'colunas' | 'indices' | 'relacoes'
 
@@ -25,6 +26,8 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
   const [relations, setRelations] = useState<RelationInfo[]>([])
   const [loading, setLoading] = useState(false)
   const [ordem, setOrdem] = useState<OrdenacaoDaGrade | null>(null)
+  /** Formulário de nova linha aberto. */
+  const [inserindo, setInserindo] = useState(false)
   const [pagina, setPagina] = useState(0)
   // Lido uma vez, na criação da aba: mudar a preferência não deve reconsultar
   // as abas que já estão abertas na largada do usuário.
@@ -378,6 +381,27 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
                 Atualizar
               </button>
 
+              {/*
+                Inserir fica ao lado de Atualizar, no rodapé, porque é ali que
+                mora o resto do controle da tabela — e porque a linha nova
+                aparece no fim da lista, que é para onde o olho vai depois.
+              */}
+              <button
+                className="btn btn--secondary btn--sm"
+                onClick={() => setInserindo(true)}
+                disabled={loading || pendencias > 0 || !!connection?.readOnly}
+                title={
+                  connection?.readOnly
+                    ? 'Conexão em modo somente-leitura'
+                    : pendencias > 0
+                      ? 'Confirme ou descarte as alterações antes de inserir'
+                      : `Inserir uma linha em ${table}`
+                }
+              >
+                <IconPlus size={13} />
+                Inserir
+              </button>
+
               <span className="paginacao__espaco" />
 
               <label className="paginacao__tamanho">
@@ -479,6 +503,31 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
             </tbody>
           </table>
         </div>
+      )}
+
+      {inserindo && (
+        <InsertRowDialog
+          tabela={table}
+          colunas={columns}
+          semSchema={dialect === 'mongodb'}
+          onCancel={() => setInserindo(false)}
+          onInserir={async (valores) => {
+            if (!connectionId) return
+            await window.vela.data.insertRow({
+              connectionId,
+              table,
+              database: database ?? undefined,
+              values: valores
+            })
+            setInserindo(false)
+            notify('Linha inserida.', 'success')
+            // Recarrega para mostrar o que o banco **realmente** gravou: o
+            // auto-incremento, o DEFAULT, o que um trigger tenha mudado. Sem
+            // isto a tela mostraria o que foi digitado como se fosse o valor
+            // final, e os dois divergem com frequência.
+            reloadTab(tab.id)
+          }}
+        />
       )}
 
       {alterPendente && (

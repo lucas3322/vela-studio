@@ -126,6 +126,24 @@ export interface DatabaseDriver {
     keys: Record<string, unknown>
   }): Promise<{ affectedRows: number; statement: string }>
 
+  /**
+   * Insere uma linha.
+   *
+   * Mesmas garantias do `updateCell`: recusa em conexão somente-leitura e usa
+   * consulta parametrizada. Concatenar valor no SQL aqui seria pior do que no
+   * UPDATE — quem insere está digitando texto livre em todas as colunas de uma
+   * vez, e uma aspa no meio de um nome viraria comando.
+   *
+   * Colunas ausentes de `values` não entram no INSERT: é assim que o banco
+   * aplica o `DEFAULT` e o auto-incremento. Mandar `NULL` numa coluna
+   * auto-incremento funcionaria por acaso no MySQL e falharia no PostgreSQL.
+   */
+  insertRow(params: {
+    table: string
+    database?: string
+    values: Record<string, unknown>
+  }): Promise<{ affectedRows: number; statement: string }>
+
   /** Remove uma linha pela chave primária, com as mesmas garantias. */
   deleteRow(params: {
     table: string

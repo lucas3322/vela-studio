@@ -271,6 +271,36 @@ export class MongoDriver implements DatabaseDriver {
     )
   }
 
+  /**
+   * Insere um documento.
+   *
+   * Diferente do SQL, aqui não há schema: as chaves vêm do formulário e o
+   * documento nasce com exatamente elas. Campo deixado em branco simplesmente
+   * não entra — inserir `null` criaria um campo nulo de verdade, que passa a
+   * existir na coleção e aparece na amostragem de tipos como se fosse parte
+   * do formato.
+   */
+  async insertRow(params: {
+    table: string
+    database?: string
+    values: Record<string, unknown>
+  }): Promise<{ affectedRows: number; statement: string }> {
+    if (this.config?.readOnly) {
+      throw new Error('Conexão em modo somente-leitura: comandos de escrita estão bloqueados.')
+    }
+    const entradas = Object.entries(params.values)
+    if (entradas.length === 0) {
+      throw new Error('Preencha ao menos um campo para inserir o documento.')
+    }
+
+    const documento = Object.fromEntries(entradas)
+    await this.db(params.database).collection(params.table).insertOne(documento)
+    return {
+      affectedRows: 1,
+      statement: `db.${params.table}.insertOne(${JSON.stringify(documento)})`
+    }
+  }
+
   async deleteRow(): Promise<{ affectedRows: number; statement: string }> {
     throw new Error(
       'Exclusão direta na grade ainda não é suportada no MongoDB. ' +

@@ -448,6 +448,29 @@ export class PostgresDriver implements DatabaseDriver {
     return this.escreverComTransacao(sql, [params.value, ...chave.map(([, v]) => v)])
   }
 
+  async insertRow(params: {
+    table: string
+    database?: string
+    values: Record<string, unknown>
+  }): Promise<{ affectedRows: number; statement: string }> {
+    if (this.config?.readOnly) {
+      throw new Error('Conexão em modo somente-leitura: comandos de escrita estão bloqueados.')
+    }
+    const entradas = Object.entries(params.values)
+    if (entradas.length === 0) {
+      throw new Error('Preencha ao menos uma coluna para inserir a linha.')
+    }
+    const alvo = params.database
+      ? `${quoteIdent(params.database)}.${quoteIdent(params.table)}`
+      : quoteIdent(params.table)
+
+    const colunas = entradas.map(([c]) => quoteIdent(c)).join(', ')
+    const marcas = entradas.map((_, i) => `$${i + 1}`).join(', ')
+    const sql = `INSERT INTO ${alvo} (${colunas}) VALUES (${marcas})`
+
+    return this.escreverComTransacao(sql, entradas.map(([, v]) => v))
+  }
+
   async deleteRow(params: {
     table: string
     database?: string

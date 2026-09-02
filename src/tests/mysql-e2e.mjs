@@ -139,6 +139,62 @@ test('listIndexes agrupa colunas por índice', async () => {
   assert.deepEqual(indexes.find((i) => i.name === 'idx_status').columns, ['status'])
 })
 
+test('insertRow deixa o banco preencher o que ficou em branco', async () => {
+  // A distinção que decide se a inserção funciona: coluna em branco **não
+  // entra** no INSERT. Mandar NULL numa coluna auto-incremento funciona por
+  // acaso no MySQL e falha no PostgreSQL; mandar NULL numa coluna com DEFAULT
+  // grava nulo em vez do padrão.
+  await driver.query(
+    `DROP TABLE IF EXISTS novos;
+     CREATE TABLE novos (
+       id INT AUTO_INCREMENT PRIMARY KEY,
+       nome VARCHAR(80) NOT NULL,
+       apelido VARCHAR(80) NULL,
+       status VARCHAR(20) NOT NULL DEFAULT 'novo'
+     );`,
+    { queryId: 'ins-setup', maxRows: 1 }
+  )
+
+  const r = await driver.insertRow({ table: 'novos', values: { nome: 'Ana' } })
+  assert.equal(r.affectedRows, 1)
+  assert.match(r.statement, /INSERT INTO `novos` \(`nome`\) VALUES \(\?\)/)
+
+  const [conferencia] = await driver.query('SELECT id, status FROM novos', { queryId: 'ins-q' })
+  assert.equal(Number(conferencia.rows[0][0]), 1, 'o auto-incremento precisa ter agido')
+  assert.equal(conferencia.rows[0][1], 'novo', 'o DEFAULT precisa ter agido')
+})
+
+test('insertRow grava NULL quando pedido explicitamente', async () => {
+  await driver.insertRow({ table: 'novos', values: { nome: 'Bruno', apelido: null } })
+  const [r] = await driver.query("SELECT apelido FROM novos WHERE nome = 'Bruno'", {
+    queryId: 'ins-null'
+  })
+  assert.equal(r.rows[0][0], null)
+})
+
+test('insertRow parametriza o valor: injeção vira texto, não comando', async () => {
+  const veneno = "O'Brien'; DROP TABLE novos; --"
+  await driver.insertRow({ table: 'novos', values: { nome: veneno } })
+
+  const [guardado] = await driver.query('SELECT nome FROM novos ORDER BY id DESC LIMIT 1', {
+    queryId: 'ins-veneno'
+  })
+  assert.equal(guardado.rows[0][0], veneno, 'o texto precisa chegar inteiro ao banco')
+
+  // E a tabela continua de pé — se a concatenação tivesse acontecido, não estaria.
+  const [existe] = await driver.query('SELECT COUNT(*) AS n FROM novos', { queryId: 'ins-viva' })
+  assert.ok(Number(existe.rows[0][0]) >= 3)
+})
+
+test('insertRow recusa sem nenhuma coluna preenchida', async () => {
+  // Um INSERT sem coluna nenhuma é sintaticamente possível em alguns bancos e
+  // insere uma linha só de padrões, quase sempre por engano.
+  await assert.rejects(
+    driver.insertRow({ table: 'novos', values: {} }),
+    /ao menos uma coluna/
+  )
+})
+
 test('streamQuery recusa comando de escrita em vez de pendurar', async () => {
   // `.stream()` sobre um comando que não devolve conjunto de resultados nunca
   // emite o fim: o `for await` esperava para sempre e a exportação ficava

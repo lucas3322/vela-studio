@@ -231,6 +231,14 @@ export interface EditCellParams {
   keys: RowKeys
 }
 
+export interface InsertRowParams {
+  connectionId: string
+  table: string
+  database?: string
+  /** Só as colunas preenchidas. As de fora recebem o DEFAULT do banco. */
+  values: Record<string, unknown>
+}
+
 export interface DeleteRowParams {
   connectionId: string
   table: string

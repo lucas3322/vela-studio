@@ -2,6 +2,7 @@ import type {
   ColumnInfo,
   ConnectionConfig,
   DeleteRowParams,
+  InsertRowParams,
   EditCellParams,
   EditResult,
   HistoryEntry,
@@ -41,6 +42,7 @@ export const IPC = {
 
   dataUpdateCell: 'data:updateCell',
   dataDeleteRow: 'data:deleteRow',
+  dataInsertRow: 'data:insertRow',
 
   queryRun: 'query:run',
   queryCancel: 'query:cancel',
@@ -118,6 +120,8 @@ export interface VelaApi {
   data: {
     updateCell(params: EditCellParams): Promise<EditResult>
     deleteRow(params: DeleteRowParams): Promise<EditResult>
+    /** Insere uma linha. Colunas ausentes recebem o DEFAULT do banco. */
+    insertRow(params: InsertRowParams): Promise<EditResult>
   }
   query: {
     run(params: {

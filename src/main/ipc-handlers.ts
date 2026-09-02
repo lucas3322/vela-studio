@@ -6,6 +6,7 @@ import { IPC, UPDATE_PROGRESS_EVENT , EXPORT_PROGRESS_EVENT } from '../shared/ip
 import type {
   ColumnInfo,
   ConnectionConfig,
+  InsertRowParams,
   QueryRunResult,
   TableInfo
 } from '../shared/types'
@@ -169,6 +170,22 @@ export function registerIpcHandlers(manager: ConnectionManager, store: Connectio
       }
     }
   )
+
+  ipcMain.handle(IPC.dataInsertRow, async (_e, params: InsertRowParams) => {
+    const { driver, config } = manager.get(params.connectionId)
+    try {
+      return await driver.insertRow({
+        table: params.table,
+        database: params.database,
+        values: params.values
+      })
+    } catch (error) {
+      // Mesma tradução dos irmãos: um "ER_NO_DEFAULT_FOR_FIELD" cru no meio de
+      // um formulário não diz a ninguém qual campo faltou.
+      const t = translateError(error, { driver: config.driver })
+      throw new Error(t.hint ? `${t.friendly} ${t.hint}` : t.friendly)
+    }
+  })
 
   // ── Query ─────────────────────────────────────────────────────────────
   ipcMain.handle(
