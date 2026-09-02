@@ -16,6 +16,8 @@ interface Props {
   /** Filtro em vigor, para o botão saber se há algo a limpar. */
   aplicado: Condicao[]
   onAplicar: (condicoes: Condicao[]) => void
+  /** Avisa qual coluna acabou de ser escolhida, para a grade rolar até ela. */
+  onColunaEscolhida?: (coluna: string) => void
   disabled?: boolean
 }
 
@@ -37,6 +39,7 @@ export function TableFilterBar({
   dialect,
   aplicado,
   onAplicar,
+  onColunaEscolhida,
   disabled
 }: Props): React.JSX.Element {
   const [condicoes, setCondicoes] = useState<Condicao[]>([{ ...VAZIA }])
@@ -80,7 +83,12 @@ export function TableFilterBar({
             className="input filtro__coluna"
             value={condicao.coluna}
             disabled={disabled}
-            onChange={(e) => trocar(indice, { coluna: e.target.value })}
+            onChange={(e) => {
+              trocar(indice, { coluna: e.target.value })
+              // Rola a grade até ela: numa tabela larga, escolher um campo que
+              // está fora da tela deixava a pessoa sem ver o que escolheu.
+              if (e.target.value) onColunaEscolhida?.(e.target.value)
+            }}
             aria-label="Coluna"
           >
             <option value="">escolha a coluna…</option>

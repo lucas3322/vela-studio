@@ -53,6 +53,22 @@ test('reconhece a entidade que o nome da coluna sugere', () => {
   assert.equal(entidadeReferenciada('fk_cliente'), 'cliente')
 })
 
+test('prefixos empilhados: fk_id_app_crm aponta para app_crm', () => {
+  // A convenção que apareceu num CRM real: `fk_` marca a chave e `id_` marca
+  // o papel. Tirando só um prefixo sobrava `id_app_crm`, que não casa com a
+  // tabela `app_crm` — e a ligação sumia sem nenhum sinal de tentativa.
+  assert.equal(entidadeReferenciada('fk_id_app_crm'), 'app_crm')
+  assert.equal(entidadeReferenciada('fk_crm_original_account'), 'crm_original_account')
+  assert.equal(entidadeReferenciada('id_fk_cliente'), 'cliente')
+})
+
+test('o prefixo empilhado não come o nome inteiro', () => {
+  // `fk_id` sozinho não pode virar string vazia, nem `cod_id` virar undefined
+  // por engano: o laço para no primeiro nome que sobra.
+  assert.equal(entidadeReferenciada('fk_id'), undefined)
+  assert.equal(entidadeReferenciada('fk_cliente'), 'cliente')
+})
+
 test('uma coluna `id` sozinha não referencia ninguém', () => {
   // É a chave da própria tabela. Tratá-la como referência ligaria toda tabela
   // a alguma outra chamada "id".

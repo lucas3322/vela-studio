@@ -1808,6 +1808,21 @@
   background: var(--bg-selected);
 }
 
+/*
+  Hover sobre linha selecionada **soma**, não substitui.
+
+  `.grid__row:hover` tem especificidade (0,2,0) e `.grid__row--selecionada`
+  tem (0,1,0): o hover vencia e trocava o fundo da seleção pelo de hover, então
+  passar o mouse fazia a linha selecionada parecer desmarcada. Ordem no arquivo
+  não resolvia — especificidade é decidida antes.
+
+  O realce por cima mantém a resposta do hover sem apagar o sinal de seleção,
+  que é a informação mais importante das duas.
+*/
+.grid__row--selecionada:hover {
+  background: color-mix(in srgb, var(--bg-selected) 92%, var(--text-primary) 8%);
+}
+
 .grid__row--selecionada .grid__gutter {
   background: var(--accent);
   color: var(--accent-ink);
@@ -2882,4 +2897,119 @@
    do schema ficar aparente em vez de a opção simplesmente sumir. */
 .insercao__nulo--indisponivel {
   opacity: 0.4;
+}
+
+/* ── Busca dentro da grade (⌘F) ───────────────────────────────────── */
+
+.busca-grade {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  flex-shrink: 0;
+}
+
+.busca-grade > svg {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.busca-grade__campo {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+}
+
+/*
+  A contagem não é decoração: ela diz que a busca varreu só a página, e é o
+  que separa "não existe no banco" de "não está nestas 100 linhas".
+*/
+.busca-grade__contagem {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Célula de chave estrangeira ──────────────────────────────────── */
+
+.grid__cell--relacional {
+  position: relative;
+  cursor: pointer;
+  /*
+    O valor **desliza**, o ícone não o cobre.
+
+    O ícone flutua sobre a célula, então sem abrir espaço ele ficava por cima
+    do dado — justamente do dado que a pessoa quer conferir antes de clicar.
+    Aumentar o padding direito no hover empurra o conteúdo para a esquerda e o
+    ícone ocupa o espaço que sobrou: os dois ficam legíveis ao mesmo tempo.
+
+    Vale principalmente para número, que alinha à direita e é onde a
+    sobreposição acontecia. Em texto alinhado à esquerda o valor já começa
+    longe do ícone, e o padding só encurta o fim — que reticências resolvem.
+  */
+  transition: padding-right var(--duration-fast) var(--ease);
+}
+
+.grid__cell--relacional:hover,
+.grid__cell--relacional:focus-within {
+  padding-right: 28px;
+}
+
+/*
+  Ícone revelado no hover, no canto direito da célula.
+
+  Fixo em toda célula de chave estrangeira ele competiria com o dado em
+  milhares de linhas; só no hover, ele diz "aqui dá para ir" exatamente quando
+  a mão já está ali. `:focus-within` acompanha o hover porque quem navega por
+  teclado também precisa alcançar a ação.
+*/
+.grid__ir {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease);
+}
+
+.grid__cell--relacional:hover .grid__ir,
+.grid__cell--relacional:focus-within .grid__ir {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.grid__ir:hover {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/*
+  Ligação provável: ícone vazado, não preenchido.
+
+  A diferença entre "o banco garante" e "nós deduzimos pelo nome da coluna"
+  precisa estar visível **antes** do clique — quem navega para a tabela errada
+  filtrada por um valor que não significa nada nela leva um bom tempo até
+  desconfiar. A distinção é de preenchimento e borda, não de matiz, para
+  sobreviver a quem não distingue cores.
+*/
+.grid__ir--provavel {
+  background: transparent;
+  border: 1px dashed var(--accent);
+  color: var(--accent-text);
+}
+
+.grid__ir--provavel:hover {
+  background: var(--accent-subtle);
+  color: var(--accent-text);
 }

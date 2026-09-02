@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ColumnInfo, QueryResult } from '@shared/types'
+import type { ColumnInfo, QueryResult, RelationInfo } from '@shared/types'
 import { useAppStore } from '../store/app'
 import { mesmoValor, paraEdicao } from '../editor/cell-value'
 import { digitandoEmCampo, focoAtual } from '../editor/foco'
+import {
+  descreverBusca,
+  procurarNaGrade,
+  proximoAchado,
+  type Achado
+} from '../editor/busca-na-grade'
 import { CellEditorModal } from './CellEditorModal'
 import { ContextMenu, type MenuEntry } from './ContextMenu'
 import { TruncationNotice } from './TruncationNotice'
-import { IconCopy, IconTrash, IconWarning } from './Icons'
+import { IconClose, IconCopy, IconLink, IconSearch, IconTrash, IconWarning } from './Icons'
 
 const ROW_HEIGHT = 30
 const GUTTER_WIDTH = 52
@@ -60,6 +66,29 @@ interface Props {
   onPendingChange?: (quantidade: number) => void
   /** Identificador da aba, para o store saber de quem são as pendências. */
   abaId?: string
+  /**
+   * Coluna que deve entrar em evidência, vinda de fora.
+   *
+   * Usada pela barra de filtro: escolher uma coluna lá rola a grade até ela.
+   * Numa tabela de 84 colunas, filtrar por um campo que está fora da tela
+   * deixava a pessoa sem ver o que ela mesma acabou de escolher.
+   */
+  colunaEmEvidencia?: string | null
+  /**
+   * Para onde cada coluna aponta, e com que grau de certeza.
+   *
+   * `declarada` vem do catálogo do banco e é fato. `provavel` vem da dedução
+   * por nome de coluna — a mesma da modelagem — e existe porque chave
+   * estrangeira declarada é minoria em banco real: um CRM inteiro pode usar
+   * `fk_` no nome e não declarar nenhuma. Sem a dedução, o recurso ficaria
+   * invisível justamente em quem mais precisa dele.
+   *
+   * A diferença **nunca some da tela**: o ícone da provável é vazado e o texto
+   * diz que é palpite. Palpite não se veste de fato.
+   */
+  relacoes?: Array<RelationInfo & { origem?: 'declarada' | 'provavel' }>
+  /** Abre a tabela apontada pela chave, já filtrada pelo valor clicado. */
+  onAbrirRelacao?: (destino: string, colunaDestino: string, valor: unknown) => void
   /**
    * Chamado quando **tudo** foi gravado sem falha.
    *
@@ -119,6 +148,9 @@ export function EditableGrid({
   onSort,
   onPendingChange,
   abaId,
+  colunaEmEvidencia,
+  relacoes,
+  onAbrirRelacao,
   onApplied
 }: Props): React.JSX.Element {
   const scroller = useRef<HTMLDivElement>(null)
@@ -135,6 +167,19 @@ export function EditableGrid({
   const [edicaoAmpla, setEdicaoAmpla] = useState<{ linha: number; coluna: number } | null>(null)
   const [aplicando, setAplicando] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; row: number; col: number } | null>(null)
+
+  /**
+   * Busca dentro do que já está carregado (⌘F).
+   *
+   * `aberta` separado do termo: fechar precisa limpar o destaque, mas manter
+   * o texto seria pior — reabrir com uma busca velha faz a grade saltar para
+   * um lugar que ninguém pediu.
+   */
+  const [busca, setBusca] = useState<{ aberta: boolean; termo: string; indice: number }>({
+    aberta: false,
+    termo: '',
+    indice: 0
+  })
 
   /**
    * Alterações que ainda **não** foram para o banco.
@@ -197,6 +242,28 @@ export function EditableGrid({
     return mapa
   }, [schemaColumns])
 
+  /**
+   * Para onde cada coluna aponta, quando aponta.
+   *
+   * Indexado pelo nome da coluna de origem: é o que a célula precisa consultar
+   * a cada render, e varrer a lista de relações por célula numa página de 1000
+   * linhas seria trabalho repetido à toa.
+   */
+  const destinoDaColuna = useMemo(() => {
+    const mapa: Record<
+      string,
+      { tabela: string; coluna: string; provavel: boolean }
+    > = {}
+    for (const r of relacoes ?? []) {
+      // Declarada vence provável quando as duas existem para a mesma coluna:
+      // o fato manda no palpite.
+      const provavel = r.origem === 'provavel'
+      if (mapa[r.column] && !mapa[r.column].provavel && provavel) continue
+      mapa[r.column] = { tabela: r.referencedTable, coluna: r.referencedColumn, provavel }
+    }
+    return mapa
+  }, [relacoes])
+
   const chavesPrimarias = useMemo(
     () => (schemaColumns ?? []).filter((c) => c.isPrimaryKey).map((c) => c.name),
     [schemaColumns]
@@ -227,6 +294,60 @@ export function EditableGrid({
           : !indicesDaChave
             ? 'a chave primária não está no resultado'
             : undefined
+
+  const achados = useMemo(
+    () =>
+      busca.aberta
+        ? procurarNaGrade({
+            termo: busca.termo,
+            colunas: result.columns.map((c) => c.name),
+            linhas: result.rows,
+            formatar: formatarCelula
+          })
+        : [],
+    [busca.aberta, busca.termo, result.columns, result.rows]
+  )
+
+  /**
+   * Leva o achado para o meio da tela e o seleciona.
+   *
+   * Rolar só o suficiente para "entrar na tela" deixa o alvo colado na borda,
+   * onde o olho não o encontra. Centralizar custa o mesmo e resolve.
+   */
+  const irPara = useCallback(
+    (achado: Achado) => {
+      const caixa = scroller.current
+      if (!caixa) return
+
+      const esquerda = widths.slice(0, achado.coluna).reduce((soma, w) => soma + w, GUTTER_WIDTH)
+      const left = Math.max(0, esquerda - caixa.clientWidth / 2 + widths[achado.coluna] / 2)
+
+      if (achado.linha != null) {
+        const top = Math.max(0, achado.linha * ROW_HEIGHT - caixa.clientHeight / 2)
+        caixa.scrollTo({ top, left, behavior: 'smooth' })
+        setSelecao({ tipo: 'celula', linha: achado.linha, coluna: achado.coluna })
+      } else {
+        // Achado de coluna: rola na horizontal e não mexe na vertical, senão a
+        // pessoa perde o lugar onde estava lendo.
+        caixa.scrollTo({ left, behavior: 'smooth' })
+        setSelecao(null)
+      }
+    },
+    [widths]
+  )
+
+  // Pedido externo de evidência: mesma mecânica da busca, outro gatilho.
+  useEffect(() => {
+    if (!colunaEmEvidencia || widths.length === 0) return
+    const indice = result.columns.findIndex((c) => c.name === colunaEmEvidencia)
+    if (indice >= 0) irPara({ tipo: 'coluna', coluna: indice, texto: colunaEmEvidencia })
+  }, [colunaEmEvidencia, widths.length, result.columns, irPara])
+
+  // Navegar já ao digitar: a primeira ocorrência aparece sem precisar de Enter.
+  useEffect(() => {
+    if (!busca.aberta || achados.length === 0) return
+    irPara(achados[Math.min(busca.indice, achados.length - 1)])
+  }, [busca.aberta, busca.indice, achados, irPara])
 
   const chaveDaLinha = useCallback(
     (linha: number): Record<string, unknown> | null => {
@@ -488,6 +609,21 @@ export function EditableGrid({
   useEffect(() => {
     const aoTeclar = (evento: KeyboardEvent): void => {
       if (editing) return
+
+      // ⌘F abre a busca da grade. Fica antes da guarda de `selecao` porque
+      // procurar não exige nada selecionado — e antes da guarda de foco só
+      // quando o foco não está num campo, senão roubaríamos o ⌘F do editor
+      // de SQL, onde ele é a busca do Monaco.
+      if (
+        (evento.metaKey || evento.ctrlKey) &&
+        evento.key === 'f' &&
+        !digitandoEmCampo(focoAtual(document.activeElement))
+      ) {
+        evento.preventDefault()
+        setBusca((b) => ({ ...b, aberta: true }))
+        return
+      }
+
       if (!selecao) return
       // Este listener é no `window`, então vale na tela inteira. Sem esta
       // guarda, uma célula selecionada fazia o Enter do editor de SQL abrir o
@@ -649,8 +785,70 @@ export function EditableGrid({
   const totalPendente = Object.keys(pendentes).length + exclusoesPendentes.size
   const linhas = result.rows.slice(start, end)
 
+  const navegar = (passo: 1 | -1): void => {
+    if (achados.length === 0) return
+    setBusca((b) => ({ ...b, indice: proximoAchado(b.indice, achados.length, passo) }))
+  }
+
   return (
     <>
+      {busca.aberta && (
+        <div className="busca-grade">
+          <IconSearch size={13} />
+          <input
+            className="input busca-grade__campo"
+            autoFocus
+            value={busca.termo}
+            placeholder="Buscar nesta página — valor ou nome de coluna"
+            onChange={(e) => setBusca((b) => ({ ...b, termo: e.target.value, indice: 0 }))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                navegar(e.shiftKey ? -1 : 1)
+              }
+              if (e.key === 'Escape') {
+                e.preventDefault()
+                setBusca({ aberta: false, termo: '', indice: 0 })
+              }
+            }}
+          />
+
+          {/*
+            A contagem diz **onde** procurou, não só quantos achou. Numa tabela
+            de 250 mil linhas com 100 carregadas, um "0 resultados" seco seria
+            lido como "esse valor não existe no banco" — que é o mesmo engano
+            que a exportação cometia.
+          */}
+          <span className="busca-grade__contagem">
+            {busca.termo.trim() ? descreverBusca(achados, busca.indice, result.rows.length) : ''}
+          </span>
+
+          <button
+            className="icon-btn"
+            onClick={() => navegar(-1)}
+            disabled={achados.length === 0}
+            title="Anterior (⇧↵)"
+          >
+            ↑
+          </button>
+          <button
+            className="icon-btn"
+            onClick={() => navegar(1)}
+            disabled={achados.length === 0}
+            title="Próximo (↵)"
+          >
+            ↓
+          </button>
+          <button
+            className="icon-btn"
+            onClick={() => setBusca({ aberta: false, termo: '', indice: 0 })}
+            title="Fechar (Esc)"
+          >
+            <IconClose size={13} />
+          </button>
+        </div>
+      )}
+
       <div className="grid" ref={scroller} onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}>
         <div className="grid__inner" style={{ width: larguraTotal }}>
           <div className="grid__header" style={{ width: larguraTotal }}>
@@ -766,6 +964,8 @@ export function EditableGrid({
                         )
                       }
 
+                      const destino = destinoDaColuna[coluna.name]
+
                       return (
                         <div
                           key={indiceColuna}
@@ -773,9 +973,19 @@ export function EditableGrid({
                             selecionada ? 'grid__cell--selected' : ''
                           } ${aplicando && marca in pendentes ? 'grid__cell--salvando' : ''} ${
                             marca in pendentes ? 'grid__cell--alterada' : ''
-                          }`}
+                          } ${destino && valor !== null ? 'grid__cell--relacional' : ''}`}
                           style={{ width: widths[indiceColuna] }}
-                          title={valor === null ? 'NULL' : formatarCelula(valor)}
+                          title={
+                            destino && valor !== null
+                              ? `${formatarCelula(valor)}\n\nAbrir ${destino.tabela} filtrada por ${destino.coluna} = ${formatarCelula(valor)}${
+                                  destino.provavel
+                                    ? '\n\nLigação provável: o banco não declara esta chave estrangeira. Deduzida pelo nome da coluna.'
+                                    : ''
+                                }`
+                              : valor === null
+                                ? 'NULL'
+                                : formatarCelula(valor)
+                          }
                           onMouseDown={() =>
                             setSelecao({ tipo: 'celula', linha: indiceLinha, coluna: indiceColuna })
                           }
@@ -792,6 +1002,28 @@ export function EditableGrid({
                           }}
                         >
                           {valor === null ? 'NULL' : formatarCelula(valor)}
+
+                          {/*
+                            Ícone revelado no hover, no canto direito. Fixo em
+                            toda célula de chave estrangeira, ele competiria com
+                            o dado em milhares de linhas; só no hover, ele diz
+                            "aqui dá para ir" exatamente quando a mão já está
+                            ali. O `title` acima diz para onde, antes do clique.
+                          */}
+                          {destino && valor !== null && onAbrirRelacao && (
+                            <button
+                              className={`grid__ir ${destino.provavel ? 'grid__ir--provavel' : ''}`}
+                              tabIndex={-1}
+                              aria-label={`Abrir ${destino.tabela}`}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onAbrirRelacao(destino.tabela, destino.coluna, valor)
+                              }}
+                            >
+                              <IconLink size={12} />
+                            </button>
+                          )}
                         </div>
                       )
                     })}

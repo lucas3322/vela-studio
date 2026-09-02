@@ -28,6 +28,15 @@ export interface Tab {
   /** Nome da tabela — só em abas de tabela. */
   table?: string
   /**
+   * Filtro a aplicar ao abrir. É como o clique numa chave estrangeira chega
+   * na tabela de destino já apontando para a linha certa.
+   *
+   * Vive na aba, não num parâmetro de navegação, porque a aba pode ser
+   * reaproveitada: clicar em duas FKs diferentes para a mesma tabela precisa
+   * trocar o filtro, não abrir uma segunda aba idêntica.
+   */
+  initialFilter?: Array<{ coluna: string; operador: string; valor: string }>
+  /**
    * Tabela no centro do diagrama — só em abas de modelagem.
    * `undefined` significa o mapa completo do banco.
    */
@@ -87,6 +96,7 @@ interface TabState {
     database?: string | null
     table: string
     initialPanel?: 'dados' | 'colunas'
+    initialFilter?: Array<{ coluna: string; operador: string; valor: string }>
   }) => string
   closeTab: (id: string) => void
   setActive: (id: string) => void
@@ -145,7 +155,7 @@ export const useTabStore = create<TabState>((set, get) => ({
     return id
   },
 
-  openTableTab: ({ connectionId, database, table, initialPanel }) => {
+  openTableTab: ({ connectionId, database, table, initialPanel, initialFilter }) => {
     // Reaproveita a aba se a tabela já estiver aberta nesta conexão — abrir
     // cinco vezes a mesma tabela é sempre acidente, nunca intenção.
     const existing = get()
@@ -155,7 +165,18 @@ export const useTabStore = create<TabState>((set, get) => ({
     if (existing) {
       set((state) => ({
         tabs: state.tabs.map((t) =>
-          t.id === existing.id ? { ...t, initialPanel: initialPanel ?? t.initialPanel } : t
+          t.id === existing.id
+            ? {
+                ...t,
+                initialPanel: initialPanel ?? t.initialPanel,
+                // Reaproveitar a aba precisa trocar o filtro: clicar em duas
+                // chaves diferentes para a mesma tabela mostraria a primeira
+                // se o filtro novo fosse ignorado.
+                ...(initialFilter
+                  ? { initialFilter, reloadToken: (t.reloadToken ?? 0) + 1 }
+                  : {})
+              }
+            : t
         ),
         activeByConnection: { ...state.activeByConnection, [connectionId]: existing.id }
       }))
@@ -169,6 +190,7 @@ export const useTabStore = create<TabState>((set, get) => ({
       title: table,
       table,
       initialPanel,
+      initialFilter,
       sql: '',
       connectionId,
       database: database ?? null,

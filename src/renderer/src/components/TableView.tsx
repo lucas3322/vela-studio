@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { DRIVERS, type ColumnInfo, type IndexInfo, type RelationInfo } from '@shared/types'
 import { tiposDoDialeto } from '../editor/column-types'
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
 import { useTabStore, type Tab } from '../store/tabs'
+import { montarGrafo } from '../model/schema-graph'
 import { EditableGrid, type OrdenacaoDaGrade } from './EditableGrid'
 import { AlterColumnDialog } from './AlterColumnDialog'
 import { TableFilterBar } from './TableFilterBar'
@@ -28,6 +29,8 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
   const [ordem, setOrdem] = useState<OrdenacaoDaGrade | null>(null)
   /** Formulário de nova linha aberto. */
   const [inserindo, setInserindo] = useState(false)
+  /** Coluna escolhida no filtro, para a grade rolar até ela. */
+  const [colunaEmEvidencia, setColunaEmEvidencia] = useState<string | null>(null)
   const [pagina, setPagina] = useState(0)
   // Lido uma vez, na criação da aba: mudar a preferência não deve reconsultar
   // as abas que já estão abertas na largada do usuário.
@@ -51,16 +54,73 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
   /** ALTER montado pelo driver, aguardando confirmação. */
   const [alterPendente, setAlterPendente] = useState<{ coluna: string; sql: string } | null>(null)
   /** Filtro em vigor. Entra na consulta e volta para a primeira página. */
-  const [filtro, setFiltro] = useState<Condicao[]>([])
+  const [filtro, setFiltro] = useState<Condicao[]>(
+    (tab.initialFilter as Condicao[] | undefined) ?? []
+  )
+
+  /*
+    Filtro vindo de fora — o clique numa chave estrangeira. Reage ao
+    `initialFilter` porque a aba pode ser reaproveitada: clicar em duas chaves
+    diferentes para a mesma tabela precisa trocar o filtro, e sem este efeito
+    a segunda navegação mostraria o resultado da primeira.
+  */
+  useEffect(() => {
+    if (tab.initialFilter) {
+      setFiltro(tab.initialFilter as Condicao[])
+      setPagina(0)
+    }
+  }, [tab.initialFilter])
+
+  const schema = useConnectionStore((s) => s.currentSchema())
+  const preferenciaDeInferencia = useAppStore((s) => s.inferirRelacoes)
 
   const connectionId = useConnectionStore((s) => s.activeId)
   const database = useConnectionStore((s) => s.activeDatabase)
   const connection = useConnectionStore((s) => s.saved.find((c) => c.id === s.activeId))
   const updateTab = useTabStore((s) => s.updateTab)
   const reloadTab = useTabStore((s) => s.reloadTab)
+  const openTableTab = useTabStore((s) => s.openTableTab)
   const notify = useAppStore((s) => s.notify)
 
   const table = tab.table!
+
+  /**
+   * As ligações que a grade pode navegar: declaradas mais, quando fizer
+   * sentido, as deduzidas pelo nome da coluna.
+   *
+   * A dedução existe porque chave estrangeira declarada é minoria em banco
+   * real — um CRM inteiro pode nomear tudo com `fk_` e não declarar nenhuma.
+   * Sem ela o recurso ficaria invisível justamente para quem mais precisa.
+   *
+   * Obedece à mesma preferência da modelagem: em `auto`, deduz só quando o
+   * banco não declara nada. Um schema bem modelado não ganha palpite em cima.
+   */
+  const relacoesParaNavegar = useMemo(() => {
+    const declaradas = relations.map((r) => ({ ...r, origem: 'declarada' as const }))
+    const inferir =
+      preferenciaDeInferencia === 'auto'
+        ? declaradas.length === 0
+        : preferenciaDeInferencia === 'sim'
+    if (!inferir || !schema) return declaradas
+
+    const grafo = montarGrafo({
+      tables: schema.tables,
+      columns: schema.columns,
+      relations: [],
+      inferir: true
+    })
+    const provaveis = grafo.arestas
+      .filter((a) => a.de === table)
+      .map((a) => ({
+        constraintName: `provavel_${a.coluna}`,
+        column: a.coluna,
+        referencedTable: a.para,
+        referencedColumn: a.colunaAlvo,
+        origem: 'provavel' as const
+      }))
+    return [...declaradas, ...provaveis]
+  }, [relations, schema, preferenciaDeInferencia, table])
+
   const dialect = connection ? DRIVERS[connection.driver].dialect : 'mysql'
 
   // SQLite não tem ALTER COLUMN e o Mongo não tem tipo de coluna. Em vez de
@@ -260,6 +320,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
       {panel === 'dados' && result && (
         <div className={`results ${loading ? 'results--recarregando' : ''}`}>
           <TableFilterBar
+              onColunaEscolhida={setColunaEmEvidencia}
             columns={columns}
             dialect={dialect}
             aplicado={filtro}
@@ -285,6 +346,19 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
               // E volta para a primeira página — a linha 250 de outra ordenação
               // não é a mesma linha, então continuar na página 3 não faria sentido.
               abaId={tab.id}
+              colunaEmEvidencia={colunaEmEvidencia}
+              relacoes={relacoesParaNavegar}
+              onAbrirRelacao={(destino, colunaDestino, valor) => {
+                if (!connectionId) return
+                openTableTab({
+                  connectionId,
+                  database,
+                  table: destino,
+                  initialFilter: [
+                    { coluna: colunaDestino, operador: 'igual', valor: String(valor) }
+                  ]
+                })
+              }}
               onPendingChange={setPendencias}
               // Reconsulta depois de gravar. O banco pode ter guardado algo
               // diferente do que foi digitado — trigger, coerção de tipo, um
