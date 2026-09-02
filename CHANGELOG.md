@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 1.0.0 — 2026-09-02
+
+### Outras mudanças
+
+- adicionando novas infos no site (8706fe2)
+
 ## 0.28.1 — 2026-09-02
 
 ### Outras mudanças
