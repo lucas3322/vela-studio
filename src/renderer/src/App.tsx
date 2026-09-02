@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { TitleBar } from './components/TitleBar'
 import { CHAVE_DO_TOUR, jaViuOTour } from './editor/tour'
+import { BatchProgressDialog } from './components/BatchProgressDialog'
 import { DiscardEditsDialog } from './components/DiscardEditsDialog'
 import { Tour } from './components/Tour'
 import { UpdateBanner } from './components/UpdateBanner'
@@ -55,6 +56,8 @@ export function App(): React.JSX.Element {
     O atraso deixa a barra lateral terminar de montar: medir um elemento que
     ainda não existe destacaria o canto da tela.
   */
+  const lote = useAppStore((s) => s.lote)
+  const fecharLote = useAppStore((s) => s.fecharLote)
   const confirmacaoDeDescarte = useAppStore((s) => s.confirmacaoDeDescarte)
   const fecharDescarteDeEdicoes = useAppStore((s) => s.fecharDescarteDeEdicoes)
 
@@ -105,6 +108,15 @@ export function App(): React.JSX.Element {
       <UpdateBanner />
 
       {mostrarTour && <Tour aoFechar={() => setMostrarTour(false)} />}
+
+      {lote && (
+        <BatchProgressDialog
+          passos={lote.passos}
+          rodando={lote.rodando}
+          continuar={lote.continuar}
+          onFechar={fecharLote}
+        />
+      )}
 
       {confirmacaoDeDescarte && (
         <DiscardEditsDialog

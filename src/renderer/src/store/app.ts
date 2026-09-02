@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { PALETA_PADRAO, aplicarPaleta } from '../styles/palettes'
 import { paletaEmVigor } from '../styles/connection-colors'
+import type { PassoDoLote } from '../editor/lote'
 
 export type ThemeMode = 'light' | 'dark' | 'system'
 
@@ -88,6 +89,18 @@ interface AppState {
   pedidoDeDescarte: number
   /** Pergunta pendente: descartar as edições para poder executar? */
   confirmacaoDeDescarte: { quantas: number; aoConfirmar: () => void } | null
+  /**
+   * Lote em execução, quando há mais de um comando.
+   *
+   * Fica no store porque o modal vive na raiz do app e quem executa é o hook —
+   * os dois não se enxergam. `continuar` é preenchido só quando o lote para
+   * num erro: é a decisão que a pessoa toma com o erro na tela.
+   */
+  lote: {
+    passos: PassoDoLote[]
+    rodando: boolean
+    continuar?: () => void
+  } | null
 
   setTheme: (theme: ThemeMode) => void
   applySystemTheme: (theme: 'light' | 'dark') => void
@@ -109,6 +122,11 @@ interface AppState {
   descartarPendencias: () => void
   pedirDescarteDeEdicoes: (quantas: number, aoConfirmar: () => void) => void
   fecharDescarteDeEdicoes: () => void
+  iniciarLote: (passos: PassoDoLote[]) => void
+  atualizarPasso: (indice: number, passo: PassoDoLote) => void
+  pararLoteNoErro: (continuar: () => void) => void
+  encerrarLote: () => void
+  fecharLote: () => void
   totalDePendencias: () => number
   fecharConfirmacaoDeEscrita: () => void
 }
@@ -219,6 +237,7 @@ export const useAppStore = create<AppState>((set, get) => {
     pendenciasDeEdicao: {},
     pedidoDeDescarte: 0,
     confirmacaoDeDescarte: null,
+    lote: null,
 
     setTheme: (theme) => {
       localStorage.setItem(STORAGE_KEY, theme)
@@ -303,6 +322,26 @@ export const useAppStore = create<AppState>((set, get) => {
       set({ confirmacaoDeDescarte: { quantas, aoConfirmar } }),
 
     fecharDescarteDeEdicoes: () => set({ confirmacaoDeDescarte: null }),
+
+    iniciarLote: (passos) => set({ lote: { passos, rodando: true } }),
+
+    atualizarPasso: (indice, passo) =>
+      set((estado) => {
+        if (!estado.lote) return estado
+        const passos = [...estado.lote.passos]
+        passos[indice] = passo
+        return { lote: { ...estado.lote, passos } }
+      }),
+
+    pararLoteNoErro: (continuar) =>
+      set((estado) => (estado.lote ? { lote: { ...estado.lote, rodando: false, continuar } } : estado)),
+
+    encerrarLote: () =>
+      set((estado) =>
+        estado.lote ? { lote: { ...estado.lote, rodando: false, continuar: undefined } } : estado
+      ),
+
+    fecharLote: () => set({ lote: null }),
 
     descartarPendencias: () =>
       set((estado) => ({

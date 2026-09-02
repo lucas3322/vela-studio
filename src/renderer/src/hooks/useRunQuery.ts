@@ -1,8 +1,10 @@
 import { useCallback } from 'react'
+import type { QueryError, QueryResult } from '@shared/types'
 import { isUnboundedMutation, splitStatements } from '@shared/sql-shape'
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
 import { useTabStore } from '../store/tabs'
+import { classificarPasso, prepararLote } from '../editor/lote'
 
 let queryCounter = 0
 
@@ -61,6 +63,15 @@ export function useRunQuery(): {
         return
       }
 
+      // Mais de um comando: executa um a um para poder dizer qual quebrou.
+      // Com um só, o caminho antigo continua — abrir um modal de progresso
+      // para uma consulta seria cerimônia sem informação.
+      const comandos = splitStatements(sql)
+      if (comandos.length > 1) {
+        await rodarEmLote(comandos, tab.id, connectionId, activeDatabase)
+        return
+      }
+
       const queryId = `q_${Date.now()}_${++queryCounter}`
       // `connectionId` não entra no patch: a conexão da aba é imutável.
       tabStore.updateTab(tab.id, {
@@ -114,6 +125,85 @@ export function useRunQuery(): {
       }
     },
     [notify]
+  )
+
+  /**
+   * Executa os comandos um a um, relatando cada um.
+   *
+   * Para no primeiro erro e oferece continuar dali. Seguir automaticamente
+   * produziria cascata: se o comando 3 cria uma tabela e o 4 insere nela,
+   * os erros seguintes escondem o primeiro — o único que importa.
+   *
+   * O resultado que fica na aba é o do **último comando que devolveu linhas**.
+   * Mostrar o do último executado deixaria a grade vazia depois de um lote que
+   * termina em `UPDATE`, como se a consulta anterior não tivesse achado nada.
+   */
+  const rodarEmLote = useCallback(
+    async (
+      comandos: string[],
+      tabId: string,
+      connectionId: string,
+      database: string | null
+    ): Promise<void> => {
+      const loja = useAppStore.getState()
+      loja.iniciarLote(prepararLote(comandos))
+      useTabStore.getState().updateTab(tabId, { running: true, error: undefined })
+
+      let ultimoComLinhas: QueryResult[] | null = null
+
+      const executarDe = async (inicio: number): Promise<void> => {
+        for (let i = inicio; i < comandos.length; i++) {
+          const passos = useAppStore.getState().lote?.passos
+          if (!passos) return // a pessoa fechou o modal no meio
+
+          useAppStore.getState().atualizarPasso(i, { sql: comandos[i], estado: 'rodando' })
+          const comecou = Date.now()
+
+          let saida: { results: QueryResult[]; error?: QueryError }
+          try {
+            saida = await window.vela.query.run({
+              connectionId,
+              sql: comandos[i],
+              database: database ?? undefined,
+              queryId: `lote_${Date.now()}_${i}`,
+              previewRows: useAppStore.getState().limitePreview
+            })
+          } catch (erro) {
+            saida = {
+              results: [],
+              error: { raw: (erro as Error).message, friendly: (erro as Error).message }
+            }
+          }
+
+          const passo = classificarPasso(
+            { sql: comandos[i], estado: 'rodando' },
+            saida,
+            Date.now() - comecou
+          )
+          useAppStore.getState().atualizarPasso(i, passo)
+
+          if (passo.estado === 'erro') {
+            // Para aqui. A decisão de seguir é da pessoa, com o erro na tela.
+            useAppStore.getState().pararLoteNoErro(() => void executarDe(i + 1))
+            useTabStore.getState().updateTab(tabId, { running: false, error: passo.erro })
+            return
+          }
+
+          if (saida.results.some((r) => r.columns.length > 0)) ultimoComLinhas = saida.results
+        }
+
+        useAppStore.getState().encerrarLote()
+        useTabStore.getState().updateTab(tabId, {
+          running: false,
+          queryId: undefined,
+          results: ultimoComLinhas ?? [],
+          activeResultIndex: 0
+        })
+      }
+
+      await executarDe(0)
+    },
+    []
   )
 
   const cancel = useCallback(async () => {

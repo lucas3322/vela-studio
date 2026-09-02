@@ -3013,3 +3013,98 @@
   background: var(--accent-subtle);
   color: var(--accent-text);
 }
+
+/* ── Andamento de lote ────────────────────────────────────────────── */
+
+.lote {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: min(46vh, 440px);
+  overflow-y: auto;
+}
+
+.lote__passo {
+  display: grid;
+  grid-template-columns: 28px 20px 1fr auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
+
+/*
+  Quem já rodou recua; o foco é onde a execução está agora.
+
+  A opacidade é 0.85, não menos: a 0.62 o texto secundário — a contagem de
+  linhas e o tempo — caía para 3.02:1, e ele é justamente o que responde "o que
+  já entrou no banco". O mínimo é 0.80 no tema claro e 0.82 no escuro; 0.85 dá
+  folga nos dois.
+
+  A primeira medição não pegou isso porque eu li a cor sem compor a
+  opacidade. Recuar visualmente não pode custar a leitura.
+*/
+.lote__passo--ok {
+  opacity: 0.85;
+}
+
+.lote__passo--rodando {
+  background: var(--accent-subtle);
+}
+
+.lote__passo--erro {
+  background: var(--danger-subtle);
+}
+
+/*
+  Na fila: recua mais que o concluído, mas o comando ainda precisa ser legível
+  — é por ele que a pessoa decide se vale continuar depois de um erro. A 0.45
+  o SQL media 2.84:1.
+*/
+.lote__passo--espera {
+  opacity: 0.85;
+}
+
+.lote__passo--espera .lote__marca::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+}
+
+.lote__numero {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.lote__marca {
+  display: grid;
+  place-items: center;
+}
+
+.lote__passo--ok .lote__marca {
+  color: var(--success);
+}
+
+.lote__passo--erro .lote__marca {
+  color: var(--danger);
+}
+
+.lote__sql {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-primary);
+}
+
+.lote__medida {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
