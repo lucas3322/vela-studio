@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vela Studio — a IDE de banco que ajuda a escrever a query</title>
-<meta name="description" content="IDE de banco de dados para macOS e Windows. Autocomplete que conhece seu schema, ajuda em português no hover e erros traduzidos. MySQL, PostgreSQL, SQLite e MongoDB.">
+<meta name="description" content="IDE de banco de dados para macOS e Windows. Autocomplete que conhece seu schema, ajuda em português no hover e erros traduzidos. MySQL, PostgreSQL, SQLite, MongoDB e Redis.">
 
 <meta property="og:title" content="Vela Studio">
 <meta property="og:description" content="A IDE de banco de dados que ajuda a escrever a query — não só a executá-la.">
@@ -789,8 +789,8 @@ LEFT JOIN pedidos p ON p.cliente_id = c.id</div>
   <div class="wrap">
     <div class="plate-head reveal">
       <span class="plate-num">04</span>
-      <h2>Quatro bancos, uma interface</h2>
-      <span class="mono-note">relacional e documentos</span>
+      <h2>Cinco bancos, uma interface</h2>
+      <span class="mono-note">relacional, documentos e chave-valor</span>
     </div>
 
     <div class="dbs reveal">
@@ -814,6 +814,11 @@ LEFT JOIN pedidos p ON p.cliente_id = c.id</div>
         <div class="db__n">MongoDB</div>
         <div class="db__d">Sintaxe do shell, com os campos inferidos por amostragem dos documentos.</div>
       </div>
+      <div class="db">
+        <div class="db__dot" style="background:#DC382D"></div>
+        <div class="db__n">Redis</div>
+        <div class="db__d">Strings, hashes, listas, sets e sorted sets navegáveis como tabela, com TTL na própria grade.</div>
+      </div>
     </div>
   </div>
 </section>
@@ -835,7 +840,7 @@ LEFT JOIN pedidos p ON p.cliente_id = c.id</div>
       <div class="feat"><div class="feat__k">Abas</div><div class="feat__t">Uma sessão por conexão</div><div class="feat__d">Troque de banco e volte: suas abas, resultados e SQL continuam onde estavam.</div></div>
       <div class="feat"><div class="feat__k">Tema</div><div class="feat__t">Claro e escuro de verdade</div><div class="feat__d">Desenhados separadamente, não invertidos. Acompanha o sistema se você quiser.</div></div>
       <div class="feat"><div class="feat__k">Histórico</div><div class="feat__t">As últimas 500 queries</div><div class="feat__d">Com busca. Aquela consulta de ontem não se perde.</div></div>
-      <div class="feat"><div class="feat__k">Guia</div><div class="feat__t">Referência navegável</div><div class="feat__d">Todo comando de SQL e MongoDB explicado, buscável, dentro do app.</div></div>
+      <div class="feat"><div class="feat__k">Guia</div><div class="feat__t">Referência navegável</div><div class="feat__d">Comandos de SQL, MongoDB e Redis explicados, buscáveis, dentro do app.</div></div>
     </div>
   </div>
 </section>
