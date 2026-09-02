@@ -29,15 +29,6 @@ import {
 
 const numberFormat = new Intl.NumberFormat('pt-BR', { notation: 'compact' })
 
-/** Tipo Redis correspondente a cada pseudo-tabela sintetizada pelo driver. */
-const TIPO_REDIS_POR_PSEUDOTABELA: Record<string, string> = {
-  strings: 'string',
-  hashes: 'hash',
-  lists: 'list',
-  sets: 'set',
-  'sorted-sets': 'zset'
-}
-
 interface DangerState {
   kind: 'truncate' | 'drop'
   table: string
@@ -150,16 +141,16 @@ export function Sidebar(): React.JSX.Element {
   /**
    * `SCAN` equivalente ao `SELECT * FROM tabela LIMIT 100` das outras abas.
    *
-   * Cada pseudo-tabela Redis representa um tipo (`strings`, `hashes`…), e o
-   * driver espera comandos brutos no console — não há um "nome de tabela"
-   * real para citar. `MATCH *` traz qualquer chave; `TYPE` restringe ao tipo
-   * desta pseudo-tabela, e `COUNT` é só uma dica de tamanho de lote, não um
-   * limite garantido — o Redis pode devolver menos, nunca mais que existir.
+   * `src/main/drivers/redis.ts` só reconhece a navegação de pseudo-tabela
+   * nesta forma exata, `SCAN <pseudo-tabela> [MATCH padrao]` — é assim que
+   * ele diferencia "abrir esta tabela" de um `SCAN <cursor>` de verdade
+   * digitado no console. Um `SCAN 0 MATCH * TYPE hash` (sintaxe real do
+   * Redis) cairia no caminho de comando cru, devolvendo cursor+chaves em vez
+   * da grade de três colunas — e a exportação, que usa este mesmo comando,
+   * pararia de fazer streaming de verdade. `TYPE` não entra aqui porque o
+   * tipo já está implícito no nome da pseudo-tabela.
    */
-  const comandoScanPseudoTabela = (pseudoTabela: string): string => {
-    const tipo = TIPO_REDIS_POR_PSEUDOTABELA[pseudoTabela] ?? pseudoTabela
-    return `SCAN 0 MATCH * TYPE ${tipo} COUNT 100`
-  }
+  const comandoScanPseudoTabela = (pseudoTabela: string): string => `SCAN ${pseudoTabela} MATCH *`
 
   const openInEditor = (sql: string, title?: string): void => {
     if (!activeId) return

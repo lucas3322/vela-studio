@@ -172,12 +172,21 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
           : dialect === 'redis'
             ? // O único filtro é a `key`: FiltroDeChaveRedis sempre manda uma
               // condição única com `coluna: 'key'`, cujo `valor` é o padrão glob.
-              montarScanRedis(table, filtro[0]?.valor ?? '', limite, salto)
+              montarScanRedis(table, filtro[0]?.valor ?? '')
             : montarSelect(table, dialect, ordemEfetiva, limite, salto, montarWhere(filtro, dialect))
 
       try {
         const [outcome, cols, idx, rels] = await Promise.all([
-          window.vela.query.run({ connectionId, sql, database: database ?? undefined, queryId }),
+          window.vela.query.run({
+            connectionId,
+            sql,
+            database: database ?? undefined,
+            queryId,
+            // SQL e Mongo embutem LIMIT/OFFSET no próprio comando; o Redis não
+            // tem OFFSET, então é `maxRows` que diz ao driver quantas chaves
+            // varrer do zero — ver `montarScanRedis`.
+            ...(dialect === 'redis' ? { maxRows: montarOpcoesRedis(limite, salto) } : {})
+          }),
           window.vela.schema.columns(connectionId, table, database ?? undefined).catch(() => []),
           window.vela.schema.indexes(connectionId, table, database ?? undefined).catch(() => []),
           window.vela.schema.relations(connectionId, table, database ?? undefined).catch(() => [])
@@ -191,7 +200,15 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
 
         // A linha-sonda não pode chegar à grade: ela pertence à próxima página.
         // Exibi-la faria a última linha de cada página aparecer duas vezes.
-        const resultados = outcome.results.map((resultado) => {
+        const resultados = outcome.results.map((resultadoBruto) => {
+          // O Redis não tem OFFSET: o driver devolveu `salto + limite` chaves
+          // varridas do zero (ver `montarScanRedis`), então as `salto`
+          // primeiras são de páginas já vistas e precisam ser descartadas
+          // aqui — nos outros drivers isso já vem cortado do próprio banco.
+          const resultado =
+            dialect === 'redis' && salto > 0
+              ? { ...resultadoBruto, rows: resultadoBruto.rows.slice(salto) }
+              : resultadoBruto
           const sobrou = resultado.rows.length > tamanhoPagina
           if (!cancelled) setTemProxima(sobrou)
           return sobrou
@@ -761,33 +778,33 @@ function montarFind(
   return `db.${table}.find(${filtro})${ordenacao}${pulo}.limit(${limite})`
 }
 
-/** Tipo Redis correspondente a cada pseudo-tabela sintetizada pelo driver. */
-const TIPO_REDIS_POR_PSEUDOTABELA: Record<string, string> = {
-  strings: 'string',
-  hashes: 'hash',
-  lists: 'list',
-  sets: 'set',
-  'sorted-sets': 'zset'
-}
 
 /**
  * Comando Redis equivalente ao `SELECT` paginado dos outros drivers.
  *
+ * `src/main/drivers/redis.ts` só reconhece a navegação de pseudo-tabela na
+ * forma exata `SCAN <pseudo-tabela> [MATCH padrao]` — é assim que ele
+ * diferencia "abrir esta tabela" de um `SCAN <cursor>` de verdade digitado
+ * no console (cujo primeiro argumento é sempre um cursor numérico). `TYPE` e
+ * `COUNT` não fazem parte dessa convenção: o tipo já está implícito no nome
+ * da pseudo-tabela, e quem decide quantas linhas voltam é o `maxRows` da
+ * chamada, não o texto do comando — ver `montarOpcoesRedis`.
+ *
  * O Redis não tem `OFFSET` de verdade: `SCAN` devolve um cursor opaco, não
- * uma posição, e a ordem das chaves não é estável entre chamadas. Como a
- * grade desta IDE pagina por página+tamanho fixos — igual aos drivers SQL —,
- * pedimos ao driver os primeiros `salto + limite` resultados a partir do
- * cursor `0`; cabe a ele cortar a página em vista, do mesmo jeito que o
- * `LIMIT/OFFSET` de SQL corta depois do `ORDER BY`. É uma aproximação sabida
- * como imperfeita: sem um cursor real chegando ao renderer, não existe forma
- * de pedir "a próxima leva" sem reler tudo desde o início. `TYPE` restringe
- * ao tipo Redis desta pseudo-tabela; `MATCH` é o único filtro que o Redis
- * aceita aqui, porque não há índice secundário por campo.
+ * uma posição, e a ordem das chaves não é estável entre chamadas. Pedir a
+ * "próxima leva" sem reler tudo desde o início não existe aqui — por isso
+ * `montarOpcoesRedis` pede `salto + limite` chaves do zero a cada página, e o
+ * carregamento descarta as `salto` primeiras depois. Aproximação sabida como
+ * imperfeita, documentada em vez de escondida.
  */
-function montarScanRedis(table: string, padraoDeChave: string, limite: number, salto: number): string {
-  const tipo = TIPO_REDIS_POR_PSEUDOTABELA[table] ?? table
+function montarScanRedis(table: string, padraoDeChave: string): string {
   const padrao = padraoDeChave.trim() || '*'
-  return `SCAN 0 MATCH ${padrao} TYPE ${tipo} COUNT ${salto + limite}`
+  return `SCAN ${table} MATCH ${padrao}`
+}
+
+/** Quantas chaves pedir ao driver para cobrir a página pedida — ver `montarScanRedis`. */
+function montarOpcoesRedis(limite: number, salto: number): number {
+  return salto + limite
 }
 
 /**
