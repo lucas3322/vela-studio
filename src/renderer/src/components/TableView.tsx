@@ -80,6 +80,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
   const updateTab = useTabStore((s) => s.updateTab)
   const reloadTab = useTabStore((s) => s.reloadTab)
   const openTableTab = useTabStore((s) => s.openTableTab)
+  const openQueryTab = useTabStore((s) => s.openQueryTab)
   const notify = useAppStore((s) => s.notify)
 
   const table = tab.table!
@@ -364,6 +365,13 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
               schemaColumns={columns}
               readOnly={!!connection?.readOnly}
               onNotify={notify}
+              dialect={dialect}
+              // Mesmo padrão do "Gerar SELECT" da barra lateral: só monta o
+              // comando das linhas marcadas e abre numa aba nova, sem rodar.
+              onGerarComando={(sql, titulo) => {
+                if (!connectionId) return
+                openQueryTab({ connectionId, database, sql, title: titulo })
+              }}
               sort={ordem}
               // Trocar a ordem reexecuta a consulta: o ORDER BY vai para o
               // banco, que ordena a tabela inteira antes de cortar a página.

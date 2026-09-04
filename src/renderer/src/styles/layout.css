@@ -610,6 +610,21 @@
   background: var(--accent);
 }
 
+/*
+ * Cabeçalho da coluna que a busca (⌘F) encontrou pelo nome: âmbar cheio, o
+ * mesmo "é aqui" da seleção de linha pelo número. O rótulo do tipo perde a
+ * cor terciária (invisível sobre o âmbar) e passa a tinta de contraste.
+ */
+.grid__th--realcada {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.grid__th--realcada .grid__th-type {
+  color: var(--accent-ink);
+  opacity: 0.75;
+}
+
 .grid__row {
   display: flex;
   height: var(--row-height);
@@ -636,6 +651,17 @@
   flex-shrink: 0;
   user-select: text;
   cursor: text;
+}
+
+/*
+ * Célula de uma coluna realçada pela busca. Âmbar tênue na coluna inteira —
+ * só o cabeçalho leva o âmbar cheio; a faixa de células precisa deixar o dado
+ * legível. Declarada antes de `--selected` de propósito: se a pessoa focar uma
+ * célula dentro da coluna acesa, o foco (mais específico do que "a coluna
+ * toda") tem de vencer, e no empate de especificidade vence quem vem depois.
+ */
+.grid__cell--coluna-realcada {
+  background: var(--accent-subtle);
 }
 
 .grid__cell--selected {
@@ -716,6 +742,35 @@
 
 .grid__truncated--alerta strong {
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Barra de seleção múltipla (checkbox da grade) ──────────────────── */
+
+/*
+ * Aparece só com algo marcado. O fundo âmbar tênue é o mesmo vocabulário do
+ * acento em outros lugares do app — aqui ele é legítimo porque a barra
+ * inteira é interface, não dado, e o amarelo já é reservado a exatamente
+ * este tipo de sinal (estado ativo, não neutro).
+ */
+.grid-selecao {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--accent-subtle);
+  border-bottom: 1px solid var(--accent);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.grid-selecao strong {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.grid-selecao__espaco {
+  flex: 1;
 }
 
 /* ── Painel de erro ──────────────────────────────────────────────── */
@@ -1797,6 +1852,26 @@
 .grid__gutter--clicavel:hover {
   color: var(--accent-text);
   background: var(--accent-subtle);
+}
+
+/*
+ * Linha marcada para o conjunto (exportar / gerar INSERT): número em âmbar
+ * cheio — o mesmo sinal do foco de linha (`.grid__row--selecionada .grid__gutter`),
+ * mas aqui várias podem estar assim ao mesmo tempo. É a seleção múltipla,
+ * agora sem coluna de checkbox: o próprio número é a caixa.
+ *
+ * O hover é na **linha**, com o número como descendente — nunca `:hover` no
+ * próprio número. Passar o mouse por qualquer célula da linha aciona
+ * `.grid__row:hover .grid__gutter` (fundo neutro, mesma especificidade 0,3,0);
+ * se o realce dependesse do número estar sob o cursor, ele sumia assim que o
+ * mouse saísse do número e ficasse sobre o dado — a seleção parecia
+ * desmarcar no hover. Esta regra vem depois e cobre a linha inteira.
+ */
+.grid__gutter--selecionada,
+.grid__row:hover .grid__gutter--selecionada {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
 }
 
 /*

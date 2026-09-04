@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
-import type { QueryResult } from '@shared/types'
+import { DRIVERS, type QueryResult } from '@shared/types'
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
 import { useTabStore, type Tab } from '../store/tabs'
@@ -149,7 +149,10 @@ function GradeDoResultado({ tab, result }: { tab: Tab; result: QueryResult }): R
   const schema = useConnectionStore((s) => s.currentSchema())
   const conexao = useConnectionStore((s) => s.saved.find((c) => c.id === tab.connectionId))
   const notify = useAppStore((s) => s.notify)
+  const openQueryTab = useTabStore((s) => s.openQueryTab)
   const { run } = useRunQuery()
+
+  const dialect = conexao ? DRIVERS[conexao.driver].dialect : 'mysql'
 
   const origem = useMemo(
     () =>
@@ -178,6 +181,15 @@ function GradeDoResultado({ tab, result }: { tab: Tab; result: QueryResult }): R
       readOnly={!!conexao?.readOnly}
       motivoExterno={origem.motivo}
       onNotify={notify}
+      dialect={dialect}
+      // "Gerar INSERT" da seleção múltipla só existe quando `origemEditavel`
+      // achou uma tabela única de origem — sem ela não há para onde gerar.
+      onGerarComando={
+        origem.tabela
+          ? (sql, titulo) =>
+              openQueryTab({ connectionId: tab.connectionId, database: tab.database, sql, title: titulo })
+          : undefined
+      }
       /*
         Reconsulta depois de gravar. O banco pode ter guardado algo diferente
         do que foi digitado — trigger, coerção de tipo, um varchar que truncou

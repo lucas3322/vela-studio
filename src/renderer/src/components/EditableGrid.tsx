@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ColumnInfo, QueryResult, RelationInfo } from '@shared/types'
+import type { ColumnInfo, Dialect, QueryResult, RelationInfo } from '@shared/types'
 import { useAppStore } from '../store/app'
 import { mesmoValor, paraEdicao } from '../editor/cell-value'
 import { digitandoEmCampo, focoAtual } from '../editor/foco'
@@ -9,13 +9,30 @@ import {
   proximoAchado,
   type Achado
 } from '../editor/busca-na-grade'
+import { descreverExportacao } from '../editor/export-message'
+import { gerarComandosRedis, gerarInsertMongo, gerarInsertSql } from '../editor/gerar-insert'
 import { CellEditorModal } from './CellEditorModal'
 import { ContextMenu, type MenuEntry } from './ContextMenu'
 import { TruncationNotice } from './TruncationNotice'
-import { IconClose, IconCopy, IconLink, IconSearch, IconTrash, IconWarning } from './Icons'
+import {
+  IconClose,
+  IconCopy,
+  IconDownload,
+  IconLink,
+  IconSearch,
+  IconStructure,
+  IconTrash,
+  IconWarning
+} from './Icons'
 
 const ROW_HEIGHT = 30
 const GUTTER_WIDTH = 52
+/**
+ * Coluna de checkbox, para marcar mais de uma linha e agir sobre o conjunto
+ * (exportar, gerar INSERT). Fica à esquerda até do número da linha — é o
+ * primeiro gesto de planilha, então ocupa o primeiro lugar.
+ */
+const CHECK_WIDTH = 32
 const OVERSCAN = 8
 
 const numberFormat = new Intl.NumberFormat('pt-BR')
@@ -96,6 +113,19 @@ interface Props {
    * descartaria em silêncio a alteração que ainda não entrou.
    */
   onApplied?: () => void
+  /**
+   * Dialeto da conexão, só para a barra de seleção múltipla saber que sintaxe
+   * usar no "Gerar INSERT" — SQL cita identificador de um jeito por banco, e
+   * Mongo e Redis nem falam `INSERT`. Sem isto o botão teria que adivinhar.
+   */
+  dialect?: Dialect
+  /**
+   * Abre o texto gerado numa aba de query nova. Mesmo padrão do "Gerar
+   * SELECT" da barra lateral (`Sidebar.tsx`, `openInEditor`): só monta o
+   * comando, quem decide rodar é o usuário. A grade não conhece aba nem
+   * conexão — por isso o prop, em vez de importar o store de abas aqui.
+   */
+  onGerarComando?: (sql: string, titulo?: string) => void
 }
 
 export interface OrdenacaoDaGrade {
@@ -151,7 +181,9 @@ export function EditableGrid({
   colunaEmEvidencia,
   relacoes,
   onAbrirRelacao,
-  onApplied
+  onApplied,
+  dialect,
+  onGerarComando
 }: Props): React.JSX.Element {
   const scroller = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
@@ -182,6 +214,16 @@ export function EditableGrid({
   })
 
   /**
+   * Coluna inteira em realce, quando o achado da busca é um **nome de coluna**.
+   *
+   * Rolar até a coluna a punha na tela mas não dizia qual das que apareceram
+   * era a procurada — numa faixa de oitenta colunas parecidas, "está em algum
+   * lugar por aqui" não ajuda. O realce marca a coluna certa, cabeçalho e
+   * células, até a busca fechar ou o foco ir para uma célula.
+   */
+  const [colunaRealcada, setColunaRealcada] = useState<number | null>(null)
+
+  /**
    * Alterações que ainda **não** foram para o banco.
    *
    * Antes cada Enter gravava direto, sem volta: um clique errado numa coluna e
@@ -197,6 +239,18 @@ export function EditableGrid({
   const [exclusoesPendentes, setExclusoesPendentes] = useState<Set<number>>(new Set())
   /** Linhas que o banco já removeu — ficam riscadas até a próxima consulta. */
   const [excluidas, setExcluidas] = useState<Set<number>>(new Set())
+
+  /**
+   * Linhas marcadas pelo checkbox, para agir sobre o conjunto — exportar ou
+   * gerar INSERT. É um conceito **novo e independente** de `selecao`: aquela
+   * é o foco de uma célula/linha só (edição, ⌘C), esta é uma multi-marcação
+   * para ação em lote. As duas convivem: dá para ter uma célula em foco e três
+   * linhas marcadas ao mesmo tempo, então não reaproveitam o mesmo estado nem
+   * a mesma classe CSS.
+   */
+  const [selecionadas, setSelecionadas] = useState<Set<number>>(new Set())
+  /** Âncora do shift+clique — o índice do último clique simples no checkbox. */
+  const ultimaMarcada = useRef<number | null>(null)
 
   useEffect(() => {
     const quantas = Object.keys(pendentes).length + exclusoesPendentes.size
@@ -319,18 +373,25 @@ export function EditableGrid({
       const caixa = scroller.current
       if (!caixa) return
 
-      const esquerda = widths.slice(0, achado.coluna).reduce((soma, w) => soma + w, GUTTER_WIDTH)
+      const esquerda = widths
+        .slice(0, achado.coluna)
+        .reduce((soma, w) => soma + w, CHECK_WIDTH + GUTTER_WIDTH)
       const left = Math.max(0, esquerda - caixa.clientWidth / 2 + widths[achado.coluna] / 2)
 
       if (achado.linha != null) {
         const top = Math.max(0, achado.linha * ROW_HEIGHT - caixa.clientHeight / 2)
         caixa.scrollTo({ top, left, behavior: 'smooth' })
         setSelecao({ tipo: 'celula', linha: achado.linha, coluna: achado.coluna })
+        // O foco é a célula: um realce de coluna sobrando aqui competiria com
+        // ele e diria "é isto" duas vezes, em coisas diferentes.
+        setColunaRealcada(null)
       } else {
         // Achado de coluna: rola na horizontal e não mexe na vertical, senão a
-        // pessoa perde o lugar onde estava lendo.
+        // pessoa perde o lugar onde estava lendo. Sem célula para focar, o que
+        // aponta a coluna é o realce dela inteira.
         caixa.scrollTo({ left, behavior: 'smooth' })
         setSelecao(null)
+        setColunaRealcada(achado.coluna)
       }
     },
     [widths]
@@ -345,7 +406,13 @@ export function EditableGrid({
 
   // Navegar já ao digitar: a primeira ocorrência aparece sem precisar de Enter.
   useEffect(() => {
-    if (!busca.aberta || achados.length === 0) return
+    if (!busca.aberta) return
+    if (achados.length === 0) {
+      // O termo deixou de casar qualquer coluna: um realce velho apontaria
+      // uma coluna que a busca atual não escolheu mais.
+      setColunaRealcada(null)
+      return
+    }
     irPara(achados[Math.min(busca.indice, achados.length - 1)])
   }, [busca.aberta, busca.indice, achados, irPara])
 
@@ -421,6 +488,12 @@ export function EditableGrid({
     setPendentes({})
     setExclusoesPendentes(new Set())
     setExcluidas(new Set())
+    // Trocar de página, filtrar, reordenar ou trocar de tabela troca o
+    // conjunto de linhas por baixo dos índices marcados: a linha 3 de uma
+    // página não é a linha 3 da próxima. Continuar com a marca seria um bug
+    // silencioso — pareceria selecionado o que na verdade é outro registro.
+    setSelecionadas(new Set())
+    ultimaMarcada.current = null
 
     // O vertical volta ao topo sempre — a ordem das linhas mudou, e continuar
     // na linha 400 não significa nada. O horizontal só volta quando o conjunto
@@ -447,7 +520,7 @@ export function EditableGrid({
   }, [scrollTop, viewportHeight, result.rows.length])
 
   const larguraTotal = useMemo(
-    () => widths.reduce((soma, w) => soma + w, GUTTER_WIDTH),
+    () => widths.reduce((soma, w) => soma + w, CHECK_WIDTH + GUTTER_WIDTH),
     [widths]
   )
 
@@ -528,6 +601,109 @@ export function EditableGrid({
     setExclusoesPendentes(new Set())
     onNotify?.('Alterações descartadas.', 'info')
   }, [onNotify])
+
+  // ── Seleção múltipla (pelo número da linha) ───────────────────────────
+
+  /**
+   * Seleciona linhas clicando no número, no gesto de qualquer planilha:
+   *
+   *  - clique simples: seleciona só esta linha, trocando a seleção anterior;
+   *  - ⌘/Ctrl+clique: soma ou tira esta linha, sem mexer nas outras;
+   *  - Shift+clique: marca o intervalo da âncora (o último clique simples)
+   *    até aqui, somando ao que já estava selecionado.
+   *
+   * Não há mais coluna de checkbox: o número da linha **é** a caixa de
+   * seleção. O clique simples também vira o foco da linha (`selecao`), para o
+   * ⌘C e o menu de contexto continuarem com um alvo — foco e seleção múltipla
+   * convivem: a linha em foco ganha o fundo cheio, as demais selecionadas
+   * ficam só com o número em âmbar.
+   */
+  const selecionarLinha = useCallback(
+    (linha: number, mods: { shift: boolean; meta: boolean }) => {
+      setSelecionadas((atuais) => {
+        // Shift soma o intervalo: marcar a 2, depois shift+clicar na 5, não
+        // deveria apagar uma marca distante feita antes.
+        if (mods.shift && ultimaMarcada.current !== null) {
+          const copia = new Set(atuais)
+          const inicio = Math.min(ultimaMarcada.current, linha)
+          const fim = Math.max(ultimaMarcada.current, linha)
+          for (let i = inicio; i <= fim; i++) copia.add(i)
+          return copia
+        }
+        if (mods.meta) {
+          const copia = new Set(atuais)
+          if (copia.has(linha)) copia.delete(linha)
+          else copia.add(linha)
+          ultimaMarcada.current = linha
+          return copia
+        }
+        ultimaMarcada.current = linha
+        return new Set([linha])
+      })
+      setSelecao({ tipo: 'linha', linha })
+    },
+    []
+  )
+
+  const limparSelecao = useCallback(() => {
+    setSelecionadas(new Set())
+    ultimaMarcada.current = null
+  }, [])
+
+  /**
+   * Serializa as linhas marcadas e salva em arquivo — CSV ou JSON, mesmo
+   * formato da exportação existente (`export-format.ts`, BOM no CSV). A
+   * diferença para aquela é só a origem do dado: aqui as linhas já estão na
+   * memória da grade, então não há por que consultar o banco de novo — é
+   * por isso que chama `app.exportResult` (reempacota o que já tem) e não
+   * `app.exportQuery` (que refaz a consulta em fluxo, para exportações que
+   * não cabem na grade).
+   */
+  const exportarSelecionadas = useCallback(
+    async (formato: 'csv' | 'json') => {
+      const indices = [...selecionadas].sort((a, b) => a - b)
+      if (indices.length === 0) return
+      const colunas = result.columns.map((c) => c.name)
+      const linhas = indices.map((linha) => colunas.map((_, coluna) => valorDe(linha, coluna)))
+
+      try {
+        const caminho = await window.vela.app.exportResult({
+          format: formato,
+          columns: colunas,
+          rows: linhas,
+          suggestedName: `${table ?? 'selecao'}_selecionadas`
+        })
+        if (caminho) {
+          onNotify?.(descreverExportacao({ arquivos: [caminho], linhas: linhas.length }), 'success')
+        }
+      } catch (erro) {
+        onNotify?.(erro instanceof Error ? erro.message : 'Falha ao exportar.', 'danger')
+      }
+    },
+    [selecionadas, result.columns, valorDe, table, onNotify]
+  )
+
+  /**
+   * Monta o(s) comando(s) de escrita das linhas marcadas e abre numa aba de
+   * query nova — nunca executa. `table` aqui é a origem (tabela, coleção ou
+   * pseudo-tabela Redis); sem ela não há para onde gerar o INSERT, porque uma
+   * consulta com JOIN não tem um destino único.
+   */
+  const gerarInsertDasSelecionadas = useCallback(() => {
+    if (!table || !onGerarComando) return
+    const indices = [...selecionadas].sort((a, b) => a - b)
+    if (indices.length === 0) return
+    const colunas = result.columns.map((c) => c.name)
+    const linhas = indices.map((linha) => colunas.map((_, coluna) => valorDe(linha, coluna)))
+
+    if (dialect === 'mongodb') {
+      onGerarComando(gerarInsertMongo(table, colunas, linhas), `Insert ${table}`)
+    } else if (dialect === 'redis') {
+      onGerarComando(gerarComandosRedis(table, colunas, linhas), `Comandos ${table}`)
+    } else {
+      onGerarComando(gerarInsertSql(table, colunas, linhas, dialect ?? 'mysql'), `Insert ${table}`)
+    }
+  }, [table, onGerarComando, selecionadas, result.columns, valorDe, dialect])
 
   /**
    * Grava tudo que está pendente.
@@ -624,6 +800,20 @@ export function EditableGrid({
         return
       }
 
+      // Esc limpa a seleção múltipla antes de olhar para `selecao` — são
+      // estados independentes, e sem isto o Esc não fazia nada quando havia
+      // linha marcada por checkbox mas nenhuma célula em foco (a guarda
+      // abaixo teria retornado cedo demais).
+      if (
+        evento.key === 'Escape' &&
+        selecionadas.size > 0 &&
+        !digitandoEmCampo(focoAtual(document.activeElement))
+      ) {
+        setSelecionadas(new Set())
+        ultimaMarcada.current = null
+        return
+      }
+
       if (!selecao) return
       // Este listener é no `window`, então vale na tela inteira. Sem esta
       // guarda, uma célula selecionada fazia o Enter do editor de SQL abrir o
@@ -658,7 +848,7 @@ export function EditableGrid({
     }
     window.addEventListener('keydown', aoTeclar)
     return () => window.removeEventListener('keydown', aoTeclar)
-  }, [selecao, editing, valorDe, abrirEdicao, abrirEdicaoAmpla, result.columns, onNotify])
+  }, [selecao, editing, valorDe, abrirEdicao, abrirEdicaoAmpla, result.columns, onNotify, selecionadas])
 
   const iniciarRedimensionamento = (indice: number) => (evento: React.MouseEvent) => {
     evento.preventDefault()
@@ -809,6 +999,7 @@ export function EditableGrid({
               if (e.key === 'Escape') {
                 e.preventDefault()
                 setBusca({ aberta: false, termo: '', indice: 0 })
+                setColunaRealcada(null)
               }
             }}
           />
@@ -841,9 +1032,67 @@ export function EditableGrid({
           </button>
           <button
             className="icon-btn"
-            onClick={() => setBusca({ aberta: false, termo: '', indice: 0 })}
+            onClick={() => {
+              setBusca({ aberta: false, termo: '', indice: 0 })
+              setColunaRealcada(null)
+            }}
             title="Fechar (Esc)"
           >
+            <IconClose size={13} />
+          </button>
+        </div>
+      )}
+
+      {/*
+        Barra de ações da seleção múltipla — só aparece com algo marcado.
+        Fica acima da grade, abaixo do filtro (que mora em `TableFilterBar`,
+        renderizado por quem chama esta grade).
+      */}
+      {selecionadas.size > 0 && (
+        <div className="grid-selecao">
+          <span>
+            <strong>{numberFormat.format(selecionadas.size)}</strong>{' '}
+            {selecionadas.size === 1 ? 'selecionada' : 'selecionadas'}
+          </span>
+          <span className="grid-selecao__espaco" />
+          <button
+            className="btn btn--secondary btn--sm"
+            onClick={() => void exportarSelecionadas('csv')}
+            title="Salva as linhas marcadas em CSV — abre no Excel"
+          >
+            <IconDownload size={13} />
+            Exportar CSV
+          </button>
+          <button
+            className="btn btn--secondary btn--sm"
+            onClick={() => void exportarSelecionadas('json')}
+            title="Salva as linhas marcadas em JSON"
+          >
+            <IconDownload size={13} />
+            Exportar JSON
+          </button>
+          <button
+            className="btn btn--secondary btn--sm"
+            onClick={gerarInsertDasSelecionadas}
+            disabled={!table || !onGerarComando}
+            title={
+              !table
+                ? 'A origem da linha não foi identificada — sem tabela, não há para onde gerar o comando'
+                : dialect === 'mongodb'
+                  ? 'Abre um insertOne por linha numa aba de query nova'
+                  : dialect === 'redis'
+                    ? 'Abre o comando equivalente por linha numa aba de query nova'
+                    : 'Abre um INSERT por linha numa aba de query nova'
+            }
+          >
+            <IconStructure size={13} />
+            {dialect === 'mongodb'
+              ? 'Gerar insertOne'
+              : dialect === 'redis'
+                ? 'Gerar comandos'
+                : 'Gerar INSERT'}
+          </button>
+          <button className="icon-btn" onClick={limparSelecao} title="Limpar seleção (Esc)">
             <IconClose size={13} />
           </button>
         </div>
@@ -861,7 +1110,7 @@ export function EditableGrid({
                   key={coluna.name + indice}
                   className={`grid__th ${onSort ? 'grid__th--ordenavel' : ''} ${
                     ordenadaPor ? 'grid__th--ordenada' : ''
-                  }`}
+                  } ${indice === colunaRealcada ? 'grid__th--realcada' : ''}`}
                   style={{ width: widths[indice] }}
                   onClick={() => onSort?.(proximaOrdem(coluna.name, sort ?? null))}
                   title={
@@ -899,6 +1148,7 @@ export function EditableGrid({
                 const excluida = excluidas.has(indiceLinha)
                 const marcadaParaExcluir = exclusoesPendentes.has(indiceLinha)
                 const linhaSelecionada = selecao?.tipo === 'linha' && selecao.linha === indiceLinha
+                const selecionadaNoConjunto = selecionadas.has(indiceLinha)
                 return (
                   <div
                     key={indiceLinha}
@@ -910,20 +1160,33 @@ export function EditableGrid({
                     style={{ width: larguraTotal }}
                   >
                     {/*
-                      Clicar no número seleciona a linha inteira, como em
-                      qualquer planilha. É `onMouseDown` para casar com o
-                      gesto das células — no `click` a seleção só apareceria
-                      ao soltar o botão.
+                      O número da linha é a caixa de seleção. Clique simples
+                      troca a seleção, ⌘/Ctrl soma, Shift marca o intervalo —
+                      o gesto de planilha, sem uma coluna de checkbox ocupando
+                      espaço. `onMouseDown` casa com o gesto das células: no
+                      `click`, a seleção só apareceria ao soltar o botão.
                     */}
                     <div
-                      className="grid__gutter grid__gutter--clicavel"
-                      onMouseDown={() => setSelecao({ tipo: 'linha', linha: indiceLinha })}
+                      className={`grid__gutter grid__gutter--clicavel ${
+                        selecionadaNoConjunto ? 'grid__gutter--selecionada' : ''
+                      }`}
+                      onMouseDown={(e) =>
+                        selecionarLinha(indiceLinha, {
+                          shift: e.shiftKey,
+                          meta: e.metaKey || e.ctrlKey
+                        })
+                      }
                       onContextMenu={(e) => {
                         e.preventDefault()
-                        setSelecao({ tipo: 'linha', linha: indiceLinha })
+                        // Menu numa linha fora da seleção passa a mirar só ela;
+                        // dentro da seleção, preserva o conjunto (agir sobre
+                        // várias de uma vez).
+                        if (!selecionadaNoConjunto) {
+                          selecionarLinha(indiceLinha, { shift: false, meta: false })
+                        }
                         setMenu({ x: e.clientX, y: e.clientY, row: indiceLinha, col: 0 })
                       }}
-                      title="Clique para selecionar a linha · ⌘C copia para a planilha"
+                      title="Clique seleciona a linha · ⌘/Ctrl soma · Shift marca intervalo · ⌘C copia"
                     >
                       {indiceLinha + 1}
                     </div>
@@ -973,7 +1236,9 @@ export function EditableGrid({
                             selecionada ? 'grid__cell--selected' : ''
                           } ${aplicando && marca in pendentes ? 'grid__cell--salvando' : ''} ${
                             marca in pendentes ? 'grid__cell--alterada' : ''
-                          } ${destino && valor !== null ? 'grid__cell--relacional' : ''}`}
+                          } ${destino && valor !== null ? 'grid__cell--relacional' : ''} ${
+                            indiceColuna === colunaRealcada ? 'grid__cell--coluna-realcada' : ''
+                          }`}
                           style={{ width: widths[indiceColuna] }}
                           title={
                             destino && valor !== null
