@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 1.1.0 — 2026-09-04
+
+### Novidades
+
+- adicionar suporte à seleção múltipla na grade e geração de comandos para exportação (dddf781)
+
 ## 1.0.0 — 2026-09-02
 
 ### Outras mudanças
