@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 1.1.1 — 2026-09-06
+
+### Correções
+
+- adicionar opção para abrir queries salvas em nova aba (813b9da)
+
 ## 1.1.0 — 2026-09-04
 
 ### Novidades
