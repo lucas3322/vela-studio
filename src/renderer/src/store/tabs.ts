@@ -82,6 +82,13 @@ interface TabState {
     sql?: string
     title?: string
     savedQueryId?: string
+    /**
+     * Abre uma aba nova mesmo que esta query salva já esteja aberta.
+     *
+     * O clique normal numa query salva reaproveita a aba existente; só a ação
+     * explícita "Abrir em nova aba" do menu força uma cópia.
+     */
+    forceNew?: boolean
   /**
    * Contador que força a aba a reconsultar o banco.
    *
@@ -127,7 +134,25 @@ export const useTabStore = create<TabState>((set, get) => ({
     return tabs.find((t) => t.id === activeId) ?? tabs[0]
   },
 
-  openQueryTab: ({ connectionId, database, sql, title, savedQueryId }) => {
+  openQueryTab: ({ connectionId, database, sql, title, savedQueryId, forceNew }) => {
+    // Query salva já aberta nesta conexão: foca a aba existente em vez de
+    // empilhar cópias. Clicar cinco vezes na mesma query salva é acidente, não
+    // intenção — mesmo princípio de openTableTab/openModelTab. Só foca; não
+    // sobrescreve o SQL da aba, que a pessoa pode ter editado desde que abriu.
+    // O "Abrir em nova aba" do menu passa forceNew para o caso de querer cópia.
+    if (savedQueryId && !forceNew) {
+      const existente = get()
+        .tabsFor(connectionId)
+        .find((t) => t.kind === 'query' && t.savedQueryId === savedQueryId)
+
+      if (existente) {
+        set((state) => ({
+          activeByConnection: { ...state.activeByConnection, [connectionId]: existente.id }
+        }))
+        return existente.id
+      }
+    }
+
     const id = newId()
     const existing = get()
       .tabsFor(connectionId)

@@ -53,7 +53,7 @@ export function SavedQueries(): React.JSX.Element {
     )
   }, [queries, filtro])
 
-  const abrir = (query: SavedQuery): void => {
+  const abrir = (query: SavedQuery, opcoes?: { novaAba?: boolean }): void => {
     // Abre sempre na conexão ativa: clicar numa query salva de outro banco e
     // ser jogado para outra conexão sem avisar seria pior que o inconveniente
     // de ela não rodar de primeira.
@@ -66,7 +66,10 @@ export function SavedQueries(): React.JSX.Element {
       database: activeDatabase,
       sql: query.sql,
       title: query.name,
-      savedQueryId: query.id
+      savedQueryId: query.id,
+      // Clique normal reaproveita a aba se ela já estiver aberta; só o item
+      // "Abrir em nova aba" do menu força uma cópia.
+      forceNew: opcoes?.novaAba
     })
   }
 
@@ -77,7 +80,7 @@ export function SavedQueries(): React.JSX.Element {
   }
 
   const itensDoMenu = (query: SavedQuery): MenuEntry[] => [
-    { label: 'Abrir em nova aba', onSelect: () => abrir(query) },
+    { label: 'Abrir em nova aba', onSelect: () => abrir(query, { novaAba: true }) },
     {
       label: 'Copiar SQL',
       icon: <IconCopy size={14} />,
