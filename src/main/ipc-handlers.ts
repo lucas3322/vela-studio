@@ -1,22 +1,40 @@
 import { randomUUID } from 'node:crypto'
 import { exportarEmFluxo } from './export-writer'
-import { writeFileSync } from 'node:fs'
-import { ipcMain, dialog, nativeTheme, BrowserWindow } from 'electron'
-import { IPC, UPDATE_PROGRESS_EVENT , EXPORT_PROGRESS_EVENT } from '../shared/ipc'
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { ipcMain, dialog, nativeTheme, shell, BrowserWindow } from 'electron'
+import { IPC, UPDATE_PROGRESS_EVENT, EXPORT_PROGRESS_EVENT, IMPORT_PROGRESS_EVENT } from '../shared/ipc'
 import type {
   ColumnInfo,
   ConnectionConfig,
+  DriverId,
+  FormatoDeImportacao,
+  ImportProgress,
   InsertRowParams,
+  MapeamentoDeColuna,
+  OpcoesDeImportacao,
+  PreviaDeImportacao,
   QueryRunResult,
+  ResultadoDaImportacao,
   TableInfo
 } from '../shared/types'
+import type { DatabaseDriver } from './drivers/types'
 import { ConnectionManager } from './connection-manager'
 import { ConnectionStore } from './connection-store'
 import { translateError } from './error-translator'
 import { isMutation, splitStatements } from '../shared/sql-shape'
+import {
+  lerLinhasCsv,
+  lerPreviaArquivo,
+  numerosDeLinhaDosComandos,
+  removerBom
+} from './import-reader'
 import { abrirArquivo, abrirPaginaDaRelease, baixarAtualizacao, verificarAtualizacao } from './updater'
 
 export function registerIpcHandlers(manager: ConnectionManager, store: ConnectionStore): void {
+  // Marca cooperativa de cancelamento da importação — mesmo espírito do
+  // `cancel` de query: para no fim do lote atual, não no meio.
+  const importsCancelados = new Set<string>()
+
   // ── Conexões ──────────────────────────────────────────────────────────
   ipcMain.handle(IPC.connectionsList, () => store.list())
 
@@ -344,6 +362,7 @@ export function registerIpcHandlers(manager: ConnectionManager, store: Connectio
         database?: string
         format: 'csv' | 'json'
         suggestedName: string
+        totalEstimado?: number
       }
     ) => {
       const window = BrowserWindow.fromWebContents(event.sender)
@@ -364,12 +383,82 @@ export function registerIpcHandlers(manager: ConnectionManager, store: Connectio
           // Exportação de milhões de linhas leva minutos. Sem andamento, a
           // única leitura possível da tela é "travou".
           if (!event.sender.isDestroyed()) {
-            event.sender.send(EXPORT_PROGRESS_EVENT, { linhas, arquivos })
+            event.sender.send(EXPORT_PROGRESS_EVENT, {
+              linhas,
+              arquivos,
+              totalEstimado: params.totalEstimado
+            })
           }
         }
       })
     }
   )
+
+  // ── Importação de arquivo ────────────────────────────────────────────
+
+  ipcMain.handle(
+    IPC.appImportPreview,
+    async (event, params: { caminho?: string; linhas?: number }): Promise<PreviaDeImportacao | undefined> => {
+      let caminho = params.caminho
+      if (!caminho) {
+        const window = BrowserWindow.fromWebContents(event.sender)
+        const escolha = await dialog.showOpenDialog(window!, {
+          properties: ['openFile'],
+          filters: [
+            { name: 'CSV ou dump SQL', extensions: ['csv', 'sql', 'txt'] },
+            { name: 'Todos os arquivos', extensions: ['*'] }
+          ]
+        })
+        if (escolha.canceled || !escolha.filePaths[0]) return undefined
+        caminho = escolha.filePaths[0]
+      }
+      return lerPreviaArquivo(caminho, { linhas: params.linhas })
+    }
+  )
+
+  ipcMain.handle(
+    IPC.appImportRun,
+    async (
+      event,
+      params: {
+        connectionId: string
+        table: string
+        database?: string
+        caminho: string
+        formato: FormatoDeImportacao
+        mapeamento: MapeamentoDeColuna[]
+        opcoes: OpcoesDeImportacao
+        importId: string
+      }
+    ): Promise<ResultadoDaImportacao> => {
+      const { driver, config } = manager.get(params.connectionId)
+      importsCancelados.delete(params.importId)
+
+      const emitirProgresso = (progresso: ImportProgress): void => {
+        if (!event.sender.isDestroyed()) event.sender.send(IMPORT_PROGRESS_EVENT, progresso)
+      }
+
+      try {
+        if (params.formato === 'sql') {
+          return await importarSql(driver, config, params, emitirProgresso, importsCancelados)
+        }
+        return await importarCsv(driver, config, params, emitirProgresso, importsCancelados)
+      } finally {
+        importsCancelados.delete(params.importId)
+      }
+    }
+  )
+
+  ipcMain.handle(IPC.appImportCancel, (_e, importId: string) => {
+    importsCancelados.add(importId)
+  })
+
+  ipcMain.handle(IPC.appRevealInFolder, (_e, caminho: string) => {
+    if (!existsSync(caminho)) {
+      throw new Error(`Arquivo não encontrado: ${caminho}`)
+    }
+    shell.showItemInFolder(caminho)
+  })
 
   ipcMain.handle(
     IPC.schemaAlterColumnStatement,
@@ -441,6 +530,218 @@ function comSenhaGuardada(config: ConnectionConfig, store: ConnectionStore): Con
   // Só a senha vem do disco: o resto é o que está no formulário agora, senão
   // uma edição de host ou de porta seria descartada ao testar.
   return { ...config, password: guardada.password }
+}
+
+/* ── Importação de arquivo ─────────────────────────────────────────────── */
+
+/** Teto de falhas relatadas em detalhe — acima disso só a contagem, para não estourar a memória num arquivo ruim. */
+const TETO_FALHAS_RELATADAS = 100
+
+/** Mesma tradução usada nos outros canais de escrita: erro cru de driver não diz nada a quem está importando. */
+function mensagemDeErro(error: unknown, driverId: DriverId): string {
+  const t = translateError(error, { driver: driverId })
+  return t.hint ? `${t.friendly} ${t.hint}` : t.friendly
+}
+
+/**
+ * Campo vazio do CSV vira `null`, não string vazia — é a leitura mais honesta
+ * de "a pessoa deixou em branco" para uma coluna que pode ser numérica, de
+ * data ou ter um DEFAULT no banco. O valor não vazio segue como texto: quem
+ * decide o tipo final é o próprio banco, ao receber o parâmetro — converter
+ * para número ou data aqui, sem saber o tipo real da coluna de destino,
+ * arriscaria estragar um CPF ou um CEP que começa com zero.
+ */
+function converterValorCsv(bruto: string | undefined): unknown {
+  if (bruto === undefined || bruto === '') return null
+  return bruto
+}
+
+/** Mensagens que indicam falha do banco/conexão, não de uma linha — abortam a importação em vez de virar 1 falha por linha. */
+const ERRO_SISTEMICO = /somente-leitura|ainda não é suportada/i
+
+interface ParametrosImportacao {
+  table: string
+  database?: string
+  caminho: string
+  mapeamento: MapeamentoDeColuna[]
+  opcoes: OpcoesDeImportacao
+  importId: string
+}
+
+async function importarCsv(
+  driver: DatabaseDriver,
+  config: ConnectionConfig,
+  params: ParametrosImportacao,
+  emitirProgresso: (p: ImportProgress) => void,
+  cancelados: Set<string>
+): Promise<ResultadoDaImportacao> {
+  if (config.readOnly) {
+    throw new Error('Conexão em modo somente-leitura: comandos de escrita estão bloqueados.')
+  }
+
+  const mapeamentosAtivos = params.mapeamento.filter(
+    (m): m is { origem: number; destino: string } => m.destino !== null
+  )
+  if (mapeamentosAtivos.length === 0) {
+    throw new Error('Nenhuma coluna do arquivo foi mapeada para a tabela.')
+  }
+  const colunasDestino = mapeamentosAtivos.map((m) => m.destino)
+  const tamanhoDoLote = params.opcoes.tamanhoDoLote ?? 500
+
+  // Delimitador: o que a pessoa escolheu na prévia vence; sem isso, detecta
+  // de novo a partir de uma amostra pequena — mais barato que carregar o
+  // arquivo inteiro só para achar a vírgula.
+  const delimitador = params.opcoes.delimitador || lerPreviaArquivo(params.caminho, { linhas: 5 }).delimitador || ','
+
+  const falhas: Array<{ linha: number; motivo: string }> = []
+  let falhasOmitidas = 0
+  const registrarFalha = (linha: number, motivo: string): void => {
+    if (falhas.length < TETO_FALHAS_RELATADAS) falhas.push({ linha, motivo })
+    else falhasOmitidas += 1
+  }
+
+  let linhasLidas = 0
+  let linhasGravadas = 0
+  let numeroColunasEsperado: number | undefined
+  let primeiraLinhaVista = false
+  let lote: Array<{ numero: number; valores: unknown[] }> = []
+
+  const gravarLote = async (): Promise<void> => {
+    if (lote.length === 0) return
+    try {
+      const { affectedRows } = await driver.insertRows({
+        table: params.table,
+        database: params.database,
+        columns: colunasDestino,
+        rows: lote.map((l) => l.valores)
+      })
+      linhasGravadas += affectedRows
+    } catch (error) {
+      const mensagem = mensagemDeErro(error, config.driver)
+      if (lote.length === 1) {
+        registrarFalha(lote[0].numero, mensagem)
+        lote = []
+        return
+      }
+      if (ERRO_SISTEMICO.test(mensagem)) {
+        // Não é uma linha ruim, é o banco recusando a operação inteira
+        // (somente-leitura, driver sem suporte): repetir linha a linha só
+        // multiplicaria o mesmo erro centenas de vezes. Sobe e interrompe.
+        throw error
+      }
+      // O lote inteiro foi desfeito porque uma linha deu problema — refaz
+      // uma por uma para achar exatamente qual, sem perder as boas do lote.
+      for (const linha of lote) {
+        try {
+          const r = await driver.insertRows({
+            table: params.table,
+            database: params.database,
+            columns: colunasDestino,
+            rows: [linha.valores]
+          })
+          linhasGravadas += r.affectedRows
+        } catch (erroLinha) {
+          registrarFalha(linha.numero, mensagemDeErro(erroLinha, config.driver))
+        }
+      }
+    }
+    lote = []
+  }
+
+  for await (const { numero, campos } of lerLinhasCsv(params.caminho, { delimitador }, (bytesLidos, bytesTotais) => {
+    emitirProgresso({ lidas: linhasLidas, gravadas: linhasGravadas, bytesLidos, bytesTotais })
+  })) {
+    if (cancelados.has(params.importId)) break
+
+    if (params.opcoes.ignorarPrimeiraLinha && !primeiraLinhaVista) {
+      primeiraLinhaVista = true
+      numeroColunasEsperado = campos.length
+      continue
+    }
+    primeiraLinhaVista = true
+    if (numeroColunasEsperado === undefined) numeroColunasEsperado = campos.length
+
+    linhasLidas += 1
+
+    if (campos.length !== numeroColunasEsperado) {
+      registrarFalha(
+        numero,
+        `A linha tem ${campos.length} campo(s), mas o arquivo tem ${numeroColunasEsperado}.`
+      )
+      continue
+    }
+
+    lote.push({ numero, valores: mapeamentosAtivos.map((m) => converterValorCsv(campos[m.origem])) })
+    if (lote.length >= tamanhoDoLote) await gravarLote()
+  }
+  await gravarLote()
+
+  let sequenciaReajustada: string | undefined
+  if (params.opcoes.usarIdsDoArquivo) {
+    // Não sabemos, aqui, qual coluna mapeada é a chave auto-incremento — só o
+    // driver conhece o schema. Tentamos cada destino mapeado; quem não for
+    // serial/identity simplesmente devolve undefined, sem erro.
+    for (const coluna of colunasDestino) {
+      const nome = await driver.resyncSequence({ table: params.table, database: params.database, column: coluna })
+      if (nome) {
+        sequenciaReajustada = nome
+        break
+      }
+    }
+  }
+
+  return { linhasLidas, linhasGravadas, falhas, falhasOmitidas, sequenciaReajustada }
+}
+
+async function importarSql(
+  driver: DatabaseDriver,
+  config: ConnectionConfig,
+  params: ParametrosImportacao,
+  emitirProgresso: (p: ImportProgress) => void,
+  cancelados: Set<string>
+): Promise<ResultadoDaImportacao> {
+  const tamanhoBytes = statSync(params.caminho).size
+  const texto = removerBom(readFileSync(params.caminho, 'utf-8'))
+  const comandos = splitStatements(texto)
+  const numerosDeLinha = numerosDeLinhaDosComandos(texto, comandos)
+
+  const falhas: Array<{ linha: number; motivo: string }> = []
+  let falhasOmitidas = 0
+  const registrarFalha = (linha: number, motivo: string): void => {
+    if (falhas.length < TETO_FALHAS_RELATADAS) falhas.push({ linha, motivo })
+    else falhasOmitidas += 1
+  }
+
+  let linhasLidas = 0
+  let linhasGravadas = 0
+  let bytesLidos = 0
+
+  for (let i = 0; i < comandos.length; i++) {
+    if (cancelados.has(params.importId)) break
+    const comando = comandos[i]
+    linhasLidas += 1
+    bytesLidos = Math.min(bytesLidos + Buffer.byteLength(comando, 'utf-8'), tamanhoBytes)
+
+    if (config.readOnly && isMutation(comando)) {
+      registrarFalha(
+        numerosDeLinha[i],
+        'Conexão em modo somente-leitura: comando de escrita bloqueado.'
+      )
+    } else {
+      try {
+        await driver.query(comando, { queryId: `${params.importId}_${i}` })
+        linhasGravadas += 1
+      } catch (error) {
+        registrarFalha(numerosDeLinha[i], mensagemDeErro(error, config.driver))
+      }
+    }
+
+    if (i % 20 === 0 || i === comandos.length - 1) {
+      emitirProgresso({ lidas: linhasLidas, gravadas: linhasGravadas, bytesLidos, bytesTotais: tamanhoBytes })
+    }
+  }
+
+  return { linhasLidas, linhasGravadas, falhas, falhasOmitidas }
 }
 
 function toCsv(columns: string[], rows: unknown[][]): string {

@@ -16,6 +16,7 @@ import {
   LOTE_EXPORTACAO,
   PREVIEW_ROWS,
   applyPreviewLimit,
+  chunkForPlaceholders,
   hasExplicitLimit,
   exigirChave,
   exigirTipoValido,
@@ -24,6 +25,13 @@ import {
 } from './types'
 import { isMutation, splitStatements } from '../../shared/sql-shape'
 import { toGridFromArrays } from './value-types'
+
+/**
+ * Teto de parâmetros de uma consulta parametrizada do PostgreSQL: o
+ * protocolo estendido usa um inteiro de 16 bits para o número de parâmetros
+ * (65.535). A margem evita chegar perto do limite.
+ */
+const MAX_PLACEHOLDERS_POSTGRES = 60_000
 
 // Por padrão o pg converte int8/numeric para string pra não perder precisão.
 // Para exibição isso atrapalha o alinhamento; convertemos e aceitamos o risco em
@@ -469,6 +477,95 @@ export class PostgresDriver implements DatabaseDriver {
     const sql = `INSERT INTO ${alvo} (${colunas}) VALUES (${marcas})`
 
     return this.escreverComTransacao(sql, entradas.map(([, v]) => v))
+  }
+
+  /**
+   * Insere muitas linhas de uma vez — o caminho da importação de arquivo.
+   *
+   * `columns` fixa a ordem; cada linha de `rows` é lida por posição. O lote
+   * inteiro roda numa transação só e é quebrado em sub-lotes pelo teto de
+   * parâmetros do protocolo do Postgres (65.535).
+   */
+  async insertRows(params: {
+    table: string
+    database?: string
+    columns: string[]
+    rows: unknown[][]
+  }): Promise<{ affectedRows: number }> {
+    if (this.config?.readOnly) {
+      throw new Error('Conexão em modo somente-leitura: comandos de escrita estão bloqueados.')
+    }
+    if (params.columns.length === 0) {
+      throw new Error('Informe ao menos uma coluna para inserir.')
+    }
+    if (params.rows.length === 0) return { affectedRows: 0 }
+
+    const alvo = params.database
+      ? `${quoteIdent(params.database)}.${quoteIdent(params.table)}`
+      : quoteIdent(params.table)
+    const colunasSql = params.columns.map(quoteIdent).join(', ')
+
+    const client = await this.require().connect()
+    try {
+      await client.query('BEGIN')
+      let total = 0
+      for (const lote of chunkForPlaceholders(params.rows, params.columns.length, MAX_PLACEHOLDERS_POSTGRES)) {
+        const linhasSql = lote
+          .map((_, i) =>
+            `(${params.columns.map((_, j) => `$${i * params.columns.length + j + 1}`).join(', ')})`
+          )
+          .join(', ')
+        const sql = `INSERT INTO ${alvo} (${colunasSql}) VALUES ${linhasSql}`
+        const resultado = await client.query(sql, lote.flat())
+        total += resultado.rowCount ?? 0
+      }
+      await client.query('COMMIT')
+      return { affectedRows: total }
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined)
+      throw error
+    } finally {
+      client.release()
+    }
+  }
+
+  /**
+   * Reajusta a sequência da chave depois de uma importação com ids
+   * explícitos.
+   *
+   * A armadilha: `INSERT INTO t (id, ...) VALUES (37, ...)` não avança a
+   * sequência ligada a `id` — ela só anda em `nextval()`, que só é chamado
+   * quando a coluna é omitida do INSERT. Depois de uma importação com id
+   * explícito, a sequência continua apontando para onde estava, e o próximo
+   * INSERT "normal" do sistema (sem id, contando com o DEFAULT) tenta
+   * reusar um valor já ocupado — estoura em chave duplicada, longe da
+   * importação, sem nada ligando uma coisa à outra.
+   *
+   * `pg_get_serial_sequence` acha o nome da sequência a partir da coluna —
+   * não dá para adivinhar por convenção, porque a sequência pode ter sido
+   * renomeada. Devolve `undefined` quando a coluna não é serial/identity:
+   * não há o que reajustar.
+   */
+  async resyncSequence(params: {
+    table: string
+    database?: string
+    column: string
+  }): Promise<string | undefined> {
+    const alvo = `${quoteIdent(params.database ?? 'public')}.${quoteIdent(params.table)}`
+    const achou = await this.require().query('SELECT pg_get_serial_sequence($1, $2) AS seq', [
+      alvo,
+      params.column
+    ])
+    const sequencia = achou.rows[0]?.seq as string | null
+    if (!sequencia) return undefined
+
+    // setval(seq, max) com is_called implícito em true: o próximo nextval()
+    // devolve max+1. Tabela sem linha nenhuma (import vazio) cai no 1.
+    await this.require().query(
+      `SELECT setval($1, COALESCE((SELECT MAX(${quoteIdent(params.column)}) FROM ${alvo}), 1))`,
+      [sequencia]
+    )
+    return sequencia
   }
 
   async deleteRow(params: {

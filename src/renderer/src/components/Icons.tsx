@@ -281,3 +281,18 @@ export const IconViewOff = (p: IconProps): React.JSX.Element => (
     <path d="M13.1 10c.9-1 1.4-2 1.4-2S12 3.5 8 3.5c-.6 0-1.1.1-1.6.2" />
   </Icon>
 )
+
+/** Espelho do IconDownload — seta para cima, para "Importar arquivo". */
+export const IconUpload = (p: IconProps): React.JSX.Element => (
+  <Icon {...p}>
+    <path d="M8 10.5V3M5 6l3-3 3 3" />
+    <path d="M2.5 11v1.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V11" />
+  </Icon>
+)
+
+/** Pasta aberta — "Mostrar na pasta", ao fim de uma exportação. */
+export const IconFolder = (p: IconProps): React.JSX.Element => (
+  <Icon {...p}>
+    <path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.6l1.2 1.5H12.5A1.5 1.5 0 0 1 14 6v5.5A1.5 1.5 0 0 1 12.5 13h-9A1.5 1.5 0 0 1 2 11.5Z" />
+  </Icon>
+)

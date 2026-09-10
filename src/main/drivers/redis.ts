@@ -621,6 +621,24 @@ export class RedisDriver implements DatabaseDriver {
     const removidas = await this.require().del(key)
     return { affectedRows: removidas, statement: `DEL ${key}` }
   }
+
+  /**
+   * Importação de arquivo ainda não vale para o Redis — vem numa etapa
+   * seguinte. O modelo de pseudo-tabela (uma chave por linha, tipo definido
+   * pela pseudo-tabela) pede uma decisão própria sobre como um CSV vira
+   * SET/HSET/RPUSH/SADD/ZADD; melhor recusar com clareza do que inventar essa
+   * regra aqui, sem ninguém ter validado o formato esperado.
+   */
+  async insertRows(): Promise<{ affectedRows: number }> {
+    throw new Error(
+      'A importação de arquivo ainda não é suportada no Redis. Está prevista para uma etapa seguinte.'
+    )
+  }
+
+  /** Redis não tem sequência — cada chave é independente das outras. */
+  async resyncSequence(): Promise<string | undefined> {
+    return undefined
+  }
 }
 
 /**

@@ -27,7 +27,7 @@ export function useMenuEvents(): void {
       window.velaEvents.on('menu:closeTab', () => {
         const connectionId = useConnectionStore.getState().activeId
         const tab = useTabStore.getState().activeTabFor(connectionId)
-        if (tab) useTabStore.getState().closeTab(tab.id)
+        if (tab) useTabStore.getState().requestCloseTab(tab.id)
       }),
       // Passam pela ação do editor para manter a mesma semântica do atalho.
       window.velaEvents.on('menu:run', () => triggerEditorAction('vela.run')),

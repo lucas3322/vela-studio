@@ -1,8 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { DRIVERS, type ColumnInfo, type TableInfo } from '@shared/types'
+import {
+  DRIVERS,
+  type ColumnInfo,
+  type ExportProgress,
+  type FormatoDeImportacao,
+  type ImportProgress,
+  type MapeamentoDeColuna,
+  type OpcoesDeImportacao,
+  type TableInfo
+} from '@shared/types'
+import { EXPORT_PROGRESS_EVENT, IMPORT_PROGRESS_EVENT } from '@shared/ipc'
 import { useAppStore } from '../store/app'
 import { corDaConexao } from '../styles/connection-colors'
-import { descreverExportacao } from '../editor/export-message'
 import { useConnectionStore } from '../store/connections'
 import { useTabStore } from '../store/tabs'
 import { ContextMenu, type MenuEntry } from './ContextMenu'
@@ -10,6 +19,7 @@ import { SavedQueries } from './SavedQueries'
 import { SchemaModelList } from './SchemaModelList'
 import { SidebarConnections } from './SidebarConnections'
 import { DangerDialog } from './DangerDialog'
+import { ImportDialog } from './ImportDialog'
 import {
   IconChevronDown,
   IconChevronRight,
@@ -25,6 +35,7 @@ import {
   IconStructure,
   IconTable,
   IconTrash,
+  IconUpload,
   IconView
 } from './Icons'
 
@@ -41,6 +52,14 @@ export function Sidebar(): React.JSX.Element {
   const [modo, setModo] = useState<'tabelas' | 'modelagem' | 'salvas'>('tabelas')
   const openModal = useAppStore((s) => s.openModal)
   const notify = useAppStore((s) => s.notify)
+  const iniciarExportacao = useAppStore((s) => s.iniciarExportacao)
+  const atualizarProgressoExportacao = useAppStore((s) => s.atualizarProgressoExportacao)
+  const concluirExportacao = useAppStore((s) => s.concluirExportacao)
+  const iniciarImportacao = useAppStore((s) => s.iniciarImportacao)
+  const atualizarProgressoImportacao = useAppStore((s) => s.atualizarProgressoImportacao)
+  const concluirImportacao = useAppStore((s) => s.concluirImportacao)
+  const falharTarefa = useAppStore((s) => s.falharTarefa)
+  const fecharTarefa = useAppStore((s) => s.fecharTarefa)
   const {
     activeId,
     activeDatabase,
@@ -54,13 +73,14 @@ export function Sidebar(): React.JSX.Element {
   const temaAtual = useAppStore((s) => s.resolvedTheme)
   const corAtiva = corDaConexao(connection?.color, temaAtual)
   const schema = useConnectionStore((s) => s.currentSchema())
-  const { openTableTab, openQueryTab } = useTabStore()
+  const { openTableTab, openQueryTab, reloadTab } = useTabStore()
 
   const [filter, setFilter] = useState('')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [width, setWidth] = useState(264)
   const [menu, setMenu] = useState<{ x: number; y: number; table: TableInfo } | null>(null)
   const [danger, setDanger] = useState<DangerState | null>(null)
+  const [importDialog, setImportDialog] = useState<TableInfo | null>(null)
   const sidebarRef = useRef<HTMLElement>(null)
 
   const dialect = connection ? DRIVERS[connection.driver].dialect : 'mysql'
@@ -201,15 +221,29 @@ export function Sidebar(): React.JSX.Element {
    * linhas nem passam pelo renderer, e acima de um milhão o arquivo é dividido
    * para continuar abrindo em planilha.
    */
-  const exportar = async (table: string, formato: 'csv' | 'json'): Promise<void> => {
+  /**
+   * O andamento aparece no card do canto (`ProgressToast`), não no toast
+   * central: exportar uma tabela grande pode levar minutos, e um toast que
+   * some em 4 segundos não é onde essa espera deveria ser acompanhada.
+   *
+   * `totalEstimado` vem do `rowCount` que a própria árvore já mostra — é a
+   * contagem do catálogo, por isso a % que ele produz é rotulada como
+   * estimativa lá no card, nunca como fato.
+   */
+  const exportar = async (table: TableInfo, formato: 'csv' | 'json'): Promise<void> => {
     if (!activeId) return
 
     const sql =
       dialect === 'mongodb'
-        ? `db.${table}.find({})`
+        ? `db.${table.name}.find({})`
         : dialect === 'redis'
-          ? comandoScanPseudoTabela(table)
-          : `SELECT * FROM ${quote(table)}`
+          ? comandoScanPseudoTabela(table.name)
+          : `SELECT * FROM ${quote(table.name)}`
+
+    iniciarExportacao(`${table.name}.${formato}`, table.rowCount)
+    const pararDeEscutarProgresso = window.velaEvents.on(EXPORT_PROGRESS_EVENT, ((
+      progresso: ExportProgress
+    ) => atualizarProgressoExportacao(progresso)) as never)
 
     try {
       const saida = await window.vela.app.exportQuery({
@@ -217,13 +251,76 @@ export function Sidebar(): React.JSX.Element {
         sql,
         database: activeDatabase ?? undefined,
         format: formato,
-        suggestedName: table
+        suggestedName: table.name,
+        totalEstimado: table.rowCount
       })
 
-      if (!saida) return // o usuário cancelou o diálogo de salvar
-      notify(descreverExportacao(saida), 'success')
+      if (!saida) {
+        fecharTarefa() // o usuário cancelou o diálogo de salvar
+        return
+      }
+      concluirExportacao(saida.arquivos, saida.linhas)
     } catch (erro) {
-      notify(erro instanceof Error ? erro.message : 'Falha ao exportar.', 'danger')
+      falharTarefa(erro instanceof Error ? erro.message : 'Falha ao exportar.')
+    } finally {
+      pararDeEscutarProgresso()
+    }
+  }
+
+  /**
+   * Executa a importação depois que o `ImportDialog` já fechou.
+   *
+   * Fica no Sidebar, não no diálogo: o card de progresso precisa sobreviver
+   * ao fechamento da modal, e a chamada de IPC não pode morrer com o
+   * componente que a disparou.
+   */
+  const executarImportacao = async (
+    table: string,
+    params: {
+      caminho: string
+      formato: FormatoDeImportacao
+      mapeamento: MapeamentoDeColuna[]
+      opcoes: OpcoesDeImportacao
+    }
+  ): Promise<void> => {
+    if (!activeId) return
+    const importId = `import_${Date.now()}`
+
+    iniciarImportacao(table)
+    const pararDeEscutarProgresso = window.velaEvents.on(IMPORT_PROGRESS_EVENT, ((
+      progresso: ImportProgress
+    ) => atualizarProgressoImportacao(progresso)) as never)
+
+    try {
+      const resultado = await window.vela.app.importRun({
+        connectionId: activeId,
+        table,
+        database: activeDatabase ?? undefined,
+        caminho: params.caminho,
+        formato: params.formato,
+        mapeamento: params.mapeamento,
+        opcoes: params.opcoes,
+        importId
+      })
+      concluirImportacao(resultado)
+
+      // A grade só mostra o que entrou se a aba e o schema forem recarregados
+      // — sem isto, a importação teria acontecido no banco mas não na tela.
+      await reloadSchema()
+      const aba = useTabStore
+        .getState()
+        .tabs.find(
+          (t) =>
+            t.kind === 'table' &&
+            t.table === table &&
+            t.connectionId === activeId &&
+            t.database === (activeDatabase ?? null)
+        )
+      if (aba) reloadTab(aba.id)
+    } catch (erro) {
+      falharTarefa(erro instanceof Error ? erro.message : 'Falha ao importar.')
+    } finally {
+      pararDeEscutarProgresso()
     }
   }
 
@@ -328,15 +425,26 @@ export function Sidebar(): React.JSX.Element {
         }
       },
       {
+        // Mongo e Redis ainda não têm importação implementada no main — ver
+        // a nota em `ImportDialog`/`executarImportacao`. Desabilitar aqui,
+        // com o motivo no hint, é melhor do que deixar clicar e estourar um
+        // erro cru vindo do IPC.
+        label: 'Importar arquivo…',
+        icon: <IconUpload size={14} />,
+        disabled: readOnly || isMongo || isRedis,
+        hint: readOnly ? 'somente leitura' : isMongo || isRedis ? 'ainda não disponível' : undefined,
+        onSelect: () => setImportDialog(table)
+      },
+      {
         label: 'Exportar para CSV…',
         icon: <IconDownload size={14} />,
         hint: 'abre no Excel',
-        onSelect: () => void exportar(table.name, 'csv')
+        onSelect: () => void exportar(table, 'csv')
       },
       {
         label: 'Exportar para JSON…',
         icon: <IconDownload size={14} />,
-        onSelect: () => void exportar(table.name, 'json')
+        onSelect: () => void exportar(table, 'json')
       },
       'separator',
       {
@@ -610,6 +718,20 @@ export function Sidebar(): React.JSX.Element {
             setDanger(null)
           }}
           onCancel={() => setDanger(null)}
+        />
+      )}
+
+      {importDialog && (
+        <ImportDialog
+          tabela={importDialog.name}
+          colunasDaTabela={schema?.columns[importDialog.name] ?? []}
+          motivoBloqueio={connection?.readOnly ? 'Esta conexão está em modo somente leitura.' : undefined}
+          onFechar={() => setImportDialog(null)}
+          onExecutar={(params) => {
+            const tabela = importDialog.name
+            setImportDialog(null)
+            void executarImportacao(tabela, params)
+          }}
         />
       )}
     </aside>

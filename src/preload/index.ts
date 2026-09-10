@@ -53,6 +53,10 @@ const api: VelaApi = {
     pickFile: (filters) => ipcRenderer.invoke(IPC.appPickFile, filters),
     exportQuery: (params) => ipcRenderer.invoke(IPC.appExportQuery, params),
     exportResult: (params) => ipcRenderer.invoke(IPC.appExport, params),
+    importPreview: (params) => ipcRenderer.invoke(IPC.appImportPreview, params),
+    importRun: (params) => ipcRenderer.invoke(IPC.appImportRun, params),
+    importCancel: (importId) => ipcRenderer.invoke(IPC.appImportCancel, importId),
+    revealInFolder: (caminho) => ipcRenderer.invoke(IPC.appRevealInFolder, caminho),
     platform: process.platform
   },
   update: {

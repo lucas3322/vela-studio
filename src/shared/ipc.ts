@@ -5,9 +5,14 @@ import type {
   InsertRowParams,
   EditCellParams,
   EditResult,
+  FormatoDeImportacao,
   HistoryEntry,
   IndexInfo,
+  MapeamentoDeColuna,
+  OpcoesDeImportacao,
+  PreviaDeImportacao,
   QueryRunResult,
+  ResultadoDaImportacao,
   RelationInfo,
   SchemaRelation,
   StoredConnection,
@@ -58,6 +63,10 @@ export const IPC = {
   appPickFile: 'app:pickFile',
   appExport: 'app:export',
   appExportQuery: 'app:exportQuery',
+  appImportPreview: 'app:importPreview',
+  appImportRun: 'app:importRun',
+  appImportCancel: 'app:importCancel',
+  appRevealInFolder: 'app:revealInFolder',
 
   updateCheck: 'update:check',
   updateDownload: 'update:download',
@@ -69,6 +78,9 @@ export const UPDATE_PROGRESS_EVENT = 'app:updateProgress'
 
 /** Andamento da exportação em fluxo, emitido pelo main a cada bloco gravado. */
 export const EXPORT_PROGRESS_EVENT = 'app:exportProgress'
+
+/** Andamento da importação, emitido pelo main a cada lote gravado. */
+export const IMPORT_PROGRESS_EVENT = 'app:importProgress'
 
 export interface VelaApi {
   connections: {
@@ -162,6 +174,12 @@ export interface VelaApi {
       database?: string
       format: 'csv' | 'json'
       suggestedName: string
+      /**
+       * Estimativa de linhas, quando quem chama tem uma (a contagem do
+       * catálogo). Só serve para a barra de progresso mostrar porcentagem;
+       * volta no evento de progresso e é rotulada como estimativa na tela.
+       */
+      totalEstimado?: number
     }): Promise<{ arquivos: string[]; linhas: number } | undefined>
     exportResult(params: {
       format: 'csv' | 'json'
@@ -169,6 +187,46 @@ export interface VelaApi {
       rows: unknown[][]
       suggestedName: string
     }): Promise<string | undefined>
+
+    /**
+     * Lê o começo de um arquivo e devolve o que ele parece ser.
+     *
+     * Não toca no banco: a prévia é sobre o **arquivo**. Quem cruza isso com
+     * as colunas da tabela é o renderer, onde a regra de compatibilidade vive
+     * como lógica pura e testável.
+     */
+    importPreview(params: {
+      /** Omitido abre o seletor de arquivo. */
+      caminho?: string
+      /** Quantas linhas trazer na prévia. */
+      linhas?: number
+    }): Promise<PreviaDeImportacao | undefined>
+
+    /**
+     * Executa a importação, em lotes, emitindo `IMPORT_PROGRESS_EVENT`.
+     *
+     * Relata o que entrou e o que não entrou — nunca "sucesso" quando metade
+     * das linhas falhou.
+     */
+    importRun(params: {
+      connectionId: string
+      table: string
+      database?: string
+      caminho: string
+      formato: FormatoDeImportacao
+      /** CSV: de→para das colunas. Vazio em SQL, que não mapeia nada. */
+      mapeamento: MapeamentoDeColuna[]
+      opcoes: OpcoesDeImportacao
+      /** Identificador para cancelar no meio. */
+      importId: string
+    }): Promise<ResultadoDaImportacao>
+
+    /** Pede para a importação parar no fim do lote atual. */
+    importCancel(importId: string): Promise<void>
+
+    /** Abre o Finder/Explorer com o arquivo selecionado. */
+    revealInFolder(caminho: string): Promise<void>
+
     platform: string
   }
   /** Atualização do próprio app. Ver src/main/updater.ts para o porquê do fluxo. */

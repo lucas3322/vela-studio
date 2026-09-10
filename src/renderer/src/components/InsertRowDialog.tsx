@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ColumnInfo } from '@shared/types'
+import { colunaAutomatica } from '../editor/importacao'
 import { IconCheck, IconClose, IconKey, IconWarning } from './Icons'
 
 /**
@@ -43,12 +44,6 @@ interface Props {
 interface Campo {
   valor: string
   nulo: boolean
-}
-
-/** Colunas que o banco preenche sozinho não vêm marcadas para digitação. */
-function automatica(coluna: ColumnInfo): boolean {
-  const extra = (coluna.extra ?? '').toLowerCase()
-  return extra.includes('auto_increment') || extra.includes('identity') || extra.includes('generated')
 }
 
 export function InsertRowDialog({
@@ -104,7 +99,7 @@ export function InsertRowDialog({
   }
 
   const obrigatoriaVazia = colunas.filter(
-    (c) => !c.nullable && c.defaultValue == null && !automatica(c) && !(c.name in valores)
+    (c) => !c.nullable && c.defaultValue == null && !colunaAutomatica(c) && !(c.name in valores)
   )
 
   return (
@@ -139,7 +134,7 @@ export function InsertRowDialog({
           <div className="insercao">
             {colunas.map((coluna) => {
               const campo = campos[coluna.name]
-              const auto = automatica(coluna)
+              const auto = colunaAutomatica(coluna)
               return (
                 <label className="insercao__linha" key={coluna.name}>
                   <span className="insercao__rotulo">

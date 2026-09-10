@@ -214,6 +214,10 @@ const USOS: Uso[] = [
   // ── aviso de versão nova ──────────────────────────────────────────────
   { seletor: '.aviso-versao__fechar', arquivo: LAYOUT, token: 'tertiary', fundos: ['bg-elevated'], tipo: 'interface' },
 
+  // ── progresso de exportação/importação ─────────────────────────────────
+  { seletor: '.progresso-toast__fechar', arquivo: LAYOUT, token: 'tertiary', fundos: ['bg-elevated'], tipo: 'interface' },
+  { seletor: '.progresso-toast__falha--omitidas', arquivo: LAYOUT, token: 'tertiary', fundos: ['bg-input'], tipo: 'texto' },
+
   // ── primitivos ────────────────────────────────────────────────────────
   { seletor: '.input::placeholder', arquivo: GLOBAL, token: 'tertiary', fundos: ['bg-input'], tipo: 'texto' },
   // O único `.btn--acento` do app fica na barra de paginação.
@@ -238,7 +242,10 @@ const USOS: Uso[] = [
   { seletor: '.context-menu__hint', arquivo: LAYOUT, token: 'secondary', fundos: ['bg-elevated', 'bg-elevated :hover'], tipo: 'texto' },
   { seletor: '.update__nota', arquivo: LAYOUT, token: 'secondary', fundos: ['bg-elevated'], tipo: 'texto' },
   { seletor: '.update__versao-meta', arquivo: LAYOUT, token: 'secondary', fundos: ['bg-elevated'], tipo: 'texto' },
-  { seletor: '.field__hint', arquivo: GLOBAL, token: 'secondary', fundos: ['bg-elevated'], tipo: 'texto' }
+  { seletor: '.field__hint', arquivo: GLOBAL, token: 'secondary', fundos: ['bg-elevated'], tipo: 'texto' },
+  // A prévia da importação herda o fundo do corpo do modal, `--bg-elevated`,
+  // onde o terciário reprova (ver a nota em `.modal__subtitle`).
+  { seletor: '.import-previa__vazio', arquivo: LAYOUT, token: 'secondary', fundos: ['bg-elevated'], tipo: 'texto' }
 ]
 
 const MIN_TEXTO = 4.5

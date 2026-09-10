@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { QueryError, QueryResult } from '@shared/types'
+import { precisaAvisarAoFechar } from '../editor/fechar-aba'
 
 export type TabKind = 'query' | 'table' | 'model'
 
@@ -106,6 +107,18 @@ interface TabState {
     initialFilter?: Array<{ coluna: string; operador: string; valor: string }>
   }) => string
   closeTab: (id: string) => void
+  /**
+   * Fecha a aba, ou pede confirmação quando há SQL não salvo dentro dela.
+   *
+   * A guarda vive aqui, e não em cada botão, porque existem três caminhos para
+   * fechar: o × da aba, o botão do meio do mouse e o ⌘W do menu. Espalhar a
+   * regra por eles deixaria o quarto caminho — o próximo que alguém criar —
+   * fechando em silêncio.
+   */
+  requestCloseTab: (id: string) => void
+  /** Aba esperando a confirmação de fechamento, se houver. */
+  fechamentoPendente: string | null
+  cancelarFechamento: () => void
   setActive: (id: string) => void
   updateTab: (id: string, patch: Partial<Tab>) => void
   /** Pede à aba que reconsulte o banco. */
@@ -123,6 +136,20 @@ const newId = (): string => `tab_${Date.now()}_${++counter}`
 export const useTabStore = create<TabState>((set, get) => ({
   tabs: [],
   activeByConnection: {},
+  fechamentoPendente: null,
+
+  requestCloseTab: (id) => {
+    const aba = get().tabs.find((t) => t.id === id)
+    if (!aba) return
+
+    if (precisaAvisarAoFechar(aba)) {
+      set({ fechamentoPendente: id })
+      return
+    }
+    get().closeTab(id)
+  },
+
+  cancelarFechamento: () => set({ fechamentoPendente: null }),
 
   tabsFor: (connectionId) =>
     connectionId ? get().tabs.filter((t) => t.connectionId === connectionId) : [],
@@ -291,7 +318,8 @@ export const useTabStore = create<TabState>((set, get) => ({
         else delete activeByConnection[closing.connectionId]
       }
 
-      return { tabs, activeByConnection }
+      // Fechou de fato: o aviso pendente, se havia, deixa de existir.
+      return { tabs, activeByConnection, fechamentoPendente: null }
     })
   },
 

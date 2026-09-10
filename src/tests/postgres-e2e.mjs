@@ -454,3 +454,119 @@ test('tipo com formato inválido é recusado antes de virar SQL', async () => {
   const [ainda] = await driver.query('SELECT COUNT(*) FROM clientes', { queryId: 'ac3' })
   assert.ok(Number(ainda.rows[0][0]) >= 3)
 })
+
+// ── insertRows (importação de arquivo) ──────────────────────────────
+
+test('insertRows grava todas as linhas e deixa o SERIAL agir', async () => {
+  await driver.query(
+    `DROP TABLE IF EXISTS importados;
+     CREATE TABLE importados (
+       id SERIAL PRIMARY KEY,
+       nome VARCHAR(80) NOT NULL,
+       cidade VARCHAR(80)
+     );`,
+    { queryId: 'imp-setup' }
+  )
+
+  const linhas = Array.from({ length: 250 }, (_, i) => [`Pessoa ${i}`, `Cidade ${i % 5}`])
+  const r = await driver.insertRows({ table: 'importados', columns: ['nome', 'cidade'], rows: linhas })
+  assert.equal(r.affectedRows, 250)
+
+  const [contagem] = await driver.query('SELECT COUNT(*) AS n FROM importados', { queryId: 'imp-count' })
+  assert.equal(Number(contagem.rows[0][0]), 250)
+})
+
+test('insertRows recusa em conexão somente-leitura', async () => {
+  const ro = new PostgresDriver()
+  await ro.connect({ ...config, readOnly: true })
+  await assert.rejects(
+    () => ro.insertRows({ table: 'importados', columns: ['nome'], rows: [['x']] }),
+    /somente-leitura/
+  )
+  await ro.disconnect()
+})
+
+test('insertRows parametriza: injeção vira texto, não comando', async () => {
+  const veneno = "O'Brien'; DROP TABLE importados; --"
+  await driver.insertRows({ table: 'importados', columns: ['nome'], rows: [[veneno]] })
+  const [guardado] = await driver.query(
+    'SELECT nome FROM importados ORDER BY id DESC LIMIT 1',
+    { queryId: 'imp-veneno' }
+  )
+  assert.equal(guardado.rows[0][0], veneno)
+})
+
+test('insertRows quebra em sub-lotes sem perder nem duplicar linha', async () => {
+  await driver.query('DROP TABLE IF EXISTS muitas_linhas; CREATE TABLE muitas_linhas (id SERIAL PRIMARY KEY, v TEXT);', {
+    queryId: 'imp-many-setup'
+  })
+  const linhas = Array.from({ length: 5000 }, (_, i) => [`v-${i}`])
+  const r = await driver.insertRows({ table: 'muitas_linhas', columns: ['v'], rows: linhas })
+  assert.equal(r.affectedRows, 5000)
+
+  const [contagem] = await driver.query('SELECT COUNT(*) AS n FROM muitas_linhas', { queryId: 'imp-many-count' })
+  assert.equal(Number(contagem.rows[0][0]), 5000)
+  const [distintos] = await driver.query('SELECT COUNT(DISTINCT v) AS n FROM muitas_linhas', { queryId: 'imp-many-distinct' })
+  assert.equal(Number(distintos.rows[0][0]), 5000, 'nenhuma linha pode ter se repetido')
+})
+
+// ── resyncSequence — a armadilha real do Postgres ────────────────────
+
+test('sem reajuste, INSERT com id explícito deixa a sequência para trás e o próximo INSERT normal colide', async () => {
+  await driver.query(
+    `DROP TABLE IF EXISTS chave_explicita;
+     CREATE TABLE chave_explicita (id SERIAL PRIMARY KEY, nome TEXT);`,
+    { queryId: 'seq-setup' }
+  )
+
+  // Importação com id explícito, pulando a sequência de propósito — como um
+  // dump que restaura ids antigos.
+  await driver.insertRows({
+    table: 'chave_explicita',
+    columns: ['id', 'nome'],
+    rows: [[50, 'Ana'], [51, 'Bruno']]
+  })
+
+  // Sem reajustar a sequência, o próximo INSERT "normal" do sistema (sem id,
+  // contando com o DEFAULT) ainda tenta usar 1 — e colide com nada aqui
+  // porque a tabela está vazia de 1 a 49, mas em uma tabela de produção que já
+  // tinha ids baixos ocupados, isso é exatamente a colisão relatada.
+  const [antes] = await driver.query(
+    "SELECT nextval(pg_get_serial_sequence('chave_explicita', 'id')) AS proximo",
+    { queryId: 'seq-check-antes' }
+  )
+  assert.ok(
+    Number(antes.rows[0][0]) < 50,
+    'a sequência não pode ter avançado sozinha com um id explícito'
+  )
+})
+
+test('resyncSequence acha a sequência e a reajusta para o maior id da tabela', async () => {
+  await driver.query(
+    `DROP TABLE IF EXISTS chave_reajustada;
+     CREATE TABLE chave_reajustada (id SERIAL PRIMARY KEY, nome TEXT);`,
+    { queryId: 'seq2-setup' }
+  )
+  await driver.insertRows({
+    table: 'chave_reajustada',
+    columns: ['id', 'nome'],
+    rows: [[10, 'Ana'], [37, 'Bruno'], [22, 'Celia']]
+  })
+
+  const nomeSequencia = await driver.resyncSequence({ table: 'chave_reajustada', column: 'id' })
+  assert.match(nomeSequencia ?? '', /chave_reajustada_id_seq/)
+
+  // Depois do reajuste, o próximo INSERT sem id precisa vir depois do maior
+  // id gravado (37) — não colidir com 10, 22 ou 37.
+  const r = await driver.insertRow({ table: 'chave_reajustada', values: { nome: 'Duda' } })
+  assert.equal(r.affectedRows, 1)
+  const [duda] = await driver.query("SELECT id FROM chave_reajustada WHERE nome = 'Duda'", {
+    queryId: 'seq2-check'
+  })
+  assert.ok(Number(duda.rows[0][0]) > 37, `id da Duda (${duda.rows[0][0]}) precisa vir depois do maior id explícito`)
+})
+
+test('resyncSequence devolve undefined para coluna que não é serial', async () => {
+  const resultado = await driver.resyncSequence({ table: 'chave_reajustada', column: 'nome' })
+  assert.equal(resultado, undefined)
+})

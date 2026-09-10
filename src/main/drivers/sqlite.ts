@@ -17,6 +17,7 @@ import {
   LOTE_EXPORTACAO,
   PREVIEW_ROWS,
   applyPreviewLimit,
+  chunkForPlaceholders,
   hasExplicitLimit,
   exigirChave,
   type DatabaseDriver,
@@ -24,6 +25,14 @@ import {
 } from './types'
 import { isMutation, splitStatements } from '../../shared/sql-shape'
 import { toGridFromArrays } from './value-types'
+
+/**
+ * Teto de variáveis por statement do SQLite. O valor real
+ * (`SQLITE_MAX_VARIABLE_NUMBER`) é 999 em builds mais antigos e 32.766 desde
+ * a 3.32.0 — não há como consultar em runtime qual o binário empacotado usa,
+ * então usamos o mais conservador dos dois: funciona nos dois casos.
+ */
+const MAX_PLACEHOLDERS_SQLITE = 999
 
 export class SQLiteDriver implements DatabaseDriver {
   readonly dialect: Dialect = 'sqlite'
@@ -279,6 +288,58 @@ export class SQLiteDriver implements DatabaseDriver {
     const sql = `INSERT INTO ${alvo} (${colunas}) VALUES (${marcas})`
 
     return this.escreverComTransacao(sql, entradas.map(([, v]) => v))
+  }
+
+  /**
+   * Insere muitas linhas de uma vez — o caminho da importação de arquivo.
+   *
+   * `columns` fixa a ordem; cada linha de `rows` é lida por posição. O lote
+   * inteiro roda numa transação e é quebrado em sub-lotes pelo teto de
+   * variáveis por statement do SQLite.
+   */
+  async insertRows(params: {
+    table: string
+    database?: string
+    columns: string[]
+    rows: unknown[][]
+  }): Promise<{ affectedRows: number }> {
+    if (this.config?.readOnly) {
+      throw new Error('Conexão em modo somente-leitura: comandos de escrita estão bloqueados.')
+    }
+    if (params.columns.length === 0) {
+      throw new Error('Informe ao menos uma coluna para inserir.')
+    }
+    if (params.rows.length === 0) return { affectedRows: 0 }
+
+    const alvo = params.database
+      ? `${quoteIdent(params.database)}.${quoteIdent(params.table)}`
+      : quoteIdent(params.table)
+    const colunasSql = params.columns.map(quoteIdent).join(', ')
+    const marcaLinha = `(${params.columns.map(() => '?').join(', ')})`
+    const db = this.require()
+
+    // `better-sqlite3` é síncrono: a transação é literalmente este bloco.
+    const executar = db.transaction((lotes: unknown[][][]) => {
+      let total = 0
+      for (const lote of lotes) {
+        const sql = `INSERT INTO ${alvo} (${colunasSql}) VALUES ${lote.map(() => marcaLinha).join(', ')}`
+        const info = db.prepare(sql).run(...(lote.flat() as never[]))
+        total += info.changes
+      }
+      return total
+    })
+
+    const lotes = chunkForPlaceholders(params.rows, params.columns.length, MAX_PLACEHOLDERS_SQLITE)
+    return { affectedRows: executar(lotes) as number }
+  }
+
+  /**
+   * O SQLite não precisa: o auto-incremento se ajusta sozinho a cada INSERT
+   * com id explícito maior que o atual. Nada aqui para reajustar — a
+   * armadilha da sequência que fica para trás é só do PostgreSQL.
+   */
+  async resyncSequence(): Promise<string | undefined> {
+    return undefined
   }
 
   async deleteRow(params: {

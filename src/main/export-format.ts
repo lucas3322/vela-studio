@@ -50,9 +50,52 @@ export function contarPartes(linhas: number): number {
  * sistema Windows. Sem citar o `\r`, uma observação com retorno de carro parte
  * o registro em dois e desloca todas as colunas seguintes.
  */
-export function escaparCsv(valor: unknown): string {
+/**
+ * Um valor do banco como texto, antes de virar campo CSV.
+ *
+ * `String(valor)` resolvia quase tudo e errava feio em dois casos — os dois
+ * da mesma família de bug que este projeto já pagou:
+ *
+ * - **Data** saía como `Fri Mar 01 2024 00:00:00 GMT-0300 (Horário Padrão de
+ *   Brasília)`. Ilegível no Excel e, pior, impossível de reimportar:
+ *   exportação e importação são um par, e o arquivo que sai tem que poder
+ *   voltar.
+ * - **Coluna JSON** saía como `[object Object]` — exatamente o engano que a
+ *   edição de célula já tinha cometido (ver `paraEdicao`), aqui de novo por
+ *   outro caminho.
+ *
+ * A data é formatada pelos componentes **locais**, nunca por `toISOString()`:
+ * ISO converte para UTC e, em fuso positivo, meia-noite local vira o dia
+ * anterior — a data mudaria de dia dentro do arquivo, silenciosamente.
+ */
+export function valorParaTexto(valor: unknown): string {
   if (valor === null || valor === undefined) return ''
-  const texto = String(valor)
+
+  if (valor instanceof Date) {
+    if (Number.isNaN(valor.getTime())) return ''
+    const dd = (n: number): string => String(n).padStart(2, '0')
+    const data = `${valor.getFullYear()}-${dd(valor.getMonth() + 1)}-${dd(valor.getDate())}`
+    const temHora =
+      valor.getHours() || valor.getMinutes() || valor.getSeconds() || valor.getMilliseconds()
+    // Coluna DATE sai só com a data: acrescentar `00:00:00` que o banco não
+    // tem faria o arquivo afirmar uma precisão que o dado não carrega.
+    return temHora
+      ? `${data} ${dd(valor.getHours())}:${dd(valor.getMinutes())}:${dd(valor.getSeconds())}`
+      : data
+  }
+
+  // Buffer antes de objeto: `JSON.stringify` num Buffer devolveria
+  // `{"type":"Buffer","data":[...]}`, que é pior do que o texto cru de antes.
+  if (Buffer.isBuffer(valor)) return valor.toString()
+
+  if (typeof valor === 'object') return JSON.stringify(valor)
+
+  return String(valor)
+}
+
+export function escaparCsv(valor: unknown): string {
+  const texto = valorParaTexto(valor)
+  if (texto === '') return ''
   return /["\n\r,]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto
 }
 

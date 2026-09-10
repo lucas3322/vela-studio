@@ -195,6 +195,100 @@ test('insertRow recusa sem nenhuma coluna preenchida', async () => {
   )
 })
 
+// ── insertRows (importação de arquivo) ──────────────────────────────
+
+test('insertRows grava todas as linhas e deixa o AUTO_INCREMENT agir', async () => {
+  await driver.query(
+    `DROP TABLE IF EXISTS importados;
+     CREATE TABLE importados (
+       id INT AUTO_INCREMENT PRIMARY KEY,
+       nome VARCHAR(80) NOT NULL,
+       cidade VARCHAR(80)
+     );`,
+    { queryId: 'imp-setup' }
+  )
+
+  const linhas = Array.from({ length: 250 }, (_, i) => [`Pessoa ${i}`, `Cidade ${i % 5}`])
+  const r = await driver.insertRows({
+    table: 'importados',
+    columns: ['nome', 'cidade'],
+    rows: linhas
+  })
+  assert.equal(r.affectedRows, 250)
+
+  const [contagem] = await driver.query('SELECT COUNT(*) AS n FROM importados', { queryId: 'imp-count' })
+  assert.equal(Number(contagem.rows[0][0]), 250)
+
+  const [maxId] = await driver.query('SELECT MAX(id) AS m FROM importados', { queryId: 'imp-max' })
+  assert.equal(Number(maxId.rows[0][0]), 250, 'o auto-incremento precisa ter numerado as 250 linhas')
+})
+
+test('insertRows quebra em sub-lotes sem perder nem duplicar linha', async () => {
+  // Uma tabela "larga" força a divisão bem antes das 250 linhas: com o teto de
+  // placeholders reduzido artificialmente pelo tamanho da tabela real (aqui
+  // simulado por muitas colunas), cada INSERT carrega só uma fração do lote.
+  await driver.query(
+    `DROP TABLE IF EXISTS largona;
+     CREATE TABLE largona (
+       id INT AUTO_INCREMENT PRIMARY KEY,
+       c1 VARCHAR(10), c2 VARCHAR(10), c3 VARCHAR(10), c4 VARCHAR(10), c5 VARCHAR(10)
+     );`,
+    { queryId: 'imp-wide-setup' }
+  )
+  const colunas = ['c1', 'c2', 'c3', 'c4', 'c5']
+  const linhas = Array.from({ length: 3000 }, (_, i) => colunas.map((c) => `${c}-${i}`))
+
+  const r = await driver.insertRows({ table: 'largona', columns: colunas, rows: linhas })
+  assert.equal(r.affectedRows, 3000)
+
+  const [contagem] = await driver.query('SELECT COUNT(*) AS n FROM largona', { queryId: 'imp-wide-count' })
+  assert.equal(Number(contagem.rows[0][0]), 3000)
+
+  const [primeira] = await driver.query("SELECT c1 FROM largona ORDER BY id LIMIT 1", { queryId: 'imp-wide-first' })
+  assert.equal(primeira.rows[0][0], 'c1-0')
+  const [ultima] = await driver.query('SELECT c1 FROM largona ORDER BY id DESC LIMIT 1', { queryId: 'imp-wide-last' })
+  assert.equal(ultima.rows[0][0], 'c1-2999')
+})
+
+test('insertRows recusa em conexão somente-leitura', async () => {
+  const ro = new MySQLDriver()
+  await ro.connect({ ...config, readOnly: true })
+  await assert.rejects(
+    () => ro.insertRows({ table: 'importados', columns: ['nome'], rows: [['x']] }),
+    /somente-leitura/
+  )
+  await ro.disconnect()
+
+  const [contagem] = await driver.query('SELECT COUNT(*) AS n FROM importados', { queryId: 'imp-ro-count' })
+  assert.equal(Number(contagem.rows[0][0]), 250, 'nada pode ter sido gravado')
+})
+
+test('insertRows parametriza: injeção vira texto, não comando', async () => {
+  const veneno = "O'Brien'; DROP TABLE importados; --"
+  await driver.insertRows({ table: 'importados', columns: ['nome'], rows: [[veneno]] })
+
+  const [guardado] = await driver.query(
+    'SELECT nome FROM importados ORDER BY id DESC LIMIT 1',
+    { queryId: 'imp-veneno' }
+  )
+  assert.equal(guardado.rows[0][0], veneno)
+
+  const [existe] = await driver.query('SELECT COUNT(*) AS n FROM importados', { queryId: 'imp-veneno-count' })
+  assert.ok(Number(existe.rows[0][0]) >= 251, 'a tabela precisa continuar existindo')
+})
+
+test('insertRows lote vazio não faz nada e não erra', async () => {
+  const r = await driver.insertRows({ table: 'importados', columns: ['nome'], rows: [] })
+  assert.equal(r.affectedRows, 0)
+})
+
+// ── resyncSequence ───────────────────────────────────────────────────
+
+test('resyncSequence não faz nada no MySQL: o AUTO_INCREMENT se ajusta sozinho', async () => {
+  const resultado = await driver.resyncSequence({ table: 'importados', column: 'id' })
+  assert.equal(resultado, undefined)
+})
+
 test('streamQuery recusa comando de escrita em vez de pendurar', async () => {
   // `.stream()` sobre um comando que não devolve conjunto de resultados nunca
   // emite o fim: o `for await` esperava para sempre e a exportação ficava

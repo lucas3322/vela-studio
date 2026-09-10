@@ -144,6 +144,48 @@ export interface DatabaseDriver {
     values: Record<string, unknown>
   }): Promise<{ affectedRows: number; statement: string }>
 
+  /**
+   * Insere MUITAS linhas de uma vez — o caminho da importação de arquivo.
+   *
+   * Existe separado do `insertRow` por causa do custo: um arquivo de 200 mil
+   * linhas por `insertRow` são 200 mil idas ao banco, e a importação levaria
+   * horas. Aqui as linhas vão em lotes, num INSERT de vários `VALUES`, ainda
+   * **parametrizado** — o valor nunca é concatenado no SQL.
+   *
+   * `columns` fixa a ordem: cada linha de `rows` é lida por posição, então
+   * quem chama já resolveu o mapeamento arquivo→tabela. Coluna que o arquivo
+   * não preenche simplesmente não entra em `columns`, e o banco aplica o
+   * `DEFAULT`/auto-incremento — a mesma regra do `insertRow`.
+   *
+   * Implementações DEVEM recusar conexão somente-leitura e rodar o lote em
+   * transação: meio lote gravado é pior do que lote nenhum, porque ninguém
+   * sabe onde parou.
+   */
+  insertRows(params: {
+    table: string
+    database?: string
+    columns: string[]
+    rows: unknown[][]
+  }): Promise<{ affectedRows: number }>
+
+  /**
+   * Reajusta a sequência da chave depois de uma importação com ids explícitos.
+   *
+   * Só o PostgreSQL precisa: lá o `INSERT` com id explícito **não** avança a
+   * sequência, e o próximo insert normal do sistema estoura com chave
+   * duplicada — longe da importação, sem ninguém ligar uma coisa à outra. No
+   * MySQL e no SQLite o auto-incremento se ajusta sozinho, então eles
+   * devolvem `undefined` e não fazem nada.
+   *
+   * Devolve o nome da sequência quando reajustou, para o relato dizer o que
+   * foi feito em vez de fazer escondido.
+   */
+  resyncSequence(params: {
+    table: string
+    database?: string
+    column: string
+  }): Promise<string | undefined>
+
   /** Remove uma linha pela chave primária, com as mesmas garantias. */
   deleteRow(params: {
     table: string
@@ -253,6 +295,30 @@ export function exigirTipoValido(tipo: string): string {
     )
   }
   return limpo
+}
+
+/**
+ * Divide as linhas em sub-lotes de modo que nenhum INSERT ultrapasse o teto
+ * de parâmetros do banco.
+ *
+ * Cada linha gasta exatamente `columns` placeholders — um `INSERT ... VALUES
+ * (?,?,?), (?,?,?), ...` com 20 colunas e 5.000 linhas do lote pedido pela
+ * importação estouraria os 65.535 parâmetros de uma prepared statement do
+ * MySQL/PostgreSQL, ou os 999 de um SQLite mais antigo, bem antes de chegar
+ * lá. Cada driver chama isto com o teto que vale para ele.
+ *
+ * Uma única linha cujo número de colunas já ultrapasse o teto (tabela muito
+ * larga) ainda sai como lote de 1 — é a única opção honesta; cortar colunas
+ * por conta própria inventaria dado que a pessoa não pediu.
+ */
+export function chunkForPlaceholders<T>(rows: T[], columns: number, maxPlaceholders: number): T[][] {
+  if (rows.length === 0) return []
+  const perChunk = Math.max(1, Math.floor(maxPlaceholders / Math.max(1, columns)))
+  const chunks: T[][] = []
+  for (let i = 0; i < rows.length; i += perChunk) {
+    chunks.push(rows.slice(i, i + perChunk))
+  }
+  return chunks
 }
 
 export function exigirChave(keys: Record<string, unknown>): Array<[string, unknown]> {

@@ -127,3 +127,41 @@ test('o CSV começa com BOM para o Excel não estragar o acento', () => {
   assert.equal(BOM_UTF8, '﻿')
   assert.equal(Buffer.from(BOM_UTF8, 'utf-8').toString('hex'), 'efbbbf')
 })
+
+// ── Data e JSON no CSV: o par exportar→importar ──────────────────────
+//
+// Achados dirigindo o app: a exportação escrevia `Fri Mar 01 2024 00:00:00
+// GMT-0300 (Horário Padrão de Brasília)` numa coluna DATE e `[object Object]`
+// numa coluna JSON. O primeiro torna o arquivo impossível de reimportar; o
+// segundo é o mesmo engano que a edição de célula já tinha cometido.
+
+test('coluna DATE sai como data, não como toString do JS', () => {
+  // Componentes locais de propósito: `toISOString` converteria para UTC e, em
+  // fuso positivo, meia-noite local viraria o dia anterior.
+  const valor = new Date(2024, 2, 1) // 1º de março de 2024, meia-noite local
+  assert.equal(escaparCsv(valor), '2024-03-01')
+  assert.ok(!escaparCsv(valor).includes('GMT'))
+})
+
+test('data com hora mantém a hora; data pura não ganha 00:00:00 inventado', () => {
+  assert.equal(escaparCsv(new Date(2024, 11, 25, 14, 7, 9)), '2024-12-25 14:07:09')
+  assert.equal(escaparCsv(new Date(2024, 11, 25)), '2024-12-25')
+})
+
+test('data inválida vira campo vazio em vez de "Invalid Date"', () => {
+  assert.equal(escaparCsv(new Date('nada')), '')
+})
+
+test('coluna JSON sai como JSON, nunca "[object Object]"', () => {
+  const payload = { ItemCode: 'ATFX013628', GrupoItemId: 115 }
+  const campo = escaparCsv(payload)
+  assert.ok(!campo.includes('[object Object]'), campo)
+  // Tem vírgula dentro, então o campo precisa vir citado.
+  assert.ok(campo.startsWith('"') && campo.includes('""ItemCode""'), campo)
+})
+
+test('Buffer continua saindo como texto, não como {"type":"Buffer"}', () => {
+  // `JSON.stringify` num Buffer devolveria o objeto interno — pior do que o
+  // texto cru que já saía antes.
+  assert.equal(escaparCsv(Buffer.from('Ana')), 'Ana')
+})

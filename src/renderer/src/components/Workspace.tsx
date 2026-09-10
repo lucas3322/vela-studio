@@ -34,7 +34,7 @@ export function Workspace(): React.JSX.Element {
 
   const allTabs = useTabStore((s) => s.tabs)
   const activeByConnection = useTabStore((s) => s.activeByConnection)
-  const { setActive, closeTab, openQueryTab } = useTabStore()
+  const { setActive, requestCloseTab, openQueryTab } = useTabStore()
 
   // Só as abas desta conexão. Trocar de banco troca o conjunto inteiro,
   // e voltar reencontra tudo como estava.
@@ -61,7 +61,7 @@ export function Workspace(): React.JSX.Element {
             onClick={() => setActive(item.id)}
             onAuxClick={(e) => {
               // Botão do meio fecha a aba, como no navegador.
-              if (e.button === 1) closeTab(item.id)
+              if (e.button === 1) requestCloseTab(item.id)
             }}
             title={
               item.kind === 'table'
@@ -92,7 +92,7 @@ export function Workspace(): React.JSX.Element {
               className="tab__close"
               onClick={(e) => {
                 e.stopPropagation()
-                closeTab(item.id)
+                requestCloseTab(item.id)
               }}
             >
               <IconClose size={11} />

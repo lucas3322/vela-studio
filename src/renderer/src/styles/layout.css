@@ -2606,11 +2606,27 @@
   aviso que some em quatro segundos é invisível para quem estava lendo uma
   query naquele instante — e a checagem só voltava a rodar no dia seguinte.
 */
-.aviso-versao {
+/*
+ * Pilha de cards do canto inferior direito.
+ *
+ * `.aviso-versao` e `.progresso-toast` só definem a própria aparência; quem
+ * fixa a posição na tela é este contêiner comum. Sem ele, os dois cards
+ * calculariam o mesmo `bottom` e um cobriria o outro quando a checagem de
+ * versão e uma exportação caíssem ao mesmo tempo — `column-reverse` empilha
+ * o card mais recente junto à borda, como notificação de sistema.
+ */
+.corner-stack {
   position: fixed;
   right: var(--space-4);
   bottom: calc(var(--statusbar-height) + var(--space-4));
   z-index: 40;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.aviso-versao {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -2684,6 +2700,163 @@
   .aviso-versao {
     animation: none;
   }
+}
+
+/* ── Card de progresso (exportação/importação) ──────────────────────
+   Mesmo canto, mesma superfície e mesma animação de entrada do aviso de
+   versão (`.aviso-versao`) — é o vocabulário visual que o usuário já
+   reconhece como "card que fica até eu responder". */
+
+.progresso-toast {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 320px;
+  max-height: calc(100vh - var(--titlebar-height) - var(--statusbar-height) - var(--space-8));
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-lg);
+  overflow-y: auto;
+  animation: aviso-versao-entra var(--duration-base) var(--ease);
+}
+
+.progresso-toast--saindo {
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity var(--duration-fast) var(--ease),
+    transform var(--duration-fast) var(--ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progresso-toast {
+    animation: none;
+  }
+}
+
+.progresso-toast__fechar {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+}
+
+.progresso-toast__fechar:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.progresso-toast__cabecalho {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-right: var(--space-5);
+}
+
+.progresso-toast__marca {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.progresso-toast__marca--concluido {
+  color: var(--success);
+}
+
+.progresso-toast__marca--erro {
+  color: var(--danger);
+}
+
+.progresso-toast__titulo {
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.progresso-toast__progresso {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.progresso-toast__barra {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+
+.progresso-toast__barra-preenchida {
+  height: 100%;
+  background: var(--accent);
+  transition: width var(--duration-fast) linear;
+}
+
+.progresso-toast__medida {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.progresso-toast__erro {
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--danger);
+}
+
+.progresso-toast__rodape {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.progresso-toast__rodape--coluna {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.progresso-toast__resumo {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.progresso-toast__nota {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.progresso-toast__falhas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 140px;
+  overflow-y: auto;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+}
+
+.progresso-toast__falha {
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.progresso-toast__falha--omitidas {
+  color: var(--text-tertiary);
 }
 
 /* ── Edição de célula em janela ────────────────────────────────────── */
@@ -3049,6 +3222,137 @@
    do schema ficar aparente em vez de a opção simplesmente sumir. */
 .insercao__nulo--indisponivel {
   opacity: 0.4;
+}
+
+/* ── Importação de arquivo (ImportDialog) ───────────────────────────── */
+
+/* Prévia do arquivo: contorno próprio, não `--border-default` — mesma razão
+   do `--contorno-objeto` documentada em `tokens.css`: no tema claro a tabela
+   e o corpo do modal são ambos brancos. */
+.import-previa {
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--contorno-objeto);
+  border-radius: var(--radius-md);
+}
+
+.import-previa__tabela {
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.import-previa__tabela th {
+  position: sticky;
+  top: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--grid-line);
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.import-previa__tipo {
+  font-weight: 400;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.import-previa__tabela td {
+  padding: var(--space-1) var(--space-3);
+  border-bottom: 1px solid var(--grid-line);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+/* Secundário, não terciário: dentro do modal, sobre `--bg-elevated`. Ver a
+   nota em `.modal__subtitle`. */
+.import-previa__vazio {
+  color: var(--text-secondary);
+}
+
+.mapeamento {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: min(40vh, 360px);
+  overflow-y: auto;
+  padding-right: var(--space-2);
+}
+
+.mapeamento__linha {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(160px, 220px) minmax(100px, auto);
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.mapeamento__origem {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mapeamento__nome {
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mapeamento__meta {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mapeamento__select {
+  height: 30px;
+  font-size: var(--text-sm);
+}
+
+.mapeamento__selo {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+/* Selo de compatibilidade — mesmas três cores de estado do resto do app
+   (`--success`/`--warning`/`--danger`), nunca uma paleta nova para dizer a
+   mesma coisa. */
+.selo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.selo--compativel {
+  color: var(--success);
+  background: var(--success-subtle);
+}
+
+.selo--convertivel {
+  color: var(--warning);
+  background: var(--warning-subtle);
+}
+
+.selo--incompativel {
+  color: var(--danger);
+  background: var(--danger-subtle);
+}
+
+.selo--info {
+  color: var(--info);
+  background: var(--info-subtle);
 }
 
 /* ── Busca dentro da grade (⌘F) ───────────────────────────────────── */

@@ -17,6 +17,7 @@ import {
   LOTE_EXPORTACAO,
   PREVIEW_ROWS,
   applyPreviewLimit,
+  chunkForPlaceholders,
   hasExplicitLimit,
   exigirChave,
   exigirTipoValido,
@@ -25,6 +26,13 @@ import {
 } from './types'
 import { isMutation, splitStatements } from '../../shared/sql-shape'
 import { toGridFromArrays } from './value-types'
+
+/**
+ * Teto de parâmetros de uma prepared statement do MySQL/MariaDB. O protocolo
+ * usa um inteiro de 16 bits para o número de placeholders (65.535); a margem
+ * evita chegar perto do limite em servidores/configurações mais restritivas.
+ */
+const MAX_PLACEHOLDERS_MYSQL = 60_000
 
 export class MySQLDriver implements DatabaseDriver {
   readonly dialect: Dialect = 'mysql'
@@ -389,6 +397,62 @@ export class MySQLDriver implements DatabaseDriver {
     const sql = `INSERT INTO ${alvo} (${colunas}) VALUES (${marcas})`
 
     return this.escreverComTransacao(sql, entradas.map(([, v]) => v))
+  }
+
+  /**
+   * Insere muitas linhas de uma vez — o caminho da importação de arquivo.
+   *
+   * `columns` fixa a ordem; cada linha de `rows` é lida por posição. O lote
+   * inteiro roda numa transação só e é quebrado em sub-lotes pelo teto de
+   * placeholders do MySQL: um CSV de 200 mil linhas em 20 colunas estouraria
+   * os 65.535 parâmetros de uma prepared statement se mandado num INSERT só.
+   */
+  async insertRows(params: {
+    table: string
+    database?: string
+    columns: string[]
+    rows: unknown[][]
+  }): Promise<{ affectedRows: number }> {
+    if (this.config?.readOnly) {
+      throw new Error('Conexão em modo somente-leitura: comandos de escrita estão bloqueados.')
+    }
+    if (params.columns.length === 0) {
+      throw new Error('Informe ao menos uma coluna para inserir.')
+    }
+    if (params.rows.length === 0) return { affectedRows: 0 }
+
+    const alvo = params.database
+      ? `${quoteIdent(params.database)}.${quoteIdent(params.table)}`
+      : quoteIdent(params.table)
+    const colunasSql = params.columns.map(quoteIdent).join(', ')
+    const marcaLinha = `(${params.columns.map(() => '?').join(', ')})`
+
+    const conn = await this.require().getConnection()
+    try {
+      await conn.beginTransaction()
+      let total = 0
+      for (const lote of chunkForPlaceholders(params.rows, params.columns.length, MAX_PLACEHOLDERS_MYSQL)) {
+        const sql = `INSERT INTO ${alvo} (${colunasSql}) VALUES ${lote.map(() => marcaLinha).join(', ')}`
+        const [resultado] = await conn.execute(sql, lote.flat() as never[])
+        total += (resultado as mysql.ResultSetHeader).affectedRows
+      }
+      await conn.commit()
+      return { affectedRows: total }
+    } catch (error) {
+      await conn.rollback().catch(() => undefined)
+      throw error
+    } finally {
+      conn.release()
+    }
+  }
+
+  /**
+   * O MySQL não precisa: o AUTO_INCREMENT se ajusta sozinho a cada INSERT
+   * com id explícito maior que o atual. Nada aqui para reajustar — só o
+   * PostgreSQL tem a armadilha da sequência que fica para trás.
+   */
+  async resyncSequence(): Promise<string | undefined> {
+    return undefined
   }
 
   async deleteRow(params: {

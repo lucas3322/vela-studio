@@ -321,3 +321,128 @@ export interface SavedQuery {
   createdAt: number
   updatedAt: number
 }
+
+/* ── Importação de arquivo para dentro de uma tabela ──────────────────
+ *
+ * O caminho inverso da exportação. Duas formas bem diferentes de arquivo,
+ * então dois modos no mesmo fluxo:
+ *
+ * - **CSV**: o arquivo tem colunas próprias, que precisam ser casadas com as
+ *   colunas da tabela. É aqui que vive a prévia, a checagem de tipo e o
+ *   remapeamento.
+ * - **SQL** (dump de `INSERT`): os comandos já dizem para onde vão. Não há o
+ *   que mapear — há o que **conferir antes de executar**, porque um dump roda
+ *   comando arbitrário no banco.
+ */
+
+export type FormatoDeImportacao = 'csv' | 'sql'
+
+/** Tipo deduzido por amostragem — palpite sobre o arquivo, nunca sobre o banco. */
+export type TipoDeduzido = 'inteiro' | 'decimal' | 'booleano' | 'data' | 'texto' | 'vazio'
+
+/** Uma coluna do arquivo (CSV). */
+export interface ColunaDoArquivo {
+  /** Cabeçalho, ou `coluna N` quando o arquivo não tem cabeçalho. */
+  nome: string
+  /** Posição no arquivo, base 0 — é por ela que o mapeamento aponta. */
+  indice: number
+  tipoDeduzido: TipoDeduzido
+  /** Amostra de valores, para a pessoa conferir com o olho. */
+  exemplos: string[]
+}
+
+/**
+ * O que a prévia devolve.
+ *
+ * `truncada` existe para a interface poder dizer a verdade: a prévia são as
+ * primeiras linhas, não o arquivo. "Está tudo certo nas 100 primeiras" não é
+ * "está tudo certo" — e prometer o segundo é o tipo de engano que este projeto
+ * já pagou caro.
+ */
+export interface PreviaDeImportacao {
+  formato: FormatoDeImportacao
+  caminho: string
+  tamanhoBytes: number
+  /** CSV: colunas detectadas. Vazio em SQL. */
+  colunas: ColunaDoArquivo[]
+  /** CSV: primeiras linhas, já divididas por coluna. */
+  linhas: string[][]
+  /** CSV: delimitador detectado (`,`, `;`, tab). */
+  delimitador?: string
+  /** CSV: a primeira linha parece ser cabeçalho? */
+  temCabecalho?: boolean
+  /** SQL: o que foi encontrado na leitura da prévia. */
+  sql?: {
+    /** Comandos lidos na prévia. */
+    comandos: number
+    /** Quantos deles são INSERT. */
+    inserts: number
+    /** Comandos que NÃO são INSERT — o que exige confirmação consciente. */
+    outros: string[]
+    primeiros: string[]
+  }
+  /** A prévia parou antes do fim do arquivo. */
+  truncada: boolean
+}
+
+/** De→para de uma coluna do arquivo para uma coluna da tabela. */
+export interface MapeamentoDeColuna {
+  /** Índice da coluna no arquivo. */
+  origem: number
+  /** Coluna de destino; `null` significa **ignorar** esta coluna do arquivo. */
+  destino: string | null
+}
+
+export interface OpcoesDeImportacao {
+  /** CSV: pular a primeira linha (cabeçalho). */
+  ignorarPrimeiraLinha: boolean
+  delimitador?: string
+  /**
+   * Gravar os valores do arquivo nas colunas de chave auto-incremento.
+   *
+   * Padrão **falso**, e não por preguiça: mandar id explícito para uma coluna
+   * auto-incremento colide com linha existente e, no PostgreSQL, não avança a
+   * sequência — o próximo INSERT normal do sistema estoura com chave
+   * duplicada, longe daqui, sem ninguém ligar uma coisa à outra. Quando a
+   * pessoa liga isso de propósito, o import reajusta a sequência no fim.
+   */
+  usarIdsDoArquivo: boolean
+  /** Linhas por lote no INSERT. */
+  tamanhoDoLote?: number
+}
+
+/** Relato honesto do que entrou e do que não entrou. */
+export interface ResultadoDaImportacao {
+  linhasLidas: number
+  linhasGravadas: number
+  /** Falhas linha a linha, com o número da linha **no arquivo**. */
+  falhas: Array<{ linha: number; motivo: string }>
+  /** Falhas que não couberam no relato, para não estourar a memória. */
+  falhasOmitidas: number
+  /** Sequência reajustada no fim (só PostgreSQL, com `usarIdsDoArquivo`). */
+  sequenciaReajustada?: string
+}
+
+/** Andamento da importação, emitido pelo main. */
+export interface ImportProgress {
+  lidas: number
+  gravadas: number
+  /** Bytes já consumidos do arquivo e o total — dá porcentagem honesta. */
+  bytesLidos: number
+  bytesTotais: number
+}
+
+/**
+ * Andamento da exportação.
+ *
+ * `totalEstimado` é opcional de propósito: a exportação em fluxo não sabe
+ * quantas linhas vêm por aí. Quando quem chamou tem uma estimativa (a
+ * contagem do catálogo, no caso da tabela), ela vem aqui e a interface mostra
+ * porcentagem — rotulada como estimativa, porque é o que é. Sem ela, a barra
+ * fica indeterminada e o número de linhas gravadas é o único fato.
+ */
+export interface ExportProgress {
+  linhas: number
+  arquivos: number
+  totalEstimado?: number
+}

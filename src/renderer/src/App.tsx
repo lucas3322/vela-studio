@@ -5,10 +5,12 @@ import { BatchProgressDialog } from './components/BatchProgressDialog'
 import { DiscardEditsDialog } from './components/DiscardEditsDialog'
 import { Tour } from './components/Tour'
 import { UpdateBanner } from './components/UpdateBanner'
+import { ProgressToast } from './components/ProgressToast'
 import { Sidebar } from './components/Sidebar'
 import { Workspace } from './components/Workspace'
 import { StatusBar } from './components/StatusBar'
 import { ConnectionModal } from './components/ConnectionModal'
+import { UnsavedTabDialog } from './components/UnsavedTabDialog'
 import { HistoryModal } from './components/HistoryModal'
 import { CheatsheetModal } from './components/CheatsheetModal'
 import { UpdateModal } from './components/UpdateModal'
@@ -105,7 +107,12 @@ export function App(): React.JSX.Element {
       </div>
       <StatusBar />
 
-      <UpdateBanner />
+      <div className="corner-stack">
+        <UpdateBanner />
+
+      <UnsavedTabDialog />
+        <ProgressToast />
+      </div>
 
       {mostrarTour && <Tour aoFechar={() => setMostrarTour(false)} />}
 

@@ -301,6 +301,24 @@ export class MongoDriver implements DatabaseDriver {
     }
   }
 
+  /**
+   * Importação de arquivo ainda não vale para o MongoDB — vem numa etapa
+   * seguinte. Falha explícita em vez de tentar um caminho parcial (por
+   * exemplo, um `insertMany` sem cuidar de tipo, mapeamento ou lote): melhor
+   * dizer claramente que não dá do que fingir e devolver um resultado
+   * incompleto.
+   */
+  async insertRows(): Promise<{ affectedRows: number }> {
+    throw new Error(
+      'A importação de arquivo ainda não é suportada no MongoDB. Está prevista para uma etapa seguinte.'
+    )
+  }
+
+  /** MongoDB não tem sequência — o `_id` não depende de contador nenhum. */
+  async resyncSequence(): Promise<string | undefined> {
+    return undefined
+  }
+
   async deleteRow(): Promise<{ affectedRows: number; statement: string }> {
     throw new Error(
       'Exclusão direta na grade ainda não é suportada no MongoDB. ' +

@@ -1,9 +1,62 @@
 import { create } from 'zustand'
+import type { ExportProgress, ImportProgress, ResultadoDaImportacao } from '@shared/types'
 import { PALETA_PADRAO, aplicarPaleta } from '../styles/palettes'
 import { paletaEmVigor } from '../styles/connection-colors'
 import type { PassoDoLote } from '../editor/lote'
 
 export type ThemeMode = 'light' | 'dark' | 'system'
+
+/**
+ * Tarefa de exportação ou importação em andamento, mostrada no cartão do
+ * canto inferior direito — o mesmo lugar e o mesmo vocabulário visual do
+ * aviso de atualização (`.aviso-versao`), a referência que o usuário pediu.
+ *
+ * Uma só por vez: a barra lateral não deixa começar uma exportação nova
+ * enquanto a anterior está rodando (o menu de contexto não desabilita isso
+ * hoje, mas a UI de exportar/importar é sempre disparada por um clique, e um
+ * segundo clique reabre o mesmo card, não empilha dois).
+ *
+ * ## Por que união discriminada por `tipo`, e não um campo genérico
+ *
+ * Exportação e importação medem o andamento de jeitos diferentes — uma em
+ * linhas e arquivos, outra em linhas e bytes — e só a exportação tem
+ * "estimativa do catálogo". Um formato genérico teria campo opcional demais
+ * e nenhuma garantia em tempo de compilação de que o card de exportação não
+ * está lendo `bytesLidos`, que não existe ali.
+ */
+export type TarefaDeProgresso =
+  | {
+      tipo: 'exportacao'
+      /** O que está sendo exportado, para o título do card — ex.: "clientes.csv". */
+      rotulo: string
+      estado: 'rodando' | 'concluido' | 'erro'
+      linhas: number
+      arquivos: number
+      /**
+       * Estimativa de linhas vinda do catálogo (a contagem que a árvore já
+       * mostra). Ausente quando quem chamou não tinha uma — aí a % não
+       * aparece, só o indeterminado e a contagem de linhas, porque a
+       * exportação em fluxo não sabe quantas linhas vêm por aí.
+       */
+      totalEstimado?: number
+      /** Arquivos gravados, preenchido ao concluir — é o que abre "Mostrar na pasta". */
+      arquivosGerados?: string[]
+      mensagemDeErro?: string
+    }
+  | {
+      tipo: 'importacao'
+      /** Tabela de destino, para o título do card. */
+      rotulo: string
+      estado: 'rodando' | 'concluido' | 'erro'
+      lidas: number
+      gravadas: number
+      /** Bytes do arquivo já lidos e o total — é o que dá % honesta na importação. */
+      bytesLidos: number
+      bytesTotais: number
+      /** Relato final, preenchido ao concluir — o que entrou e o que falhou. */
+      resultado?: ResultadoDaImportacao
+      mensagemDeErro?: string
+    }
 
 interface AppState {
   theme: ThemeMode
@@ -110,6 +163,9 @@ interface AppState {
     continuar?: () => void
   } | null
 
+  /** Tarefa de exportação/importação mostrada no cartão do canto. Ver `TarefaDeProgresso`. */
+  tarefa: TarefaDeProgresso | null
+
   setTheme: (theme: ThemeMode) => void
   applySystemTheme: (theme: 'light' | 'dark') => void
   toggleSidebar: () => void
@@ -141,6 +197,18 @@ interface AppState {
   fecharLote: () => void
   totalDePendencias: () => number
   fecharConfirmacaoDeEscrita: () => void
+
+  /** Abre o card de progresso no estado inicial de uma exportação. */
+  iniciarExportacao: (rotulo: string, totalEstimado?: number) => void
+  atualizarProgressoExportacao: (progresso: ExportProgress) => void
+  concluirExportacao: (arquivos: string[], linhas: number) => void
+  /** Abre o card de progresso no estado inicial de uma importação. */
+  iniciarImportacao: (rotulo: string) => void
+  atualizarProgressoImportacao: (progresso: ImportProgress) => void
+  concluirImportacao: (resultado: ResultadoDaImportacao) => void
+  /** Vale para a tarefa em andamento, seja exportação ou importação. */
+  falharTarefa: (mensagem: string) => void
+  fecharTarefa: () => void
 }
 
 const STORAGE_KEY = 'vela.theme'
@@ -251,6 +319,7 @@ export const useAppStore = create<AppState>((set, get) => {
     pedidoDeDescarte: 0,
     confirmacaoDeDescarte: null,
     lote: null,
+    tarefa: null,
 
     setTheme: (theme) => {
       localStorage.setItem(STORAGE_KEY, theme)
@@ -375,7 +444,92 @@ export const useAppStore = create<AppState>((set, get) => {
       clearTimeout(toastTimer)
       set({ toast: { message, tone } })
       toastTimer = setTimeout(() => set({ toast: null }), 4000)
-    }
+    },
+
+    iniciarExportacao: (rotulo, totalEstimado) =>
+      set({
+        tarefa: {
+          tipo: 'exportacao',
+          rotulo,
+          estado: 'rodando',
+          linhas: 0,
+          arquivos: 0,
+          totalEstimado
+        }
+      }),
+
+    atualizarProgressoExportacao: (progresso) =>
+      set((estado) => {
+        if (!estado.tarefa || estado.tarefa.tipo !== 'exportacao') return estado
+        return {
+          tarefa: {
+            ...estado.tarefa,
+            linhas: progresso.linhas,
+            arquivos: progresso.arquivos,
+            // O evento pode trazer a estimativa; sem ela, mantém a que já
+            // tínhamos ao abrir o card.
+            totalEstimado: progresso.totalEstimado ?? estado.tarefa.totalEstimado
+          }
+        }
+      }),
+
+    concluirExportacao: (arquivos, linhas) =>
+      set((estado) => {
+        if (!estado.tarefa || estado.tarefa.tipo !== 'exportacao') return estado
+        return {
+          tarefa: { ...estado.tarefa, estado: 'concluido', linhas, arquivosGerados: arquivos }
+        }
+      }),
+
+    iniciarImportacao: (rotulo) =>
+      set({
+        tarefa: {
+          tipo: 'importacao',
+          rotulo,
+          estado: 'rodando',
+          lidas: 0,
+          gravadas: 0,
+          bytesLidos: 0,
+          bytesTotais: 0
+        }
+      }),
+
+    atualizarProgressoImportacao: (progresso) =>
+      set((estado) => {
+        if (!estado.tarefa || estado.tarefa.tipo !== 'importacao') return estado
+        return {
+          tarefa: {
+            ...estado.tarefa,
+            lidas: progresso.lidas,
+            gravadas: progresso.gravadas,
+            bytesLidos: progresso.bytesLidos,
+            bytesTotais: progresso.bytesTotais
+          }
+        }
+      }),
+
+    concluirImportacao: (resultado) =>
+      set((estado) => {
+        if (!estado.tarefa || estado.tarefa.tipo !== 'importacao') return estado
+        return {
+          tarefa: {
+            ...estado.tarefa,
+            estado: 'concluido',
+            lidas: resultado.linhasLidas,
+            gravadas: resultado.linhasGravadas,
+            resultado
+          }
+        }
+      }),
+
+    falharTarefa: (mensagem) =>
+      set((estado) =>
+        estado.tarefa
+          ? { tarefa: { ...estado.tarefa, estado: 'erro', mensagemDeErro: mensagem } }
+          : estado
+      ),
+
+    fecharTarefa: () => set({ tarefa: null })
   }
 })
 
