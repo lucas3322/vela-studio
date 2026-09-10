@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 2.0.0 — 2026-09-10
+
+### Novidades
+
+- implementar lógica de versionamento semântico e testes para classificação de commits (b3a4f1a)
+
 ## 1.3.1 — 2026-09-10
 
 ### Outras mudanças
