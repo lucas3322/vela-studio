@@ -9,6 +9,12 @@ interface Props {
   onEdit?: () => void
   onRemove?: () => void
   disabled?: boolean
+  /**
+   * Variante enxuta, para a barra lateral: linha rasa sem cartão, no mesmo
+   * idioma da árvore de tabelas. O cartão grande é da tela inicial, onde ele é
+   * o conteúdo principal; na lateral ele fica desproporcional.
+   */
+  compacta?: boolean
 }
 
 /**
@@ -29,7 +35,8 @@ export function ConnectionRow({
   onOpen,
   onEdit,
   onRemove,
-  disabled
+  disabled,
+  compacta
 }: Props): React.JSX.Element {
   const temAcoes = !!onEdit || !!onRemove
   const tema = useAppStore((s) => s.resolvedTheme)
@@ -48,12 +55,14 @@ export function ConnectionRow({
       CSS, sem nenhum ramo condicional espalhado pela marcação.
     */
     <div
-      className={`conexao ${temAcoes ? 'conexao--com-acoes' : ''} ${cor ? 'conexao--colorida' : ''}`}
+      className={`conexao ${temAcoes ? 'conexao--com-acoes' : ''} ${cor ? 'conexao--colorida' : ''} ${
+        compacta ? 'conexao--compacta' : ''
+      }`}
       style={cor ? ({ '--cor-conexao': cor } as React.CSSProperties) : undefined}
     >
       <button className="conexao__abrir" onClick={onOpen} disabled={disabled}>
         <IconDatabase
-          size={17}
+          size={compacta ? 15 : 17}
           style={{ color: cor ?? 'var(--accent)', flexShrink: 0 }}
           aria-hidden
         />

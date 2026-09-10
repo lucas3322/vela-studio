@@ -1,20 +1,17 @@
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
-import { useConectarSalva } from '../hooks/useConectarSalva'
 import { IconSail, IconPlus } from './Icons'
-import { ConnectionRow } from './ConnectionRow'
 
 /**
- * Primeira tela de quem abre o app.
- * Se já existem conexões salvas, elas são o conteúdo principal — clicar e
- * conectar deve ser o caminho mais curto. Sem nenhuma, viramos onboarding.
+ * Primeira tela de quem abre o app — a tela vazia, quando não há conexão ativa.
+ *
+ * A lista de conexões vive na barra lateral (ver `SidebarConnections`); aqui no
+ * centro ela seria a mesma lista uma segunda vez. Então o centro fica só com a
+ * marca e o único gesto que a lateral não repete: criar uma conexão nova.
  */
 export function WelcomeScreen(): React.JSX.Element {
   const openModal = useAppStore((s) => s.openModal)
-  const saved = useConnectionStore((s) => s.saved)
-  const connecting = useConnectionStore((s) => s.connecting)
-  const removeConnection = useConnectionStore((s) => s.removeConnection)
-  const handleConnect = useConectarSalva()
+  const temConexoes = useConnectionStore((s) => s.saved.length > 0)
 
   return (
     <div className="welcome">
@@ -22,28 +19,16 @@ export function WelcomeScreen(): React.JSX.Element {
       <div>
         <div className="welcome__title">Vela Studio</div>
         <p className="welcome__text">
-          {saved.length > 0
-            ? 'Escolha uma conexão para começar.'
-            : 'Conecte um banco MySQL, PostgreSQL, SQLite ou MongoDB e escreva consultas com ajuda de verdade: o editor conhece suas tabelas e explica cada comando.'}
+          {temConexoes
+            ? 'Escolha uma conexão na barra lateral para começar.'
+            : 'Conecte um banco MySQL, PostgreSQL, SQLite, MongoDB ou Redis e escreva consultas com ajuda de verdade: o editor conhece suas tabelas e explica cada comando.'}
         </p>
       </div>
 
-      {saved.length > 0 && (
-        <div className="welcome__list">
-          {saved.slice(0, 6).map((connection) => (
-            <ConnectionRow
-              key={connection.id}
-              connection={connection}
-              disabled={connecting}
-              onOpen={() => void handleConnect(connection.id)}
-              onEdit={() => openModal('connection', connection.id)}
-              onRemove={() => void removeConnection(connection.id)}
-            />
-          ))}
-        </div>
-      )}
-
-      <button className="btn btn--primary" onClick={() => openModal('connection')}>
+      <button
+        className="btn btn--primary"
+        onClick={() => openModal('connection', undefined, { novaConexao: true })}
+      >
         <IconPlus size={13} />
         Nova conexão
       </button>

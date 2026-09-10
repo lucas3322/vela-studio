@@ -28,7 +28,7 @@ function emptyConfig(driver: DriverId = 'mysql'): ConnectionConfig {
 }
 
 export function ConnectionModal(): React.JSX.Element {
-  const { closeModal, editingConnectionId, notify, resolvedTheme } = useAppStore()
+  const { closeModal, editingConnectionId, novaConexao, notify, resolvedTheme } = useAppStore()
   const { saved, connect, removeConnection, refreshSaved } = useConnectionStore()
 
   const existing = saved.find((c) => c.id === editingConnectionId)
@@ -44,7 +44,11 @@ export function ConnectionModal(): React.JSX.Element {
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
   const [connecting, setConnecting] = useState(false)
-  const [showList, setShowList] = useState(!editingConnectionId && saved.length > 0)
+  // "Nova conexão" (novaConexao) abre direto no formulário; sem isso, a lista
+  // aparece primeiro quando já há conexões salvas.
+  const [showList, setShowList] = useState(
+    !editingConnectionId && !novaConexao && saved.length > 0
+  )
   const [senhaVisivel, setSenhaVisivel] = useState(false)
   const [salvando, setSalvando] = useState(false)
 

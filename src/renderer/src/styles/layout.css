@@ -216,10 +216,20 @@
 .sidebar__conexoes-lista {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-1) var(--space-2) var(--space-3);
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3) var(--space-3);
   overflow-y: auto;
   flex: 1;
+}
+
+/* Respiro entre "Recentes" e "Salvas"; o primeiro grupo cola no topo. */
+.sidebar__conexoes-lista .sidebar__header {
+  padding-left: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.sidebar__conexoes-lista .sidebar__header:first-child {
+  margin-top: var(--space-1);
 }
 
 .sidebar__conexoes-vazio {
@@ -2868,6 +2878,42 @@
 
 .conexao--colorida:hover {
   background: color-mix(in srgb, var(--cor-conexao) 8%, transparent);
+}
+
+/*
+ * Variante enxuta da conexão, para a barra lateral: linha rasa em vez de
+ * cartão, no idioma da árvore de tabelas. O cartão grande é da tela inicial,
+ * onde é o conteúdo principal; espremido na lateral ele fica desproporcional.
+ * Faixa de cor fina à esquerda, sem borda nem raio grande, e o hover pinta a
+ * linha inteira — como nos nós da árvore logo abaixo.
+ */
+.conexao--compacta .conexao__abrir {
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+}
+
+.conexao--compacta .conexao__abrir:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--bg-hover);
+}
+
+.conexao--compacta.conexao--colorida {
+  border-left: 2px solid var(--cor-conexao);
+}
+
+/* Na compacta o realce é da linha (no próprio `__abrir`), não do cartão. */
+.conexao--compacta.conexao--colorida:hover {
+  background: transparent;
+}
+
+.conexao--compacta .conexao__nome {
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /*

@@ -16,7 +16,9 @@ export function useMenuEvents(): void {
     // Sempre lemos o estado na hora do evento (getState), nunca capturamos —
     // o listener vive mais que qualquer render.
     const unsubscribers = [
-      window.velaEvents.on('menu:newConnection', () => useAppStore.getState().openModal('connection')),
+      window.velaEvents.on('menu:newConnection', () =>
+        useAppStore.getState().openModal('connection', undefined, { novaConexao: true })
+      ),
       window.velaEvents.on('menu:newQueryTab', () => {
         const { activeId, activeDatabase } = useConnectionStore.getState()
         if (!activeId) return

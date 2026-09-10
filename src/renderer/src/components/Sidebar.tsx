@@ -369,6 +369,12 @@ export function Sidebar(): React.JSX.Element {
 
   return (
     <aside className="sidebar" ref={sidebarRef} style={{ width }}>
+      {/*
+        O seletor de conexão só aparece conectado. Desconectado, a lista de
+        conexões logo abaixo já é o seletor — repetir "Escolher conexão" em cima
+        dela seria o terceiro lugar dizendo a mesma coisa.
+      */}
+      {activeId && (
       <div className="sidebar__section">
         <div className="sidebar__connection-row">
           <button
@@ -410,6 +416,7 @@ export function Sidebar(): React.JSX.Element {
           )}
         </div>
       </div>
+      )}
 
       {/*
         Sem conexão ativa, a barra lateral não navega schema nenhum: tabelas,
@@ -506,7 +513,7 @@ export function Sidebar(): React.JSX.Element {
           <button
             className="icon-btn"
             style={{ width: 20, height: 20 }}
-            onClick={() => openModal('connection')}
+            onClick={() => openModal('connection', undefined, { novaConexao: true })}
             title="Nova conexão (⌘⇧N)"
           >
             <IconPlus size={13} />

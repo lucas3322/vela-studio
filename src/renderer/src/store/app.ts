@@ -67,6 +67,14 @@ interface AppState {
   modal: 'connection' | 'history' | 'cheatsheet' | 'preferences' | 'update' | 'saveQuery' | null
   /** Conexão sendo editada no modal, se houver. */
   editingConnectionId: string | null
+  /**
+   * Abrir o modal de conexão já no formulário de nova conexão, pulando a lista.
+   *
+   * "Nova conexão" tem que levar direto ao formulário: cair na lista de
+   * conexões primeiro, com a lista já visível na barra lateral, é um passo a
+   * mais para fazer justamente a coisa que a lista não faz.
+   */
+  novaConexao: boolean
   toast: { message: string; tone: 'info' | 'success' | 'danger' } | null
   /**
    * Comandos sem WHERE esperando confirmação, com o que fazer se ela vier.
@@ -114,7 +122,11 @@ interface AppState {
   aplicarAcentoDaConexao: (corDaConexao: string | undefined) => void
   setInferirRelacoes: (valor: 'auto' | 'sim' | 'nao') => void
   toggleHelpPanel: () => void
-  openModal: (modal: AppState['modal'], connectionId?: string) => void
+  openModal: (
+    modal: AppState['modal'],
+    connectionId?: string,
+    opcoes?: { novaConexao?: boolean }
+  ) => void
   closeModal: () => void
   notify: (message: string, tone?: 'info' | 'success' | 'danger') => void
   pedirConfirmacaoDeEscrita: (comandos: string[], aoConfirmar: () => void) => void
@@ -232,6 +244,7 @@ export const useAppStore = create<AppState>((set, get) => {
     helpPanelVisible: false,
     modal: null,
     editingConnectionId: null,
+    novaConexao: false,
     toast: null,
     confirmacaoDeEscrita: null,
     pendenciasDeEdicao: {},
@@ -299,8 +312,13 @@ export const useAppStore = create<AppState>((set, get) => {
     },
     toggleHelpPanel: () => set((s) => ({ helpPanelVisible: !s.helpPanelVisible })),
 
-    openModal: (modal, connectionId) => set({ modal, editingConnectionId: connectionId ?? null }),
-    closeModal: () => set({ modal: null, editingConnectionId: null }),
+    openModal: (modal, connectionId, opcoes) =>
+      set({
+        modal,
+        editingConnectionId: connectionId ?? null,
+        novaConexao: opcoes?.novaConexao ?? false
+      }),
+    closeModal: () => set({ modal: null, editingConnectionId: null, novaConexao: false }),
 
     pedirConfirmacaoDeEscrita: (comandos, aoConfirmar) =>
       set({ confirmacaoDeEscrita: { comandos, aoConfirmar } }),
