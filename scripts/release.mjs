@@ -30,6 +30,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { classificarCommit, decidirSalto, explicarSalto } from './release-semver.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const packagePath = join(root, 'package.json')
@@ -109,27 +110,11 @@ if (commits.length === 0) {
 }
 
 // ── Classificação ─────────────────────────────────────────────────────
-const CONVENTIONAL = /^(\w+)(\([^)]*\))?(!)?:\s*(.+)$/
-
-function classify(commit) {
-  const match = CONVENTIONAL.exec(commit.subject)
-  if (!match) return { type: null, breaking: false, description: commit.subject }
-  const [, type, , bang, description] = match
-  const breaking = bang === '!' || /BREAKING[ -]CHANGE/.test(commit.body)
-  return { type: type.toLowerCase(), breaking, description }
-}
-
-const classified = commits.map((c) => ({ ...c, ...classify(c) }))
+const classified = commits.map((c) => ({ ...c, ...classificarCommit(c) }))
 const conventionalCount = classified.filter((c) => c.type).length
 
-function decideBump() {
-  if (forced) return forced
-  if (classified.some((c) => c.breaking)) return 'major'
-  if (classified.some((c) => c.type === 'feat')) return 'minor'
-  return 'patch'
-}
-
-const bump = decideBump()
+const bump = decidirSalto(classified, forced)
+const motivoDoSalto = explicarSalto(classified, forced)
 
 // ── Nova versão ───────────────────────────────────────────────────────
 const pkg = JSON.parse(readFileSync(packagePath, 'utf-8'))
@@ -144,6 +129,9 @@ const next =
 
 // ── Relatório ─────────────────────────────────────────────────────────
 console.log(`\n  ${pkg.version} → ${next}   (${bump}${forced ? ', forçado' : ''})`)
+// O motivo na tela: o acidente que motivou isto foi o script mostrar
+// "breaking" ao lado do commit e anunciar "(patch)" duas linhas acima.
+console.log(`  motivo: ${motivoDoSalto}`)
 console.log(`  ${commits.length} commit(s) desde ${lastTag ?? 'o início do projeto'}\n`)
 
 if (!forced && conventionalCount === 0) {
