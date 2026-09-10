@@ -204,6 +204,37 @@
   padding-bottom: var(--space-4);
 }
 
+/* ── Conexões na barra lateral (quando não há conexão ativa) ─────── */
+
+.sidebar__conexoes {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.sidebar__conexoes-lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2) var(--space-3);
+  overflow-y: auto;
+  flex: 1;
+}
+
+.sidebar__conexoes-vazio {
+  flex: 1;
+  padding: var(--space-5) var(--space-3);
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.sidebar__conexoes-nova {
+  padding: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
 /* ── Árvore de schema ────────────────────────────────────────────── */
 
 .tree-node {

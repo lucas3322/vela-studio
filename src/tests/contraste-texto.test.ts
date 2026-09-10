@@ -161,6 +161,7 @@ const USOS: Uso[] = [
   { seletor: '.tree-node__type', arquivo: LAYOUT, token: 'tertiary', fundos: ['bg-sidebar', 'bg-sidebar :hover'], tipo: 'texto' },
   { seletor: '.tree-node__count', arquivo: LAYOUT, token: 'tertiary', fundos: ['bg-sidebar', 'bg-sidebar :hover'], tipo: 'texto' },
   { seletor: '.tree-empty', arquivo: LAYOUT, token: 'tertiary', fundos: ['bg-sidebar'], tipo: 'texto' },
+  { seletor: '.sidebar__conexoes-vazio', arquivo: LAYOUT, token: 'tertiary', fundos: ['bg-sidebar'], tipo: 'texto' },
   { seletor: '.salvas__escopo', arquivo: LAYOUT, token: 'tertiary', fundos: ['bg-sidebar'], tipo: 'texto' },
   { seletor: '.salvas__meta', arquivo: LAYOUT, token: 'tertiary', fundos: ['bg-sidebar', 'bg-sidebar :hover'], tipo: 'texto' },
   { seletor: '.modelo-lista__grau', arquivo: LAYOUT, token: 'tertiary', fundos: ['bg-sidebar', 'bg-sidebar :hover'], tipo: 'texto' },

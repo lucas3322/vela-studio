@@ -11,7 +11,7 @@ import {
   IconViewOff,
   IconWarning
 } from './Icons'
-import { needsPassword } from './WelcomeScreen'
+import { needsPassword } from '../utils/connection'
 
 function emptyConfig(driver: DriverId = 'mysql'): ConnectionConfig {
   return {

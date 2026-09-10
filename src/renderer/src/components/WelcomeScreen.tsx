@@ -1,19 +1,8 @@
-import { DRIVERS, type StoredConnection } from '@shared/types'
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
+import { useConectarSalva } from '../hooks/useConectarSalva'
 import { IconSail, IconPlus } from './Icons'
 import { ConnectionRow } from './ConnectionRow'
-
-/**
- * A conexão exige senha e não tem nenhuma guardada?
- * SQLite não usa senha, e uma string de conexão normalmente já a carrega.
- */
-export function needsPassword(connection: StoredConnection): boolean {
-  if (connection.hasPassword) return false
-  if (!DRIVERS[connection.driver].fields.includes('password')) return false
-  if (connection.connectionString?.trim()) return false
-  return true
-}
 
 /**
  * Primeira tela de quem abre o app.
@@ -22,33 +11,10 @@ export function needsPassword(connection: StoredConnection): boolean {
  */
 export function WelcomeScreen(): React.JSX.Element {
   const openModal = useAppStore((s) => s.openModal)
-  const notify = useAppStore((s) => s.notify)
   const saved = useConnectionStore((s) => s.saved)
-  const connect = useConnectionStore((s) => s.connect)
   const connecting = useConnectionStore((s) => s.connecting)
   const removeConnection = useConnectionStore((s) => s.removeConnection)
-
-  const handleConnect = async (id: string): Promise<void> => {
-    const stored = saved.find((c) => c.id === id)
-    if (!stored) return
-
-    // Sem senha guardada, tentar conectar só produziria um "Access denied"
-    // do banco. Abrimos o formulário já preenchido para pedir a senha —
-    // é a única coisa que falta, e o usuário sabe qual é.
-    if (needsPassword(stored)) {
-      openModal('connection', stored.id)
-      notify('Informe a senha para conectar.', 'info')
-      return
-    }
-
-    try {
-      // A senha vem cifrada do store; `undefined` sinaliza ao main que ele resolve.
-      await connect({ ...stored, password: undefined })
-      notify(`Conectado a ${stored.name}`, 'success')
-    } catch (error) {
-      notify((error as Error).message, 'danger')
-    }
-  }
+  const handleConnect = useConectarSalva()
 
   return (
     <div className="welcome">

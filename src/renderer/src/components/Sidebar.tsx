@@ -8,6 +8,7 @@ import { useTabStore } from '../store/tabs'
 import { ContextMenu, type MenuEntry } from './ContextMenu'
 import { SavedQueries } from './SavedQueries'
 import { SchemaModelList } from './SchemaModelList'
+import { SidebarConnections } from './SidebarConnections'
 import { DangerDialog } from './DangerDialog'
 import {
   IconChevronDown,
@@ -410,7 +411,14 @@ export function Sidebar(): React.JSX.Element {
         </div>
       </div>
 
-      {databases.length > 1 && (
+      {/*
+        Sem conexão ativa, a barra lateral não navega schema nenhum: tabelas,
+        modelagem e queries salvas pertencem a uma conexão. No lugar entra a
+        lista de conexões, para reconectar dali mesmo.
+      */}
+      {!activeId && <SidebarConnections />}
+
+      {activeId && databases.length > 1 && (
         <div className="sidebar__section">
           <select
             className="input"
@@ -427,6 +435,8 @@ export function Sidebar(): React.JSX.Element {
         </div>
       )}
 
+      {activeId && (
+      <>
       <div className="sidebar__modos">
         <button
           className={`sidebar__modo ${modo === 'tabelas' ? 'sidebar__modo--ativo' : ''}`}
@@ -505,15 +515,7 @@ export function Sidebar(): React.JSX.Element {
       </div>
 
       <div className="sidebar__tree">
-        {!activeId && (
-          <div className="tree-empty">
-            Conecte-se a um banco para ver
-            <br />
-            as tabelas por aqui.
-          </div>
-        )}
-
-        {activeId && loadingSchema && !schema && (
+        {loadingSchema && !schema && (
           <div className="tree-empty">
             <span className="spinner" style={{ margin: '0 auto var(--space-2)' }} />
             <br />
@@ -574,6 +576,8 @@ export function Sidebar(): React.JSX.Element {
           />
         ))}
       </div>
+      </>
+      )}
       </>
       )}
 
