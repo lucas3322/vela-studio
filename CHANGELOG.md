@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 1.3.1 — 2026-09-10
+
+### Outras mudanças
+
+- add comprehensive tests for import/export functionality and UI interactions (66adfd4)
+
 ## 1.3.0 — 2026-09-10
 
 ### Novidades
