@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 1.3.0 — 2026-09-10
+
+### Novidades
+
+- adicionar suporte para nova conexão diretamente no formulário e refatorar a exibição de conexões na barra lateral (83acf9a)
+
 ## 1.2.0 — 2026-09-10
 
 ### Novidades
