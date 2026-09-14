@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 2.1.0 — 2026-09-14
+
+### Novidades
+
+- adicionar funcionalidade de duplicação de linha na grade editável e no diálogo de inserção (9e64ce9)
+
 ## 2.0.0 — 2026-09-10
 
 ### Novidades
