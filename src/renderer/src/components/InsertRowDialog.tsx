@@ -37,6 +37,22 @@ interface Props {
    * do Mongo para o Redis seria uma afirmação falsa sobre o schema dele.
    */
   avisoSemSchema?: string
+  /**
+   * Valores que o formulário já nasce preenchido — é a duplicação de linha.
+   *
+   * A chave auto-incremento é deixada de fora de propósito, mesmo vindo aqui:
+   * copiar o id da linha original garantiria conflito de chave. Em branco, o
+   * banco gera o próximo, que é o que "duplicar" quer dizer.
+   */
+  valoresIniciais?: Record<string, unknown>
+  /**
+   * Colunas com índice único, para avisar na duplicação.
+   *
+   * Uma cópia fiel de uma linha colide em qualquer coluna única, e o banco
+   * responde com um erro de chave duplicada que não diz qual coluna foi. Aqui
+   * dá para apontar antes de tentar.
+   */
+  colunasUnicas?: string[]
   onInserir: (valores: Record<string, unknown>) => Promise<void>
   onCancel: () => void
 }
@@ -51,10 +67,36 @@ export function InsertRowDialog({
   colunas,
   semSchema,
   avisoSemSchema,
+  valoresIniciais,
+  colunasUnicas,
   onInserir,
   onCancel
 }: Props): React.JSX.Element {
-  const [campos, setCampos] = useState<Record<string, Campo>>({})
+  const duplicando = valoresIniciais !== undefined
+
+  const [campos, setCampos] = useState<Record<string, Campo>>(() => {
+    if (!valoresIniciais) return {}
+
+    const inicial: Record<string, Campo> = {}
+    for (const coluna of colunas) {
+      // A chave auto-incremento fica de fora: copiá-la garantiria conflito.
+      if (colunaAutomatica(coluna)) continue
+
+      const valor = valoresIniciais[coluna.name]
+      if (valor === undefined) continue
+      if (valor === null) {
+        inicial[coluna.name] = { valor: '', nulo: true }
+        continue
+      }
+      // Objeto (coluna JSON) tem que virar texto, senão o campo mostraria
+      // "[object Object]" — o mesmo engano que a edição de célula já pagou.
+      inicial[coluna.name] = {
+        valor: typeof valor === 'object' ? JSON.stringify(valor) : String(valor),
+        nulo: false
+      }
+    }
+    return inicial
+  })
   const [gravando, setGravando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
@@ -98,6 +140,21 @@ export function InsertRowDialog({
     }
   }
 
+  /**
+   * Colunas únicas que seguem com o valor copiado da linha original.
+   *
+   * Some da lista assim que a pessoa muda o valor — o aviso existe para ser
+   * resolvido, não para ficar piscando depois de já ter sido atendido.
+   */
+  const unicasRepetidas = (colunasUnicas ?? []).filter((nome) => {
+    const original = valoresIniciais?.[nome]
+    if (original === undefined || original === null) return false
+    const atual = valores[nome]
+    if (atual === undefined || atual === null) return false
+    const comoTexto = typeof original === 'object' ? JSON.stringify(original) : String(original)
+    return String(atual) === comoTexto
+  })
+
   const obrigatoriaVazia = colunas.filter(
     (c) => !c.nullable && c.defaultValue == null && !colunaAutomatica(c) && !(c.name in valores)
   )
@@ -110,9 +167,13 @@ export function InsertRowDialog({
       <div className="modal modal--wide" onMouseDown={(e) => e.stopPropagation()}>
         <div className="modal__header">
           <div>
-            <div className="modal__title">Nova linha em {tabela}</div>
+            <div className="modal__title">
+              {duplicando ? `Duplicar linha em ${tabela}` : `Nova linha em ${tabela}`}
+            </div>
             <div className="modal__subtitle">
-              Campo em branco não entra no comando — é assim que o banco aplica o valor padrão.
+              {duplicando
+                ? 'Os valores vieram da linha original. A chave automática ficou em branco para o banco gerar uma nova.'
+                : 'Campo em branco não entra no comando — é assim que o banco aplica o valor padrão.'}
             </div>
           </div>
           <button className="icon-btn" onClick={onCancel} disabled={gravando}>
@@ -185,6 +246,16 @@ export function InsertRowDialog({
               )
             })}
           </div>
+
+          {duplicando && unicasRepetidas.length > 0 && (
+            <div className="editor-celula__erro">
+              <IconWarning size={14} />
+              <span>
+                Índice único em <strong>{unicasRepetidas.join(', ')}</strong>, com o mesmo valor da
+                linha original. O banco vai recusar a cópia — altere antes de inserir.
+              </span>
+            </div>
+          )}
 
           {obrigatoriaVazia.length > 0 && (
             <div className="editor-celula__erro">

@@ -29,6 +29,14 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
   const [ordem, setOrdem] = useState<OrdenacaoDaGrade | null>(null)
   /** Formulário de nova linha aberto. */
   const [inserindo, setInserindo] = useState(false)
+  /**
+   * Valores da linha que está sendo duplicada.
+   *
+   * Separado do `inserindo` porque "inserir do zero" e "duplicar" abrem o
+   * mesmo formulário com conteúdos diferentes — e `null` aqui é o que
+   * distingue os dois no título e no aviso de coluna única.
+   */
+  const [duplicando, setDuplicando] = useState<Record<string, unknown> | null>(null)
   /** Coluna escolhida no filtro, para a grade rolar até ela. */
   const [colunaEmEvidencia, setColunaEmEvidencia] = useState<string | null>(null)
   const [pagina, setPagina] = useState(0)
@@ -391,6 +399,10 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
                   ]
                 })
               }}
+              onDuplicarLinha={(valores) => {
+                setDuplicando(valores)
+                setInserindo(true)
+              }}
               onPendingChange={setPendencias}
               // Reconsulta depois de gravar. O banco pode ter guardado algo
               // diferente do que foi digitado — trigger, coerção de tipo, um
@@ -623,13 +635,23 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
         <InsertRowDialog
           tabela={table}
           colunas={columns}
+          valoresIniciais={duplicando ?? undefined}
+          // Índice único de uma coluna só: numa cópia fiel é exatamente onde o
+          // banco recusa. Índice composto fica de fora porque a colisão ali
+          // depende da combinação, e apontar uma coluna sozinha seria palpite.
+          colunasUnicas={indexes
+            .filter((i) => i.unique && i.columns.length === 1)
+            .map((i) => i.columns[0])}
           semSchema={dialect === 'mongodb' || dialect === 'redis'}
           avisoSemSchema={
             dialect === 'redis'
               ? 'O Redis não declara schema, mas estas 3 colunas são fixas: key, value (texto puro em "strings"; JSON da estrutura nas demais pseudo-tabelas) e ttl (segundos até expirar, ou vazio para nunca expirar).'
               : undefined
           }
-          onCancel={() => setInserindo(false)}
+          onCancel={() => {
+            setInserindo(false)
+            setDuplicando(null)
+          }}
           onInserir={async (valores) => {
             if (!connectionId) return
             await window.vela.data.insertRow({
@@ -639,7 +661,8 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
               values: valores
             })
             setInserindo(false)
-            notify('Linha inserida.', 'success')
+            setDuplicando(null)
+            notify(duplicando ? 'Linha duplicada.' : 'Linha inserida.', 'success')
             // Recarrega para mostrar o que o banco **realmente** gravou: o
             // auto-incremento, o DEFAULT, o que um trigger tenha mudado. Sem
             // isto a tela mostraria o que foi digitado como se fosse o valor

@@ -17,6 +17,7 @@ import { TruncationNotice } from './TruncationNotice'
 import {
   IconClose,
   IconCopy,
+  IconPlus,
   IconDownload,
   IconLink,
   IconSearch,
@@ -59,6 +60,14 @@ interface Props {
     value: unknown
     keys: Record<string, unknown>
   }) => Promise<void>
+  /**
+   * Duplicar a linha: abre o formulário de inserção já preenchido com ela.
+   *
+   * Não insere direto de propósito. Uma cópia fiel colide em toda coluna
+   * única, e a pessoa quase sempre quer trocar uma coisa ou outra antes de
+   * gravar — o formulário é onde isso acontece, com o comando à vista.
+   */
+  onDuplicarLinha?: (valores: Record<string, unknown>) => void
   onDeleteRow?: (keys: Record<string, unknown>) => Promise<void>
   onNotify?: (mensagem: string, tom?: 'info' | 'success' | 'danger') => void
   /** Ordenação vigente. Quem manda é quem monta a query, não a grade. */
@@ -172,6 +181,7 @@ export function EditableGrid({
   readOnly,
   motivoExterno,
   onEditCell,
+  onDuplicarLinha,
   onDeleteRow,
   onNotify,
   sort,
@@ -918,6 +928,14 @@ export function EditableGrid({
           result.columns.map((c, i) => formatarCelula(valorDe(linha, i))).join('\t'),
           'Linha'
         )
+      },
+      'separator',
+      {
+        label: 'Duplicar linha',
+        icon: <IconPlus size={14} />,
+        disabled: !podeEditar || !onDuplicarLinha,
+        hint: motivoSemEdicao,
+        onSelect: () => onDuplicarLinha?.(linhaComoObjeto)
       },
       'separator',
       {
