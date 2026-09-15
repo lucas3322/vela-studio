@@ -16,17 +16,24 @@ import { InsertRowDialog } from './InsertRowDialog'
 type Panel = 'dados' | 'colunas' | 'indices' | 'relacoes'
 
 /**
+ * Lista vazia compartilhada.
+ *
+ * Um `[]` escrito na hora seria um array novo a cada render, e ele está nas
+ * dependências do efeito que consulta o banco: a aba reconsultaria em laço.
+ */
+const SEM_FILTRO: Condicao[] = []
+
+/**
  * Aba de tabela: os dados de um lado, a estrutura do outro.
  * Abrir uma tabela roda um SELECT limitado automaticamente — é o gesto
  * que todo mundo faz manualmente ao clicar numa tabela.
  */
 export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
-  const [panel, setPanel] = useState<Panel>(tab.initialPanel ?? 'dados')
+  const updateTableView = useTabStore((s) => s.updateTableView)
   const [columns, setColumns] = useState<ColumnInfo[]>([])
   const [indexes, setIndexes] = useState<IndexInfo[]>([])
   const [relations, setRelations] = useState<RelationInfo[]>([])
   const [loading, setLoading] = useState(false)
-  const [ordem, setOrdem] = useState<OrdenacaoDaGrade | null>(null)
   /** Formulário de nova linha aberto. */
   const [inserindo, setInserindo] = useState(false)
   /**
@@ -39,7 +46,6 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
   const [duplicando, setDuplicando] = useState<Record<string, unknown> | null>(null)
   /** Coluna escolhida no filtro, para a grade rolar até ela. */
   const [colunaEmEvidencia, setColunaEmEvidencia] = useState<string | null>(null)
-  const [pagina, setPagina] = useState(0)
   // Lido uma vez, na criação da aba: mudar a preferência não deve reconsultar
   // as abas que já estão abertas na largada do usuário.
   const [tamanhoPagina, setTamanhoPagina] = useState(
@@ -61,23 +67,29 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
   const [tipoEmEdicao, setTipoEmEdicao] = useState<{ coluna: string; texto: string } | null>(null)
   /** ALTER montado pelo driver, aguardando confirmação. */
   const [alterPendente, setAlterPendente] = useState<{ coluna: string; sql: string } | null>(null)
-  /** Filtro em vigor. Entra na consulta e volta para a primeira página. */
-  const [filtro, setFiltro] = useState<Condicao[]>(
-    (tab.initialFilter as Condicao[] | undefined) ?? []
-  )
-
   /*
-    Filtro vindo de fora — o clique numa chave estrangeira. Reage ao
-    `initialFilter` porque a aba pode ser reaproveitada: clicar em duas chaves
-    diferentes para a mesma tabela precisa trocar o filtro, e sem este efeito
-    a segunda navegação mostraria o resultado da primeira.
+    Filtro, página, ordem e painel moram na aba, não aqui.
+
+    Só a aba ativa fica montada: trocar de aba desmonta esta tela inteira e
+    `useState` iria junto. Era esse o bug — voltar para a aba reencontrava o
+    filtro desfeito e a consulta refeita sem o `WHERE`, sem nada na tela
+    dizendo que o recorte tinha mudado.
   */
-  useEffect(() => {
-    if (tab.initialFilter) {
-      setFiltro(tab.initialFilter as Condicao[])
-      setPagina(0)
-    }
-  }, [tab.initialFilter])
+  const panel: Panel = tab.view?.painel ?? tab.initialPanel ?? 'dados'
+  const setPanel = (novo: Panel): void => updateTableView(tab.id, { painel: novo })
+
+  const ordem: OrdenacaoDaGrade | null = tab.view?.ordem ?? null
+  const setOrdem = (nova: OrdenacaoDaGrade | null): void =>
+    updateTableView(tab.id, { ordem: nova })
+
+  const pagina = tab.view?.pagina ?? 0
+  const setPagina = (numero: number): void =>
+    updateTableView(tab.id, { pagina: Math.max(0, numero) })
+
+  /** Filtro em vigor. Entra na consulta e volta para a primeira página. */
+  const filtro = (tab.view?.filtro as Condicao[] | undefined) ?? SEM_FILTRO
+  /** O que está montado na barra, aplicado ou não. */
+  const rascunho = (tab.view?.rascunho as Condicao[] | undefined) ?? SEM_FILTRO
 
   const schema = useConnectionStore((s) => s.currentSchema())
   const preferenciaDeInferencia = useAppStore((s) => s.inferirRelacoes)
@@ -90,6 +102,41 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
   const openTableTab = useTabStore((s) => s.openTableTab)
   const openQueryTab = useTabStore((s) => s.openQueryTab)
   const notify = useAppStore((s) => s.notify)
+
+  /*
+    Filtro vindo de fora — o clique numa chave estrangeira. Reage ao
+    `initialFilter` porque a aba pode ser reaproveitada: clicar em duas chaves
+    diferentes para a mesma tabela precisa trocar o filtro, e sem este efeito
+    a segunda navegação mostraria o resultado da primeira.
+
+    O `rascunho` vai junto para a barra mostrar a condição que chegou de fora:
+    antes a grade vinha filtrada e o construtor aparecia vazio, o que faz a
+    tela afirmar que não há filtro nenhum bem na hora em que há.
+  */
+  useEffect(() => {
+    if (!tab.initialFilter) return
+    updateTableView(tab.id, {
+      filtro: tab.initialFilter,
+      rascunho: tab.initialFilter,
+      pagina: 0
+    })
+    // Consumido, some. Ele é um pedido de navegação, não o estado da aba: se
+    // ficasse guardado, toda volta para esta aba refaria o efeito no monte e
+    // desfaria o filtro que a pessoa tivesse trocado desde então.
+    updateTab(tab.id, { initialFilter: undefined })
+  }, [tab.initialFilter, tab.id, updateTableView, updateTab])
+
+  /*
+    "Ver estrutura" e "Ver dados" na aba já aberta. Mesma natureza do
+    `initialFilter`: pedido de navegação, consumido uma vez. Sem consumir, o
+    painel escolhido no clique seguinte ficaria brigando para sempre com o que
+    a pessoa abre na própria aba.
+  */
+  useEffect(() => {
+    if (!tab.initialPanel) return
+    updateTableView(tab.id, { painel: tab.initialPanel })
+    updateTab(tab.id, { initialPanel: undefined })
+  }, [tab.initialPanel, tab.id, updateTableView, updateTab])
 
   const table = tab.table!
 
@@ -353,16 +400,17 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
       {panel === 'dados' && result && (
         <div className={`results ${loading ? 'results--recarregando' : ''}`}>
           <TableFilterBar
-              onColunaEscolhida={setColunaEmEvidencia}
+            onColunaEscolhida={setColunaEmEvidencia}
             columns={columns}
             dialect={dialect}
             aplicado={filtro}
+            condicoes={rascunho}
+            onCondicoes={(condicoes) => updateTableView(tab.id, { rascunho: condicoes })}
             disabled={pendencias > 0}
             onAplicar={(condicoes) => {
               // Filtrar muda o conjunto de linhas: continuar na página 5 do
               // resultado anterior mostraria uma página vazia sem explicação.
-              setFiltro(condicoes)
-              setPagina(0)
+              updateTableView(tab.id, { filtro: condicoes, pagina: 0 })
             }}
           />
           {tab.error && <ErrorPanel error={tab.error} />}
@@ -453,7 +501,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
             <div className="paginacao">
               <button
                 className="btn btn--secondary btn--sm"
-                onClick={() => setPagina((p) => Math.max(0, p - 1))}
+                onClick={() => setPagina(pagina - 1)}
                 disabled={pagina === 0 || pendencias > 0}
                 title={
                   pendencias > 0
@@ -474,7 +522,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
 
               <button
                 className="btn btn--secondary btn--sm"
-                onClick={() => setPagina((p) => p + 1)}
+                onClick={() => setPagina(pagina + 1)}
                 disabled={!temProxima || pendencias > 0}
                 title={
                   pendencias > 0

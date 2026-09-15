@@ -4,6 +4,33 @@ import { precisaAvisarAoFechar } from '../editor/fechar-aba'
 
 export type TabKind = 'query' | 'table' | 'model'
 
+/**
+ * Uma condição do construtor de filtro, na forma que atravessa o store.
+ *
+ * Estruturalmente igual à `Condicao` do `filter-builder`, repetida aqui pelo
+ * mesmo motivo do `initialFilter`: o store não importa do editor.
+ */
+export interface CondicaoDaAba {
+  coluna: string
+  operador: string
+  valor: string
+}
+
+/** O que uma aba de tabela precisa lembrar entre uma visita e outra. */
+export interface EstadoDaTabela {
+  /** Filtro **em vigor** — é ele que entra na consulta. */
+  filtro?: CondicaoDaAba[]
+  /**
+   * As linhas do construtor, incluindo a que está sendo digitada e ainda não
+   * foi aplicada. Separado do `filtro` porque são coisas diferentes: o que a
+   * grade está mostrando e o que a pessoa está montando.
+   */
+  rascunho?: CondicaoDaAba[]
+  pagina?: number
+  ordem?: { column: string; direction: 'asc' | 'desc' } | null
+  painel?: 'dados' | 'colunas' | 'indices' | 'relacoes'
+}
+
 export interface Tab {
   id: string
   kind: TabKind
@@ -49,6 +76,16 @@ export interface Tab {
    * itens diferentes no menu de contexto; sem isto os dois caíam em "dados".
    */
   initialPanel?: 'dados' | 'colunas'
+  /**
+   * Como a aba de tabela estava quando você saiu dela.
+   *
+   * Só a aba ativa fica montada — trocar de aba desmonta a anterior. Enquanto
+   * isso morava em `useState` dentro da `TableView`, voltar para a aba
+   * significava reencontrá-la do zero: filtro montado condição por condição,
+   * página, ordenação e painel, tudo perdido sem aviso, e a consulta refeita
+   * sem o `WHERE`. Aqui sobrevive.
+   */
+  view?: EstadoDaTabela
   /**
    * Conexão dona da aba. Definida na criação e nunca mais alterada:
    * é o que permite trocar de banco e reencontrar as abas de volta,
@@ -123,6 +160,13 @@ interface TabState {
   updateTab: (id: string, patch: Partial<Tab>) => void
   /** Pede à aba que reconsulte o banco. */
   reloadTab: (id: string) => void
+  /**
+   * Guarda como a aba de tabela está: filtro, página, ordem, painel.
+   *
+   * Mescla em vez de substituir — quem muda de página não está dizendo nada
+   * sobre o filtro, e um patch raso em `updateTab` apagaria o resto do objeto.
+   */
+  updateTableView: (id: string, patch: EstadoDaTabela) => void
   /** Fecha todas as abas de uma conexão — usado ao desconectar. */
   closeConnectionTabs: (connectionId: string) => void
 
@@ -337,6 +381,13 @@ export const useTabStore = create<TabState>((set, get) => ({
     set((state) => ({
       tabs: state.tabs.map((t) =>
         t.id === id ? { ...t, reloadToken: (t.reloadToken ?? 0) + 1 } : t
+      )
+    })),
+
+  updateTableView: (id, patch) =>
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.id === id ? { ...tab, view: { ...tab.view, ...patch } } : tab
       )
     })),
 

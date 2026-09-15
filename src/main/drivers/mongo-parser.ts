@@ -181,3 +181,29 @@ export function splitMongoCommands(source: string): string[] {
   if (current.trim()) commands.push(current.trim())
   return commands
 }
+
+/**
+ * O segundo argumento de `find`/`findOne`, traduzido para o driver.
+ *
+ * No shell do Mongo — e no Compass, que fala a mesma língua — o segundo
+ * argumento é a **projeção**: `find({ ativo: true }, { _id: 1 })` devolve só o
+ * `_id`. No driver do Node o mesmo lugar é `FindOptions`, onde a projeção mora
+ * dentro da chave `projection`.
+ *
+ * Passar um pelo outro não dá erro nenhum: o driver ignora as chaves que não
+ * conhece e devolve o documento inteiro. Era exatamente isso que acontecia
+ * aqui — a query rodava, voltava com dado, e só a seleção de colunas sumia no
+ * caminho. Falha silenciosa, que é o pior tipo.
+ *
+ * A regra é a do shell, porque é essa a sintaxe que o editor aceita: o objeto
+ * é uma projeção. A única exceção é ele já trazer a chave `projection`, que
+ * ninguém usa como nome de campo e só faz sentido como opção do driver —
+ * assim quem colou código do Node também é atendido.
+ */
+export function opcoesDeBusca(segundo: unknown): Record<string, unknown> | undefined {
+  if (!segundo || typeof segundo !== 'object' || Array.isArray(segundo)) return undefined
+  const objeto = segundo as Record<string, unknown>
+  if (Object.keys(objeto).length === 0) return undefined
+  if ('projection' in objeto) return objeto
+  return { projection: objeto }
+}

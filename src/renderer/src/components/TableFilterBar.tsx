@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { ColumnInfo, Dialect } from '@shared/types'
 import {
   OPERADORES,
@@ -15,6 +15,16 @@ interface Props {
   dialect: Dialect
   /** Filtro em vigor, para o botão saber se há algo a limpar. */
   aplicado: Condicao[]
+  /**
+   * As linhas do construtor — inclusive a que está sendo digitada e ainda não
+   * foi aplicada.
+   *
+   * Vem de fora, e não de um `useState` daqui, porque só a aba ativa fica
+   * montada: trocar de aba desmontava a barra e desfazia o filtro que a pessoa
+   * tinha montado condição por condição.
+   */
+  condicoes: Condicao[]
+  onCondicoes: (condicoes: Condicao[]) => void
   onAplicar: (condicoes: Condicao[]) => void
   /** Avisa qual coluna acabou de ser escolhida, para a grade rolar até ela. */
   onColunaEscolhida?: (coluna: string) => void
@@ -34,26 +44,10 @@ const VAZIA: Condicao = { coluna: '', operador: 'igual', valor: '' }
  * Só `AND` entre as condições, de propósito: oferecer `OR` sem parênteses
  * produziria `a AND b OR c`, que não é o que a interface aparenta dizer.
  */
-export function TableFilterBar({
-  columns,
-  dialect,
-  aplicado,
-  onAplicar,
-  onColunaEscolhida,
-  disabled
-}: Props): React.JSX.Element {
-  if (dialect === 'redis') return <FiltroDeChaveRedis aplicado={aplicado} onAplicar={onAplicar} disabled={disabled} />
+export function TableFilterBar(props: Props): React.JSX.Element {
+  if (props.dialect === 'redis') return <FiltroDeChaveRedis {...props} />
 
-  return (
-    <FiltroPorCondicoes
-      columns={columns}
-      dialect={dialect}
-      aplicado={aplicado}
-      onAplicar={onAplicar}
-      onColunaEscolhida={onColunaEscolhida}
-      disabled={disabled}
-    />
-  )
+  return <FiltroPorCondicoes {...props} />
 }
 
 /**
@@ -68,17 +62,21 @@ export function TableFilterBar({
  */
 function FiltroDeChaveRedis({
   aplicado,
+  condicoes,
+  onCondicoes,
   onAplicar,
   disabled
-}: Pick<Props, 'aplicado' | 'onAplicar' | 'disabled'>): React.JSX.Element {
-  const [padrao, setPadrao] = useState(aplicado[0]?.valor ?? '')
+}: Pick<Props, 'aplicado' | 'condicoes' | 'onCondicoes' | 'onAplicar' | 'disabled'>): React.JSX.Element {
+  const padrao = condicoes[0]?.valor ?? ''
+  const setPadrao = (valor: string): void =>
+    onCondicoes(valor ? [{ coluna: 'key', operador: 'igual', valor }] : [])
 
   const aplicar = (): void => {
     onAplicar(padrao.trim() ? [{ coluna: 'key', operador: 'igual', valor: padrao.trim() }] : [])
   }
 
   const limpar = (): void => {
-    setPadrao('')
+    onCondicoes([])
     onAplicar([])
   }
 
@@ -123,14 +121,18 @@ function FiltroPorCondicoes({
   columns,
   dialect,
   aplicado,
+  condicoes: guardadas,
+  onCondicoes,
   onAplicar,
   onColunaEscolhida,
   disabled
 }: Props): React.JSX.Element {
-  const [condicoes, setCondicoes] = useState<Condicao[]>([{ ...VAZIA }])
+  // A barra sempre mostra pelo menos uma linha, mas a linha em branco não é
+  // escrita na aba: aba sem filtro guarda nada, não guarda um vazio.
+  const condicoes = guardadas.length > 0 ? guardadas : [VAZIA]
 
   const trocar = (indice: number, patch: Partial<Condicao>): void => {
-    setCondicoes((atuais) => atuais.map((c, i) => (i === indice ? { ...c, ...patch } : c)))
+    onCondicoes(condicoes.map((c, i) => (i === indice ? { ...c, ...patch } : c)))
   }
 
   const prontas = condicoes.filter(condicaoUsavel)
@@ -154,7 +156,7 @@ function FiltroPorCondicoes({
   const aplicar = (): void => onAplicar(prontas)
 
   const limpar = (): void => {
-    setCondicoes([{ ...VAZIA }])
+    onCondicoes([])
     onAplicar([])
   }
 
@@ -211,7 +213,7 @@ function FiltroPorCondicoes({
           {condicoes.length > 1 && (
             <button
               className="icon-btn"
-              onClick={() => setCondicoes((a) => a.filter((_, i) => i !== indice))}
+              onClick={() => onCondicoes(condicoes.filter((_, i) => i !== indice))}
               title="Remover esta condição"
               aria-label="Remover esta condição"
             >
@@ -222,7 +224,7 @@ function FiltroPorCondicoes({
           {indice === condicoes.length - 1 && (
             <button
               className="icon-btn"
-              onClick={() => setCondicoes((a) => [...a, { ...VAZIA }])}
+              onClick={() => onCondicoes([...condicoes, { ...VAZIA }])}
               title="Adicionar outra condição"
               aria-label="Adicionar outra condição"
               disabled={disabled}

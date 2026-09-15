@@ -12,7 +12,7 @@ import type {
 } from '../../shared/types'
 import { DEFAULT_MAX_ROWS, PREVIEW_ROWS, type DatabaseDriver, type QueryOptions } from './types'
 import { toGrid } from './value-types'
-import { parseMongoCommand, splitMongoCommands, type MongoPlan } from './mongo-parser'
+import { opcoesDeBusca, parseMongoCommand, splitMongoCommands, type MongoPlan } from './mongo-parser'
 
 /** Operações que alteram dados — bloqueadas no modo somente-leitura. */
 const WRITE_METHODS = new Set([
@@ -379,7 +379,7 @@ export class MongoDriver implements DatabaseDriver {
 
     switch (plan.method) {
       case 'find': {
-        let cursor = coll.find(first ?? {}, second ?? {})
+        let cursor = coll.find(first ?? {}, opcoesDeBusca(second))
         let explicitLimit = false
         for (const link of plan.chain) {
           const arg = link.args[0]
@@ -398,7 +398,7 @@ export class MongoDriver implements DatabaseDriver {
         return cursor.toArray()
       }
       case 'findOne':
-        return coll.findOne(first ?? {}, second ?? {})
+        return coll.findOne(first ?? {}, opcoesDeBusca(second))
       case 'aggregate': {
         let cursor = coll.aggregate((first as unknown as Document[]) ?? [], second)
         for (const link of plan.chain) {

@@ -149,6 +149,53 @@ test('find com filtro devolve os documentos certos', async () => {
   assert.equal(result.rowCount, 2)
 })
 
+test('a projeção do segundo argumento é respeitada', async () => {
+  // O bug: o driver do Node lê o segundo argumento como `FindOptions`, e opção
+  // desconhecida ele ignora calado — a query voltava com o documento inteiro,
+  // enquanto a mesma linha no Compass devolvia só o campo pedido.
+  const [result] = await driver.query('db.clientes.find({ ativo: true }, { nome: 1 })', {
+    queryId: 'proj1'
+  })
+  assert.deepEqual(
+    result.columns.map((c) => c.name).sort(),
+    ['_id', 'nome'],
+    JSON.stringify(result.columns.map((c) => c.name))
+  )
+})
+
+test('a projeção consegue excluir o _id', async () => {
+  const [result] = await driver.query('db.clientes.find({}, { nome: 1, _id: 0 })', {
+    queryId: 'proj2'
+  })
+  assert.deepEqual(result.columns.map((c) => c.name), ['nome'])
+})
+
+test('projeção com filtro, sort, skip e limit na mesma linha', async () => {
+  // A forma exata que o usuário relatou: filtro + projeção + cursor encadeado.
+  const [result] = await driver.query(
+    'db.pedidos.find({ valor: { $gt: 10 } }, { valor: 1 }).sort({ valor: 1 }).skip(1).limit(100)',
+    { queryId: 'proj3' }
+  )
+  assert.deepEqual(result.columns.map((c) => c.name).sort(), ['_id', 'valor'])
+  assert.equal(result.rowCount, 2)
+  const valorIndex = result.columns.findIndex((c) => c.name === 'valor')
+  assert.equal(result.rows[0][valorIndex], 199.9)
+})
+
+test('quem escreve no estilo do driver, com a chave projection, também é atendido', async () => {
+  const [result] = await driver.query('db.clientes.find({}, { projection: { nome: 1 } })', {
+    queryId: 'proj4'
+  })
+  assert.deepEqual(result.columns.map((c) => c.name).sort(), ['_id', 'nome'])
+})
+
+test('findOne também respeita a projeção', async () => {
+  const [result] = await driver.query('db.clientes.findOne({ nome: "Ana" }, { nome: 1 })', {
+    queryId: 'proj5'
+  })
+  assert.deepEqual(result.columns.map((c) => c.name).sort(), ['_id', 'nome'])
+})
+
 test('find com sort e limit encadeados', async () => {
   const [result] = await driver.query('db.pedidos.find({}).sort({ valor: -1 }).limit(2)', {
     queryId: 'q2'
