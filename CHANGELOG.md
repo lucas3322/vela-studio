@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 2.2.0 — 2026-09-15
+
+### Novidades
+
+- adicionar suporte à projeção no driver MongoDB e testes correspondentes (ba57fa3)
+
 ## 2.1.0 — 2026-09-14
 
 ### Novidades
