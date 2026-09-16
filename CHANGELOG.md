@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 2.3.0 — 2026-09-16
+
+### Novidades
+
+- implement MongoDB document view and update tab state management (85d3a83)
+
 ## 2.2.0 — 2026-09-15
 
 ### Novidades
