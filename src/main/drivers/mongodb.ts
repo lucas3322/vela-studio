@@ -1,4 +1,4 @@
-import { MongoClient, type Db, type Document } from 'mongodb'
+import { BSON, MongoClient, type Db, type Document } from 'mongodb'
 import type {
   ColumnInfo,
   ConnectionConfig,
@@ -29,6 +29,24 @@ const WRITE_METHODS = new Set([
  * principal sem mensagem nenhuma.
  */
 const TETO_EXPORTACAO_MONGO = 500_000
+
+/**
+ * Os documentos prontos para atravessar o IPC sem perder o tipo do BSON.
+ *
+ * `EJSON` é a notação do próprio MongoDB para isso: o ObjectId vira
+ * `{ "$oid": "…" }` e a data vira `{ "$date": "…" }`, em vez de virarem dois
+ * textos indistinguíveis de qualquer outro texto. É o que permite a visão de
+ * documento dizer **ObjectId('…')** com a mesma certeza que o Compass diz.
+ *
+ * Modo relaxado: número continua número, e só o que o JSON não sabe
+ * representar ganha a notação estendida. Sem isso, todo inteiro do documento
+ * chegaria como `{ "$numberInt": "10000" }` na tela.
+ */
+function emEjson(documentos: Record<string, unknown>[]): Array<Record<string, unknown>> {
+  return documentos.map(
+    (documento) => BSON.EJSON.serialize(documento, { relaxed: true }) as Record<string, unknown>
+  )
+}
 
 export class MongoDriver implements DatabaseDriver {
   readonly dialect: Dialect = 'mongodb'
@@ -354,11 +372,19 @@ export class MongoDriver implements DatabaseDriver {
           rowCount: matrix.length,
           durationMs,
           statement: command,
-          truncatedAt: truncated ? maxRows : undefined
+          truncatedAt: truncated ? maxRows : undefined,
+          documents: emEjson(rows as Record<string, unknown>[])
         })
       } else if (outcome && typeof outcome === 'object') {
         const { columns, matrix } = toGrid([outcome as Record<string, unknown>])
-        results.push({ columns, rows: matrix, rowCount: 1, durationMs, statement: command })
+        results.push({
+          columns,
+          rows: matrix,
+          rowCount: 1,
+          durationMs,
+          statement: command,
+          documents: emEjson([outcome as Record<string, unknown>])
+        })
       } else {
         const { columns, matrix } = toGrid([{ resultado: outcome }])
         results.push({ columns, rows: matrix, rowCount: 1, durationMs, statement: command })

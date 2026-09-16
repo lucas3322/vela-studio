@@ -3564,3 +3564,157 @@
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+
+/* ── Visão de documento (MongoDB) ─────────────────────────────────────
+ *
+ * A alternativa à grade para quem está olhando documento, e não linha. Cada
+ * cartão mostra só os campos que aquele documento tem — diferente da grade,
+ * onde toda chave do lote vira coluna e o que falta vira `NULL`.
+ */
+
+.documentos {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  background: var(--bg-app);
+}
+
+.documento {
+  position: relative;
+  padding: var(--space-2) 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+
+  /* O navegador pula layout e pintura do cartão que está fora da tela. Um
+     documento de 84 campos são 84 linhas; sem isto, rolar uma página inteira
+     pesa mesmo com o número de cartões limitado. A altura estimada evita que
+     a barra de rolagem pule enquanto o conteúdo real é medido. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 220px;
+}
+
+.documento__topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 18px;
+  padding: 0 var(--space-3);
+}
+
+.documento__numero {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* Ação revelada no hover: fora dele, o ícone competia com o dado em todo
+   cartão da lista. `pointer-events` some junto, senão a área segue clicável. */
+.documento__copiar {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease);
+}
+
+.documento:hover .documento__copiar,
+.documento:focus-within .documento__copiar {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.documento__campos {
+  display: flex;
+  flex-direction: column;
+}
+
+.documento__linha {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 1px var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 18px;
+}
+
+.documento__linha--composta {
+  cursor: pointer;
+}
+
+.documento__linha--composta:hover {
+  background: var(--bg-hover);
+}
+
+.documento__seta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.documento__chave {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+/* O dois-pontos herda a cor da chave de propósito: em terciário ele reprovava
+   o contraste sobre a linha em hover (4.22:1), e um separador ilegível é pior
+   do que um separador sem hierarquia própria. */
+.documento__chave::after {
+  content: ':';
+}
+
+.documento__valor {
+  color: var(--data-string);
+  overflow-wrap: anywhere;
+}
+
+.documento__valor--numero {
+  color: var(--data-number);
+  font-variant-numeric: tabular-nums;
+}
+
+.documento__valor--data {
+  color: var(--data-date);
+}
+
+.documento__valor--booleano {
+  color: var(--data-boolean);
+}
+
+.documento__valor--objectid,
+.documento__valor--binario,
+.documento__valor--regex,
+.documento__valor--codigo {
+  color: var(--data-json);
+}
+
+/* Objeto e lista fechados são estrutura, não dado: ficam com a cor de texto
+   comum para não competirem com os valores de verdade ao lado. */
+.documento__valor--objeto,
+.documento__valor--lista {
+  color: var(--text-secondary);
+}
+
+.documento__valor--nulo {
+  color: var(--data-null);
+  font-style: italic;
+}
+
+.documentos__rodape {
+  padding: var(--space-3);
+  text-align: center;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* Empurra o seletor de exibição para a ponta direita da barra de painéis. */
+.structure__espaco {
+  flex: 1;
+}

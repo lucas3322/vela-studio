@@ -10,6 +10,7 @@ import { origemEditavel } from '../editor/origem-editavel'
 import { ErrorPanel } from './ErrorPanel'
 import { HelpPanel } from './HelpPanel'
 import { TableView } from './TableView'
+import { MongoDocumentView } from './MongoDocumentView'
 import { ModelDiagram } from './ModelDiagram'
 import { WelcomeScreen } from './WelcomeScreen'
 import { ExportChoiceDialog } from './ExportChoiceDialog'
@@ -240,6 +241,8 @@ function GradeDoResultado({ tab, result }: { tab: Tab; result: QueryResult }): R
 function QueryPane({ tabId }: { tabId: string }): React.JSX.Element | null {
   const tab = useTabStore((s) => s.tabs.find((t) => t.id === tabId))
   const updateTab = useTabStore((s) => s.updateTab)
+  const updateTabView = useTabStore((s) => s.updateTabView)
+  const conexao = useConnectionStore((s) => s.saved.find((c) => c.id === s.activeId))
   const notify = useAppStore((s) => s.notify)
   const openModal = useAppStore((s) => s.openModal)
   const { cancel } = useRunQuery()
@@ -285,6 +288,17 @@ function QueryPane({ tabId }: { tabId: string }): React.JSX.Element | null {
   if (!tab) return null
 
   const result = tab.results[tab.activeResultIndex]
+
+  /*
+    O mesmo seletor da aba de coleção, pelo mesmo motivo: resultado de Mongo é
+    documento nas duas telas. Só aparece quando há documento para desenhar —
+    um comando que devolve valor solto volta sem `documents`, e ali a grade é
+    a única forma possível.
+  */
+  const modo = tab.view?.modo ?? 'tabela'
+  const ehMongo = conexao ? DRIVERS[conexao.driver].dialect === 'mongodb' : false
+  const podeVerDocumento = ehMongo && !!result?.documents
+  const comoDocumento = podeVerDocumento && modo === 'documento'
 
   /**
    * Exporta o resultado da aba.
@@ -403,6 +417,25 @@ function QueryPane({ tabId }: { tabId: string }): React.JSX.Element | null {
           </div>
         )}
 
+        {podeVerDocumento && (
+          <span className="segmented" role="group" aria-label="Forma de exibição">
+            <button
+              data-active={modo === 'tabela'}
+              onClick={() => updateTabView(tab.id, { modo: 'tabela' })}
+              title="Uma linha por documento, uma coluna por campo"
+            >
+              Tabela
+            </button>
+            <button
+              data-active={modo === 'documento'}
+              onClick={() => updateTabView(tab.id, { modo: 'documento' })}
+              title="Cada documento com os campos que ele realmente tem"
+            >
+              Documento
+            </button>
+          </span>
+        )}
+
         {result && result.columns.length > 0 && (
           <>
             <span className="editor-toolbar__hint">
@@ -452,7 +485,12 @@ function QueryPane({ tabId }: { tabId: string }): React.JSX.Element | null {
           </div>
         )}
 
-        {!tab.running && result && <GradeDoResultado tab={tab} result={result} />}
+        {!tab.running && result && comoDocumento && result.documents && (
+          <MongoDocumentView documentos={result.documents} onNotify={notify} />
+        )}
+        {!tab.running && result && !comoDocumento && (
+          <GradeDoResultado tab={tab} result={result} />
+        )}
       </div>
 
       {exportacao && (

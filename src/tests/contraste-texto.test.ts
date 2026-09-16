@@ -183,6 +183,10 @@ const USOS: Uso[] = [
   { seletor: '.filtro__juncao', arquivo: LAYOUT, token: 'tertiary', fundos: ['bg-sidebar'], tipo: 'texto' },
   { seletor: '.data-table th', arquivo: LAYOUT, token: 'tertiary', fundos: ['bg-app'], tipo: 'texto' },
 
+  // ── visão de documento (Mongo) ────────────────────────────────────────
+  { seletor: '.documento__numero', arquivo: LAYOUT, token: 'tertiary', fundos: ['bg-surface'], tipo: 'texto' },
+  { seletor: '.documentos__rodape', arquivo: LAYOUT, token: 'tertiary', fundos: ['bg-app'], tipo: 'texto' },
+
   // ── erro e status ─────────────────────────────────────────────────────
   { seletor: '.error-panel__raw', arquivo: LAYOUT, token: 'tertiary', fundos: ['bg-input'], tipo: 'texto' },
   { seletor: '.error-panel__toggle', arquivo: LAYOUT, token: 'tertiary', fundos: ['painel de erro'], tipo: 'texto' },

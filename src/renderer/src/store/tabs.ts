@@ -16,8 +16,8 @@ export interface CondicaoDaAba {
   valor: string
 }
 
-/** O que uma aba de tabela precisa lembrar entre uma visita e outra. */
-export interface EstadoDaTabela {
+/** O que uma aba precisa lembrar entre uma visita e outra. */
+export interface EstadoDaAba {
   /** Filtro **em vigor** — é ele que entra na consulta. */
   filtro?: CondicaoDaAba[]
   /**
@@ -29,6 +29,14 @@ export interface EstadoDaTabela {
   pagina?: number
   ordem?: { column: string; direction: 'asc' | 'desc' } | null
   painel?: 'dados' | 'colunas' | 'indices' | 'relacoes'
+  /**
+   * Como o resultado do MongoDB é desenhado: em grade ou em documento.
+   *
+   * Vale para os dois tipos de aba — a de coleção e a de query —, porque é
+   * nas duas que documento do Mongo aparece. Em banco SQL não tem efeito:
+   * linha de tabela não tem forma de documento para assumir.
+   */
+  modo?: 'tabela' | 'documento'
 }
 
 export interface Tab {
@@ -85,7 +93,7 @@ export interface Tab {
    * página, ordenação e painel, tudo perdido sem aviso, e a consulta refeita
    * sem o `WHERE`. Aqui sobrevive.
    */
-  view?: EstadoDaTabela
+  view?: EstadoDaAba
   /**
    * Conexão dona da aba. Definida na criação e nunca mais alterada:
    * é o que permite trocar de banco e reencontrar as abas de volta,
@@ -161,12 +169,12 @@ interface TabState {
   /** Pede à aba que reconsulte o banco. */
   reloadTab: (id: string) => void
   /**
-   * Guarda como a aba de tabela está: filtro, página, ordem, painel.
+   * Guarda como a aba está: filtro, página, ordem, painel, modo de exibição.
    *
    * Mescla em vez de substituir — quem muda de página não está dizendo nada
    * sobre o filtro, e um patch raso em `updateTab` apagaria o resto do objeto.
    */
-  updateTableView: (id: string, patch: EstadoDaTabela) => void
+  updateTabView: (id: string, patch: EstadoDaAba) => void
   /** Fecha todas as abas de uma conexão — usado ao desconectar. */
   closeConnectionTabs: (connectionId: string) => void
 
@@ -384,7 +392,7 @@ export const useTabStore = create<TabState>((set, get) => ({
       )
     })),
 
-  updateTableView: (id, patch) =>
+  updateTabView: (id, patch) =>
     set((state) => ({
       tabs: state.tabs.map((tab) =>
         tab.id === id ? { ...tab, view: { ...tab.view, ...patch } } : tab

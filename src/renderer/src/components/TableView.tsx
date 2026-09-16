@@ -12,6 +12,7 @@ import { montarFiltroMongo, montarWhere, type Condicao } from '../editor/filter-
 import { ErrorPanel } from './ErrorPanel'
 import { IconKey, IconLink, IconPlus, IconRefresh } from './Icons'
 import { InsertRowDialog } from './InsertRowDialog'
+import { MongoDocumentView } from './MongoDocumentView'
 
 type Panel = 'dados' | 'colunas' | 'indices' | 'relacoes'
 
@@ -29,7 +30,7 @@ const SEM_FILTRO: Condicao[] = []
  * que todo mundo faz manualmente ao clicar numa tabela.
  */
 export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
-  const updateTableView = useTabStore((s) => s.updateTableView)
+  const updateTabView = useTabStore((s) => s.updateTabView)
   const [columns, setColumns] = useState<ColumnInfo[]>([])
   const [indexes, setIndexes] = useState<IndexInfo[]>([])
   const [relations, setRelations] = useState<RelationInfo[]>([])
@@ -76,15 +77,21 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
     dizendo que o recorte tinha mudado.
   */
   const panel: Panel = tab.view?.painel ?? tab.initialPanel ?? 'dados'
-  const setPanel = (novo: Panel): void => updateTableView(tab.id, { painel: novo })
+  const setPanel = (novo: Panel): void => updateTabView(tab.id, { painel: novo })
 
   const ordem: OrdenacaoDaGrade | null = tab.view?.ordem ?? null
   const setOrdem = (nova: OrdenacaoDaGrade | null): void =>
-    updateTableView(tab.id, { ordem: nova })
+    updateTabView(tab.id, { ordem: nova })
 
   const pagina = tab.view?.pagina ?? 0
   const setPagina = (numero: number): void =>
-    updateTableView(tab.id, { pagina: Math.max(0, numero) })
+    updateTabView(tab.id, { pagina: Math.max(0, numero) })
+
+  /**
+   * Grade ou documento. Só o Mongo tem os dois — em banco SQL a linha não tem
+   * forma de documento para assumir, e o seletor nem aparece.
+   */
+  const modo = tab.view?.modo ?? 'tabela'
 
   /** Filtro em vigor. Entra na consulta e volta para a primeira página. */
   const filtro = (tab.view?.filtro as Condicao[] | undefined) ?? SEM_FILTRO
@@ -115,7 +122,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
   */
   useEffect(() => {
     if (!tab.initialFilter) return
-    updateTableView(tab.id, {
+    updateTabView(tab.id, {
       filtro: tab.initialFilter,
       rascunho: tab.initialFilter,
       pagina: 0
@@ -124,7 +131,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
     // ficasse guardado, toda volta para esta aba refaria o efeito no monte e
     // desfaria o filtro que a pessoa tivesse trocado desde então.
     updateTab(tab.id, { initialFilter: undefined })
-  }, [tab.initialFilter, tab.id, updateTableView, updateTab])
+  }, [tab.initialFilter, tab.id, updateTabView, updateTab])
 
   /*
     "Ver estrutura" e "Ver dados" na aba já aberta. Mesma natureza do
@@ -134,9 +141,9 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
   */
   useEffect(() => {
     if (!tab.initialPanel) return
-    updateTableView(tab.id, { painel: tab.initialPanel })
+    updateTabView(tab.id, { painel: tab.initialPanel })
     updateTab(tab.id, { initialPanel: undefined })
-  }, [tab.initialPanel, tab.id, updateTableView, updateTab])
+  }, [tab.initialPanel, tab.id, updateTabView, updateTab])
 
   const table = tab.table!
 
@@ -366,6 +373,15 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
 
   const result = tab.results[tab.activeResultIndex]
 
+  /*
+    Só desenha como documento quando existe documento para desenhar. Resultado
+    que não é objeto — um valor solto devolvido por um comando — não tem
+    `documents`, e aí a grade é a forma certa mesmo com o seletor em
+    "Documento": melhor mostrar o resultado do que deixar a tela vazia por
+    causa de uma preferência.
+  */
+  const comoDocumento = modo === 'documento' && !!result?.documents
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       <div className="structure__tabs">
@@ -381,6 +397,28 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
             {item === 'relacoes' && relations.length > 0 && ` (${relations.length})`}
           </button>
         ))}
+
+        {dialect === 'mongodb' && panel === 'dados' && (
+          <>
+            <span className="structure__espaco" />
+            <span className="segmented" role="group" aria-label="Forma de exibição">
+              <button
+                data-active={modo === 'tabela'}
+                onClick={() => updateTabView(tab.id, { modo: 'tabela' })}
+                title="Uma linha por documento, uma coluna por campo"
+              >
+                Tabela
+              </button>
+              <button
+                data-active={modo === 'documento'}
+                onClick={() => updateTabView(tab.id, { modo: 'documento' })}
+                title="Cada documento com os campos que ele realmente tem"
+              >
+                Documento
+              </button>
+            </span>
+          </>
+        )}
       </div>
 
       {/*
@@ -405,16 +443,21 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
             dialect={dialect}
             aplicado={filtro}
             condicoes={rascunho}
-            onCondicoes={(condicoes) => updateTableView(tab.id, { rascunho: condicoes })}
+            onCondicoes={(condicoes) => updateTabView(tab.id, { rascunho: condicoes })}
             disabled={pendencias > 0}
             onAplicar={(condicoes) => {
               // Filtrar muda o conjunto de linhas: continuar na página 5 do
               // resultado anterior mostraria uma página vazia sem explicação.
-              updateTableView(tab.id, { filtro: condicoes, pagina: 0 })
+              updateTabView(tab.id, { filtro: condicoes, pagina: 0 })
             }}
           />
           {tab.error && <ErrorPanel error={tab.error} />}
-          {result && (
+
+          {comoDocumento && result?.documents && (
+            <MongoDocumentView documentos={result.documents} onNotify={notify} />
+          )}
+
+          {result && !comoDocumento && (
             <EditableGrid
               result={result}
               table={table}

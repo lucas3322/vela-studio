@@ -196,6 +196,36 @@ test('findOne também respeita a projeção', async () => {
   assert.deepEqual(result.columns.map((c) => c.name).sort(), ['_id', 'nome'])
 })
 
+test('o resultado carrega os documentos, com o tipo do BSON preservado', async () => {
+  // A visão de documento não pode ser reconstruída a partir da grade: lá o
+  // ObjectId já virou texto e a data já virou string ISO.
+  const [result] = await driver.query('db.clientes.find({ nome: "Ana" })', { queryId: 'doc1' })
+  const [documento] = result.documents
+  assert.ok(documento._id.$oid, JSON.stringify(documento))
+  assert.ok(documento.criadoEm.$date, JSON.stringify(documento))
+  assert.equal(documento.nome, 'Ana')
+  assert.equal(documento.ativo, true)
+})
+
+test('campo ausente não vira nulo no documento, só na grade', async () => {
+  // O Bruno não tem `email`. Na matriz da grade ele ganha uma coluna `email`
+  // com nulo — correto para uma tabela, falso para um documento.
+  const [result] = await driver.query('db.clientes.find({})', { queryId: 'doc2' })
+  const bruno = result.documents.find((d) => d.nome === 'Bruno')
+  const indiceEmail = result.columns.findIndex((c) => c.name === 'email')
+  const linhaBruno = result.rows.find((linha) => linha.includes('Bruno'))
+
+  assert.ok(indiceEmail >= 0, 'a grade tem a coluna email, porque a Ana tem email')
+  assert.equal(linhaBruno[indiceEmail], null, 'e na linha do Bruno ela vale nulo')
+  assert.equal('email' in bruno, false, 'mas o documento do Bruno NÃO tem o campo')
+})
+
+test('documento traz subdocumento inteiro, não achatado', async () => {
+  const [result] = await driver.query('db.clientes.find({ nome: "Celia" })', { queryId: 'doc3' })
+  const [documento] = result.documents
+  assert.deepEqual(documento.endereco, { rua: 'A', numero: 10 })
+})
+
 test('find com sort e limit encadeados', async () => {
   const [result] = await driver.query('db.pedidos.find({}).sort({ valor: -1 }).limit(2)', {
     queryId: 'q2'

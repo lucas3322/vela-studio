@@ -118,6 +118,23 @@ export interface QueryResult {
   truncatedAt?: number
   /** Texto do statement que gerou esse resultado. */
   statement: string
+  /**
+   * Os documentos como o banco devolveu — só em driver de documento.
+   *
+   * A matriz de `rows` é uma tabela: ela tem uma coluna para cada chave que
+   * **qualquer** documento do lote trouxe, e preenche com nulo onde o
+   * documento não tem aquela chave. Numa grade isso é o certo; numa visão de
+   * documento seria mentira — `email: null` afirma que o campo existe e está
+   * vazio, quando o documento simplesmente não tem campo nenhum com esse nome.
+   *
+   * Por isso a visão de documento não é reconstruída a partir da grade: ela lê
+   * daqui, onde ausente é ausente.
+   *
+   * Vem em EJSON (`{ "$oid": … }`, `{ "$date": … }`), que é como o tipo do
+   * BSON sobrevive à viagem até a tela: sem isso, um ObjectId chega como um
+   * texto de 24 caracteres indistinguível de um texto de verdade.
+   */
+  documents?: Array<Record<string, unknown>>
 }
 
 export interface QueryError {

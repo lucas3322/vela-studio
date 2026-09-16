@@ -12,7 +12,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-interface EstadoDaTabela {
+interface EstadoDaAba {
   filtro?: Array<{ coluna: string; operador: string; valor: string }>
   rascunho?: Array<{ coluna: string; operador: string; valor: string }>
   pagina?: number
@@ -22,11 +22,11 @@ interface EstadoDaTabela {
 
 interface Aba {
   id: string
-  view?: EstadoDaTabela
+  view?: EstadoDaAba
 }
 
-/** Espelha `updateTableView` do store. */
-function updateTableView(abas: Aba[], id: string, patch: EstadoDaTabela): Aba[] {
+/** Espelha `updateTabView` do store. */
+function updateTabView(abas: Aba[], id: string, patch: EstadoDaAba): Aba[] {
   return abas.map((t) => (t.id === id ? { ...t, view: { ...t.view, ...patch } } : t))
 }
 
@@ -36,8 +36,8 @@ test('mudar de página não apaga o filtro', () => {
   // A razão de mesclar em vez de substituir: um patch raso trocaria o objeto
   // inteiro, e a próxima consulta sairia sem WHERE nenhum.
   let abas: Aba[] = [{ id: 'a' }]
-  abas = updateTableView(abas, 'a', { filtro: FILTRO, rascunho: FILTRO, pagina: 0 })
-  abas = updateTableView(abas, 'a', { pagina: 2 })
+  abas = updateTabView(abas, 'a', { filtro: FILTRO, rascunho: FILTRO, pagina: 0 })
+  abas = updateTabView(abas, 'a', { pagina: 2 })
 
   assert.deepEqual(abas[0].view?.filtro, FILTRO)
   assert.equal(abas[0].view?.pagina, 2)
@@ -48,16 +48,16 @@ test('mexer em um campo preserva a identidade do array de filtro', () => {
   // mudança de página devolvesse um array novo, a aba reconsultaria em laço —
   // a mesma armadilha que o seletor do Zustand tem no resto do app.
   let abas: Aba[] = [{ id: 'a' }]
-  abas = updateTableView(abas, 'a', { filtro: FILTRO })
+  abas = updateTabView(abas, 'a', { filtro: FILTRO })
   const antes = abas[0].view?.filtro
-  abas = updateTableView(abas, 'a', { pagina: 1, ordem: { column: 'id', direction: 'asc' } })
+  abas = updateTabView(abas, 'a', { pagina: 1, ordem: { column: 'id', direction: 'asc' } })
 
   assert.equal(abas[0].view?.filtro, antes, 'o array precisa ser o MESMO, não um igual')
 })
 
 test('cada aba guarda o seu, sem encostar na vizinha', () => {
   let abas: Aba[] = [{ id: 'a' }, { id: 'b' }]
-  abas = updateTableView(abas, 'a', { filtro: FILTRO })
+  abas = updateTabView(abas, 'a', { filtro: FILTRO })
 
   assert.deepEqual(abas[1].view, undefined)
 })
@@ -65,6 +65,6 @@ test('cada aba guarda o seu, sem encostar na vizinha', () => {
 test('aba sem filtro guarda nada, não guarda uma condição em branco', () => {
   // A barra sempre desenha uma linha, mas a linha vazia não vira estado: se
   // virasse, o botão "Limpar" apareceria numa aba que nunca foi filtrada.
-  const abas = updateTableView([{ id: 'a' }], 'a', { rascunho: [] })
+  const abas = updateTabView([{ id: 'a' }], 'a', { rascunho: [] })
   assert.deepEqual(abas[0].view?.rascunho, [])
 })
