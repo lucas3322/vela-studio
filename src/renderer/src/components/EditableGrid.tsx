@@ -9,6 +9,11 @@ import {
   proximoAchado,
   type Achado
 } from '../editor/busca-na-grade'
+import {
+  deveNavegar,
+  pedidoDaBusca,
+  pedidoDaEvidencia
+} from '../editor/navegacao-da-grade'
 import { descreverExportacao } from '../editor/export-message'
 import { gerarComandosRedis, gerarInsertMongo, gerarInsertSql } from '../editor/gerar-insert'
 import { CellEditorModal } from './CellEditorModal'
@@ -217,11 +222,35 @@ export function EditableGrid({
    * o texto seria pior — reabrir com uma busca velha faz a grade saltar para
    * um lugar que ninguém pediu.
    */
-  const [busca, setBusca] = useState<{ aberta: boolean; termo: string; indice: number }>({
+  const [busca, setBusca] = useState<{
+    aberta: boolean
+    termo: string
+    indice: number
+    /**
+     * Conta as ações explícitas da pessoa: abrir, digitar, ↵, ⇧↵.
+     *
+     * É o que separa "a pessoa pediu para ir até o achado" de "alguma
+     * dependência do efeito mudou" — e é também o que faz apertar ↵ de novo
+     * levar de volta ao mesmo achado, depois de a pessoa ter rolado para longe.
+     */
+    pedido: number
+  }>({
     aberta: false,
     termo: '',
-    indice: 0
+    indice: 0,
+    pedido: 0
   })
+
+  /**
+   * Pedido de rolagem já atendido.
+   *
+   * Sem isto, a rolagem acontecia de novo a cada render do efeito que a
+   * dispara — inclusive a cada pixel de arrasto na borda de um cabeçalho, já
+   * que a largura das colunas é dependência dele. A grade voltava para a
+   * coluna da busca no meio do arrasto: redimensionar outra coluna com a busca
+   * aberta era impossível.
+   */
+  const pedidoAtendido = useRef<string | null>(null)
 
   /**
    * Coluna inteira em realce, quando o achado da busca é um **nome de coluna**.
@@ -377,11 +406,21 @@ export function EditableGrid({
    *
    * Rolar só o suficiente para "entrar na tela" deixa o alvo colado na borda,
    * onde o olho não o encontra. Centralizar custa o mesmo e resolve.
+   *
+   * O `pedido` diz **a que ação isto responde**, e o mesmo pedido é atendido
+   * uma vez só: quem chama é um efeito, e efeito roda de novo a cada mudança
+   * de dependência — a largura das colunas entre elas, que muda a cada pixel
+   * de arrasto. Sem essa guarda, a grade rolava de volta para a coluna achada
+   * no meio do arrasto e travava o redimensionamento de qualquer outra.
    */
   const irPara = useCallback(
-    (achado: Achado) => {
+    (achado: Achado, pedido: string) => {
       const caixa = scroller.current
-      if (!caixa) return
+      // Sem larguras medidas não há para onde rolar — e o pedido fica sem
+      // atender de propósito, para ser atendido quando elas chegarem.
+      if (!caixa || widths.length === 0) return
+      if (!deveNavegar(pedidoAtendido.current, pedido)) return
+      pedidoAtendido.current = pedido
 
       const esquerda = widths
         .slice(0, achado.coluna)
@@ -411,20 +450,31 @@ export function EditableGrid({
   useEffect(() => {
     if (!colunaEmEvidencia || widths.length === 0) return
     const indice = result.columns.findIndex((c) => c.name === colunaEmEvidencia)
-    if (indice >= 0) irPara({ tipo: 'coluna', coluna: indice, texto: colunaEmEvidencia })
+    if (indice >= 0) {
+      irPara(
+        { tipo: 'coluna', coluna: indice, texto: colunaEmEvidencia },
+        pedidoDaEvidencia(colunaEmEvidencia)
+      )
+    }
   }, [colunaEmEvidencia, widths.length, result.columns, irPara])
 
   // Navegar já ao digitar: a primeira ocorrência aparece sem precisar de Enter.
   useEffect(() => {
-    if (!busca.aberta) return
+    if (!busca.aberta) {
+      // Busca fechada zera o histórico de pedidos: reabrir e procurar a mesma
+      // coisa é um pedido novo, e tem que levar até lá de novo.
+      pedidoAtendido.current = null
+      return
+    }
     if (achados.length === 0) {
       // O termo deixou de casar qualquer coluna: um realce velho apontaria
       // uma coluna que a busca atual não escolheu mais.
       setColunaRealcada(null)
       return
     }
-    irPara(achados[Math.min(busca.indice, achados.length - 1)])
-  }, [busca.aberta, busca.indice, achados, irPara])
+    const indice = Math.min(busca.indice, achados.length - 1)
+    irPara(achados[indice], pedidoDaBusca(busca.pedido, indice))
+  }, [busca.aberta, busca.indice, busca.pedido, achados, irPara])
 
   const chaveDaLinha = useCallback(
     (linha: number): Record<string, unknown> | null => {
@@ -806,7 +856,7 @@ export function EditableGrid({
         !digitandoEmCampo(focoAtual(document.activeElement))
       ) {
         evento.preventDefault()
-        setBusca((b) => ({ ...b, aberta: true }))
+        setBusca((b) => ({ ...b, aberta: true, pedido: b.pedido + 1 }))
         return
       }
 
@@ -995,7 +1045,13 @@ export function EditableGrid({
 
   const navegar = (passo: 1 | -1): void => {
     if (achados.length === 0) return
-    setBusca((b) => ({ ...b, indice: proximoAchado(b.indice, achados.length, passo) }))
+    // O `pedido` sobe mesmo quando o índice não muda — com um único achado,
+    // apertar ↵ de novo tem que levar de volta até ele.
+    setBusca((b) => ({
+      ...b,
+      indice: proximoAchado(b.indice, achados.length, passo),
+      pedido: b.pedido + 1
+    }))
   }
 
   return (
@@ -1008,7 +1064,9 @@ export function EditableGrid({
             autoFocus
             value={busca.termo}
             placeholder="Buscar nesta página — valor ou nome de coluna"
-            onChange={(e) => setBusca((b) => ({ ...b, termo: e.target.value, indice: 0 }))}
+            onChange={(e) =>
+              setBusca((b) => ({ ...b, termo: e.target.value, indice: 0, pedido: b.pedido + 1 }))
+            }
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault()
@@ -1016,7 +1074,7 @@ export function EditableGrid({
               }
               if (e.key === 'Escape') {
                 e.preventDefault()
-                setBusca({ aberta: false, termo: '', indice: 0 })
+                setBusca((b) => ({ aberta: false, termo: '', indice: 0, pedido: b.pedido }))
                 setColunaRealcada(null)
               }
             }}
@@ -1051,7 +1109,7 @@ export function EditableGrid({
           <button
             className="icon-btn"
             onClick={() => {
-              setBusca({ aberta: false, termo: '', indice: 0 })
+              setBusca((b) => ({ aberta: false, termo: '', indice: 0, pedido: b.pedido }))
               setColunaRealcada(null)
             }}
             title="Fechar (Esc)"
