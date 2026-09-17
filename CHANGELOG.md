@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 2.4.0 — 2026-09-17
+
+### Novidades
+
+- adicionar controle de pedidos de navegação na grade e testes correspondentes (b94754d)
+
 ## 2.3.0 — 2026-09-16
 
 ### Novidades
