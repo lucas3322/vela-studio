@@ -5,6 +5,7 @@
  */
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
 import { PALETA_PADRAO, coresDoEditor } from '../styles/palettes'
+import { coresDoBalao } from './tema-do-editor'
 import { REDIS_COMMANDS } from './sql-docs'
 
 // Contribuições do editor: cada import liga um recurso da UI.
@@ -77,6 +78,8 @@ monaco.languages.setMonarchTokensProvider('redis', {
  */
 export function defineThemes(paletaId = PALETA_PADRAO): void {
   const acento = coresDoEditor(paletaId)
+  const balaoEscuro = coresDoBalao('escuro', paletaId)
+  const balaoClaro = coresDoBalao('claro', paletaId)
 
   monaco.editor.defineTheme('vela-dark', {
     base: 'vs-dark',
@@ -110,14 +113,20 @@ export function defineThemes(paletaId = PALETA_PADRAO): void {
       'editorCursor.foreground': `#${acento.escuro}`,
       'editorIndentGuide.background1': '#2b3038',
       'editorIndentGuide.activeBackground1': '#3d434d',
-      'editorWidget.background': '#262b33',
-      'editorWidget.border': '#343a44',
-      'editorSuggestWidget.background': '#262b33',
-      'editorSuggestWidget.border': '#343a44',
-      'editorSuggestWidget.selectedBackground': '#343b46',
-      'editorSuggestWidget.highlightForeground': `#${acento.escuro}`,
-      'editorHoverWidget.background': '#262b33',
-      'editorHoverWidget.border': '#343a44',
+      'editorWidget.background': balaoEscuro.fundo,
+      'editorWidget.border': balaoEscuro.borda,
+      'editorSuggestWidget.background': balaoEscuro.fundo,
+      'editorSuggestWidget.border': balaoEscuro.borda,
+      'editorSuggestWidget.foreground': balaoEscuro.texto,
+      'editorSuggestWidget.selectedBackground': balaoEscuro.selecaoFundo,
+      // Declarado mesmo valendo o padrão herdado (branco), que aqui funciona:
+      // o dia em que o Monaco mudar essa herança, o tema escuro não descobre
+      // do mesmo jeito que o claro descobriu — pela tela.
+      'editorSuggestWidget.selectedForeground': balaoEscuro.selecaoTexto,
+      'editorSuggestWidget.highlightForeground': balaoEscuro.realce,
+      'editorSuggestWidget.focusHighlightForeground': balaoEscuro.realceSelecionado,
+      'editorHoverWidget.background': balaoEscuro.fundo,
+      'editorHoverWidget.border': balaoEscuro.borda,
       'scrollbarSlider.background': '#ffffff18',
       'scrollbarSlider.hoverBackground': '#ffffff28',
       'scrollbarSlider.activeBackground': '#ffffff38'
@@ -150,14 +159,19 @@ export function defineThemes(paletaId = PALETA_PADRAO): void {
       'editor.lineHighlightBackground': '#00000008',
       'editorCursor.foreground': `#${acento.claro}`,
       'editorIndentGuide.background1': '#eef0f3',
-      'editorWidget.background': '#ffffff',
-      'editorWidget.border': '#e2e5ea',
-      'editorSuggestWidget.background': '#ffffff',
-      'editorSuggestWidget.border': '#e2e5ea',
-      'editorSuggestWidget.selectedBackground': '#f1f3f6',
-      'editorSuggestWidget.highlightForeground': `#${acento.claro}`,
-      'editorHoverWidget.background': '#ffffff',
-      'editorHoverWidget.border': '#e2e5ea'
+      'editorWidget.background': balaoClaro.fundo,
+      'editorWidget.border': balaoClaro.borda,
+      'editorSuggestWidget.background': balaoClaro.fundo,
+      'editorSuggestWidget.border': balaoClaro.borda,
+      'editorSuggestWidget.foreground': balaoClaro.texto,
+      'editorSuggestWidget.selectedBackground': balaoClaro.selecaoFundo,
+      // A cor que faltava: sem ela, a linha em foco herdava texto BRANCO do
+      // tema base do VS Code e desaparecia na faixa clara.
+      'editorSuggestWidget.selectedForeground': balaoClaro.selecaoTexto,
+      'editorSuggestWidget.highlightForeground': balaoClaro.realce,
+      'editorSuggestWidget.focusHighlightForeground': balaoClaro.realceSelecionado,
+      'editorHoverWidget.background': balaoClaro.fundo,
+      'editorHoverWidget.border': balaoClaro.borda
     }
   })
 }
