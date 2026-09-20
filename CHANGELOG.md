@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 2.5.0 — 2026-09-20
+
+### Novidades
+
+- adicionar suporte a cores de balão no tema do editor e testes de contraste (40c8353)
+
 ## 2.4.0 — 2026-09-17
 
 ### Novidades
