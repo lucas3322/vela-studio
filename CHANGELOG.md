@@ -3,6 +3,12 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 2.6.0 — 2026-10-01
+
+### Novidades
+
+- add comprehensive tests for SSH tunneling and connection handling (e91c29d)
+
 ## 2.5.0 — 2026-09-20
 
 ### Novidades
