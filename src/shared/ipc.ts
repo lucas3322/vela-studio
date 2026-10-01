@@ -31,6 +31,7 @@ export const IPC = {
   connectionsSave: 'connections:save',
   connectionsRemove: 'connections:remove',
   connectionsTest: 'connections:test',
+  connectionsForgetSshHostKey: 'connections:forgetSshHostKey',
   connectionsOpen: 'connections:open',
   connectionsClose: 'connections:close',
 
@@ -88,7 +89,13 @@ export interface VelaApi {
     save(config: ConnectionConfig, savePassword: boolean): Promise<StoredConnection>
     remove(id: string): Promise<void>
     test(config: ConnectionConfig): Promise<TestResult>
-    open(config: ConnectionConfig): Promise<{ serverVersion?: string }>
+    /** Esquece a chave guardada do servidor SSH desta conexão (ver `SshTunnelConfig`). */
+    forgetSshHostKey(id: string): Promise<void>
+    /**
+     * `sessionTimeZone` é o fuso **efetivo** da sessão, para a status bar —
+     * pode diferir do pedido (MySQL sem tabelas de fuso cai para `-03:00`).
+     */
+    open(config: ConnectionConfig): Promise<{ serverVersion?: string; sessionTimeZone?: string }>
     close(id: string): Promise<void>
   }
   schema: {
@@ -159,7 +166,15 @@ export interface VelaApi {
   }
   app: {
     setTheme(theme: 'light' | 'dark' | 'system'): Promise<void>
-    pickFile(filters?: { name: string; extensions: string[] }[]): Promise<string | undefined>
+    pickFile(
+      filters?: { name: string; extensions: string[] }[],
+      /**
+       * `mostrarOcultos` existe por causa da chave SSH: ela mora em `~/.ssh`,
+       * pasta oculta no macOS. Sem isto o diálogo nem mostra a pasta, e a
+       * pessoa conclui que não tem chave nenhuma.
+       */
+      opcoes?: { pastaInicial?: string; mostrarOcultos?: boolean }
+    ): Promise<string | undefined>
     /**
      * Exporta o resultado **consultando o banco**, em fluxo, direto para o disco.
      *

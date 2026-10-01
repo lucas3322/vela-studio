@@ -30,6 +30,8 @@ import { IconChevronDown, IconChevronRight, IconCopy } from './Icons'
 
 interface Props {
   documentos: Array<Record<string, unknown>>
+  /** Fuso em que as datas aparecem — o mesmo da grade. Ver `fusoDoMongo`. */
+  fuso: string
   /** Documentos desenhados de uma vez; o resto entra conforme a rolagem. */
   lote?: number
   onNotify?: (mensagem: string, tipo?: 'success' | 'danger' | 'info') => void
@@ -39,6 +41,7 @@ const LOTE_PADRAO = 20
 
 export function MongoDocumentView({
   documentos,
+  fuso,
   lote = LOTE_PADRAO,
   onNotify
 }: Props): React.JSX.Element {
@@ -87,6 +90,7 @@ export function MongoDocumentView({
           key={indice}
           numero={indice + 1}
           documento={documento}
+          fuso={fuso}
           onCopiar={() => copiar(documento)}
         />
       ))}
@@ -103,13 +107,15 @@ export function MongoDocumentView({
 function Documento({
   numero,
   documento,
+  fuso,
   onCopiar
 }: {
   numero: number
   documento: Record<string, unknown>
+  fuso: string
   onCopiar: () => void
 }): React.JSX.Element {
-  const linhas = useMemo(() => campos(documento), [documento])
+  const linhas = useMemo(() => campos(documento, fuso), [documento, fuso])
 
   return (
     <article className="documento">

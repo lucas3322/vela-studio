@@ -1,5 +1,20 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC, type VelaApi } from '../shared/ipc'
+import { semEmbrulhoDoIpc } from '../shared/ipc-erro'
+
+/**
+ * `ipcRenderer.invoke` com a mensagem de erro limpa.
+ *
+ * Sem isto, todo erro do main chegava como "Error invoking remote method
+ * '<canal>': Error: …" — o main traduzia a mensagem para português e o
+ * Electron colava o nome técnico do canal na frente. Um lugar só, para nenhum
+ * canal novo esquecer.
+ */
+const invocar = (canal: string, ...args: unknown[]): Promise<any> =>
+  ipcRenderer.invoke(canal, ...args).catch((erro: unknown) => {
+    const limpo = new Error(semEmbrulhoDoIpc(erro instanceof Error ? erro.message : String(erro)))
+    throw limpo
+  })
 
 /**
  * Única superfície que o renderer enxerga do Node.
@@ -8,61 +23,62 @@ import { IPC, type VelaApi } from '../shared/ipc'
  */
 const api: VelaApi = {
   connections: {
-    list: () => ipcRenderer.invoke(IPC.connectionsList),
-    save: (config, savePassword) => ipcRenderer.invoke(IPC.connectionsSave, config, savePassword),
-    remove: (id) => ipcRenderer.invoke(IPC.connectionsRemove, id),
-    test: (config) => ipcRenderer.invoke(IPC.connectionsTest, config),
-    open: (config) => ipcRenderer.invoke(IPC.connectionsOpen, config),
-    close: (id) => ipcRenderer.invoke(IPC.connectionsClose, id)
+    list: () => invocar(IPC.connectionsList),
+    save: (config, savePassword) => invocar(IPC.connectionsSave, config, savePassword),
+    remove: (id) => invocar(IPC.connectionsRemove, id),
+    test: (config) => invocar(IPC.connectionsTest, config),
+    forgetSshHostKey: (id) => invocar(IPC.connectionsForgetSshHostKey, id),
+    open: (config) => invocar(IPC.connectionsOpen, config),
+    close: (id) => invocar(IPC.connectionsClose, id)
   },
   schema: {
-    databases: (id) => ipcRenderer.invoke(IPC.schemaDatabases, id),
-    tables: (id, database) => ipcRenderer.invoke(IPC.schemaTables, id, database),
-    columns: (id, table, database) => ipcRenderer.invoke(IPC.schemaColumns, id, table, database),
-    indexes: (id, table, database) => ipcRenderer.invoke(IPC.schemaIndexes, id, table, database),
-    relations: (id, table, database) => ipcRenderer.invoke(IPC.schemaRelations, id, table, database),
+    databases: (id) => invocar(IPC.schemaDatabases, id),
+    tables: (id, database) => invocar(IPC.schemaTables, id, database),
+    columns: (id, table, database) => invocar(IPC.schemaColumns, id, table, database),
+    indexes: (id, table, database) => invocar(IPC.schemaIndexes, id, table, database),
+    relations: (id, table, database) => invocar(IPC.schemaRelations, id, table, database),
     allRelations: (connectionId, database) =>
-      ipcRenderer.invoke(IPC.schemaAllRelations, connectionId, database),
-    loadAll: (id, database) => ipcRenderer.invoke(IPC.schemaLoadAll, id, database),
+      invocar(IPC.schemaAllRelations, connectionId, database),
+    loadAll: (id, database) => invocar(IPC.schemaLoadAll, id, database),
     createStatement: (id, table, database) =>
-      ipcRenderer.invoke(IPC.schemaCreateStatement, id, table, database),
+      invocar(IPC.schemaCreateStatement, id, table, database),
     dangerStatement: (id, kind, table) =>
-      ipcRenderer.invoke(IPC.schemaDangerStatement, id, kind, table),
-    alterColumnStatement: (params) => ipcRenderer.invoke(IPC.schemaAlterColumnStatement, params)
+      invocar(IPC.schemaDangerStatement, id, kind, table),
+    alterColumnStatement: (params) => invocar(IPC.schemaAlterColumnStatement, params)
   },
   data: {
-    updateCell: (params) => ipcRenderer.invoke(IPC.dataUpdateCell, params),
-    deleteRow: (params) => ipcRenderer.invoke(IPC.dataDeleteRow, params),
-    insertRow: (params) => ipcRenderer.invoke(IPC.dataInsertRow, params)
+    updateCell: (params) => invocar(IPC.dataUpdateCell, params),
+    deleteRow: (params) => invocar(IPC.dataDeleteRow, params),
+    insertRow: (params) => invocar(IPC.dataInsertRow, params)
   },
   query: {
-    run: (params) => ipcRenderer.invoke(IPC.queryRun, params),
-    cancel: (connectionId, queryId) => ipcRenderer.invoke(IPC.queryCancel, connectionId, queryId)
+    run: (params) => invocar(IPC.queryRun, params),
+    cancel: (connectionId, queryId) => invocar(IPC.queryCancel, connectionId, queryId)
   },
   history: {
-    list: (connectionId) => ipcRenderer.invoke(IPC.historyList, connectionId),
-    clear: () => ipcRenderer.invoke(IPC.historyClear)
+    list: (connectionId) => invocar(IPC.historyList, connectionId),
+    clear: () => invocar(IPC.historyClear)
   },
   saved: {
-    list: (connectionId) => ipcRenderer.invoke(IPC.savedList, connectionId),
-    save: (entrada) => ipcRenderer.invoke(IPC.savedSave, entrada),
-    remove: (id) => ipcRenderer.invoke(IPC.savedRemove, id)
+    list: (connectionId) => invocar(IPC.savedList, connectionId),
+    save: (entrada) => invocar(IPC.savedSave, entrada),
+    remove: (id) => invocar(IPC.savedRemove, id)
   },
   app: {
-    setTheme: (theme) => ipcRenderer.invoke(IPC.appTheme, theme),
-    pickFile: (filters) => ipcRenderer.invoke(IPC.appPickFile, filters),
-    exportQuery: (params) => ipcRenderer.invoke(IPC.appExportQuery, params),
-    exportResult: (params) => ipcRenderer.invoke(IPC.appExport, params),
-    importPreview: (params) => ipcRenderer.invoke(IPC.appImportPreview, params),
-    importRun: (params) => ipcRenderer.invoke(IPC.appImportRun, params),
-    importCancel: (importId) => ipcRenderer.invoke(IPC.appImportCancel, importId),
-    revealInFolder: (caminho) => ipcRenderer.invoke(IPC.appRevealInFolder, caminho),
+    setTheme: (theme) => invocar(IPC.appTheme, theme),
+    pickFile: (filters, opcoes) => invocar(IPC.appPickFile, filters, opcoes),
+    exportQuery: (params) => invocar(IPC.appExportQuery, params),
+    exportResult: (params) => invocar(IPC.appExport, params),
+    importPreview: (params) => invocar(IPC.appImportPreview, params),
+    importRun: (params) => invocar(IPC.appImportRun, params),
+    importCancel: (importId) => invocar(IPC.appImportCancel, importId),
+    revealInFolder: (caminho) => invocar(IPC.appRevealInFolder, caminho),
     platform: process.platform
   },
   update: {
-    check: () => ipcRenderer.invoke(IPC.updateCheck),
-    download: () => ipcRenderer.invoke(IPC.updateDownload),
-    openPage: () => ipcRenderer.invoke(IPC.updateOpenPage)
+    check: () => invocar(IPC.updateCheck),
+    download: () => invocar(IPC.updateDownload),
+    openPage: () => invocar(IPC.updateOpenPage)
   }
 }
 

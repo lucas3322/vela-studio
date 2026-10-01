@@ -152,6 +152,11 @@ export class RedisDriver implements DatabaseDriver {
     }
   }
 
+  /** Não se aplica: o Redis não tem tipo de data. */
+  sessionTimeZone(): string | undefined {
+    return undefined
+  }
+
   async serverVersion(): Promise<string | undefined> {
     const info = await this.require().info('server')
     return /redis_version:([^\r\n]+)/.exec(info)?.[1]?.trim()

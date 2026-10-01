@@ -11,6 +11,13 @@ import assert from 'node:assert/strict'
 import { test, before, after } from 'node:test'
 import { PostgresDriver } from './.postgres-bundle.mjs'
 
+/*
+  Fuso fixado em São Paulo para os testes de fuso horário no fim do arquivo
+  darem o mesmo resultado em qualquer máquina. O Node relê o fuso quando
+  `process.env.TZ` muda, inclusive o do `Intl` — que é o que a IDE usa.
+*/
+process.env.TZ = 'America/Sao_Paulo'
+
 const config = {
   id: 'test',
   name: 'test',
@@ -569,4 +576,61 @@ test('resyncSequence acha a sequência e a reajusta para o maior id da tabela', 
 test('resyncSequence devolve undefined para coluna que não é serial', async () => {
   const resultado = await driver.resyncSequence({ table: 'chave_reajustada', column: 'nome' })
   assert.equal(resultado, undefined)
+})
+
+// ── fuso horário ──────────────────────────────────────────────────────
+//
+// O bug: o parser do `pg` lia `timestamp` como hora do Mac e a tela imprimia
+// em UTC (10:00 aparecia 13:00), e o editor da célula vinha com
+// "2025-08-01T13:00:00.000Z" — que o PostgreSQL aceita em `timestamp` jogando
+// o `Z` fora. Abrir a célula e confirmar gravava 13:00. E a sessão no fuso do
+// servidor fazia o `timestamptz` digitado "10:00" virar 10:00 UTC.
+
+test('fuso · timestamp e date aparecem como gravados; timestamptz no fuso da sessão', async () => {
+  await driver.query('DROP TABLE IF EXISTS fuso_datas', { queryId: 'fz0' })
+  await driver.query(
+    'CREATE TABLE fuso_datas (id serial PRIMARY KEY, ts timestamp, tstz timestamptz, d date, criado timestamptz DEFAULT now())',
+    { queryId: 'fz1' }
+  )
+  await driver.insertRow({
+    table: 'fuso_datas',
+    values: { ts: '2025-08-01 10:00:00', tstz: '2025-08-01 10:00:00', d: '2025-08-01' }
+  })
+  const [r] = await driver.query('SELECT ts, tstz, d FROM fuso_datas', { queryId: 'fz2' })
+  // O deslocamento vai escrito: é o próprio PostgreSQL dizendo em que fuso está.
+  assert.deepEqual(r.rows[0], ['2025-08-01 10:00:00', '2025-08-01 10:00:00-03', '2025-08-01'])
+})
+
+test('fuso · o timestamptz digitado é hora de Brasília, não de UTC', async () => {
+  const servidor = new PostgresDriver()
+  await servidor.connect({ ...config, sessionTimeZone: 'server' })
+  const [r] = await servidor.query('SELECT tstz FROM fuso_datas', { queryId: 'fz3' })
+  assert.equal(r.rows[0][0], '2025-08-01 13:00:00+00')
+  assert.match(servidor.sessionTimeZone(), /\(servidor\)$/)
+  await servidor.disconnect()
+})
+
+test('fuso · abrir a célula e confirmar sem mudar nada não altera o valor', async () => {
+  // Era aqui que o dado se corrompia: +3h a cada edição, sem erro nenhum.
+  const [antes] = await driver.query('SELECT id, ts FROM fuso_datas', { queryId: 'fz4' })
+  const [id, ts] = antes.rows[0]
+  await driver.updateCell({ table: 'fuso_datas', column: 'ts', value: String(ts), keys: { id } })
+  const [depois] = await driver.query('SELECT ts FROM fuso_datas', { queryId: 'fz5' })
+  assert.equal(depois.rows[0][0], '2025-08-01 10:00:00')
+})
+
+test('fuso · now() aparece no relógio do computador', async () => {
+  const [r] = await driver.query('SELECT criado FROM fuso_datas', { queryId: 'fz6' })
+  const lido = new Date(String(r.rows[0][0]).replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00'))
+  assert.ok(Math.abs(lido.getTime() - Date.now()) < 120_000, `criado=${r.rows[0][0]}`)
+  assert.match(String(r.rows[0][0]), /-03$/)
+})
+
+test('fuso · toda conexão do pool nasce no mesmo fuso', async () => {
+  const lotes = await Promise.all(
+    [1, 2, 3, 4, 5, 6].map((i) => driver.query('SHOW timezone', { queryId: `fzp${i}` }))
+  )
+  const fusos = new Set(lotes.map(([r]) => r.rows[0][0]))
+  assert.deepEqual([...fusos], ['America/Sao_Paulo'])
+  assert.equal(driver.sessionTimeZone(), 'America/Sao_Paulo')
 })

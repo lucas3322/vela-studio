@@ -1,7 +1,14 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { app } from 'electron'
-import type { ConnectionConfig, HistoryEntry, SavedQuery, StoredConnection } from '../shared/types'
+import type {
+  ConnectionConfig,
+  HistoryEntry,
+  SavedQuery,
+  SshTunnelConfig,
+  StoredConnection,
+  StoredSshTunnel
+} from '../shared/types'
 import { cifrarSenha, decifrarSenha, ehFormatoAntigo } from './password-crypto'
 
 /**
@@ -109,7 +116,82 @@ export class ConnectionStore {
     if (!this.senhasNaMemoria.has(id)) {
       this.senhasNaMemoria.set(id, this.decrypt(encryptedPassword))
     }
-    return { ...rest, password: this.senhasNaMemoria.get(id) }
+    const { ssh, ...semSsh } = rest
+    return {
+      ...semSsh,
+      password: this.senhasNaMemoria.get(id),
+      ssh: ssh ? this.sshDecifrado(ssh as StoredSshTunnel) : undefined
+    }
+  }
+
+  /** O túnel com os segredos em texto, só para o main abrir a conexão. */
+  private sshDecifrado(ssh: StoredSshTunnel): SshTunnelConfig {
+    const { encryptedPassword, encryptedPassphrase, ...resto } = ssh
+    return {
+      ...resto,
+      password: this.decrypt(encryptedPassword),
+      passphrase: this.decrypt(encryptedPassphrase)
+    }
+  }
+
+  /**
+   * Os segredos do túnel para gravar.
+   *
+   * Campo vazio no formulário quer dizer "mantenha o que já está guardado" — é
+   * a mesma regra da senha do banco, porque o formulário nunca recebe a senha
+   * de volta e sempre abre com o campo em branco.
+   *
+   * A impressão digital da chave do servidor cai quando o host ou a porta do
+   * SSH mudam: ela é do servidor antigo, e mantê-la faria o servidor novo ser
+   * recusado como se fosse um impostor.
+   */
+  private sshParaGravar(
+    ssh: SshTunnelConfig,
+    anterior: StoredSshTunnel | undefined,
+    guardarSegredos: boolean
+  ): StoredSshTunnel {
+    const { password, passphrase, hasPassword: _a, hasPassphrase: _b, ...resto } = ssh
+    const mesmoServidor =
+      anterior && anterior.host === ssh.host && (anterior.port || 22) === (ssh.port || 22)
+    return {
+      ...resto,
+      hostKeyFingerprint: mesmoServidor ? anterior?.hostKeyFingerprint : undefined,
+      encryptedPassword: guardarSegredos
+        ? this.encrypt(password) ?? anterior?.encryptedPassword
+        : undefined,
+      encryptedPassphrase: guardarSegredos
+        ? this.encrypt(passphrase) ?? anterior?.encryptedPassphrase
+        : undefined
+    }
+  }
+
+  /**
+   * Guarda a chave do servidor SSH na primeira conexão bem-sucedida.
+   *
+   * Nunca sobrescreve uma guardada: se a chave mudou, a conexão já foi
+   * recusada antes de chegar aqui, e trocar em silêncio seria justamente
+   * aceitar o servidor que a verificação existe para barrar.
+   */
+  guardarChaveSsh(id: string, impressao: string): void {
+    const registro = this.connections.find((c) => c.id === id)
+    const ssh = registro?.ssh as StoredSshTunnel | undefined
+    if (!ssh || ssh.hostKeyFingerprint) return
+    ssh.hostKeyFingerprint = impressao
+    this.write(this.connectionsPath, this.connections)
+  }
+
+  /** "Esquecer a chave": o próximo servidor que responder passa a ser o confiável. */
+  esquecerChaveSsh(id: string): void {
+    const ssh = this.connections.find((c) => c.id === id)?.ssh as StoredSshTunnel | undefined
+    if (!ssh) return
+    delete ssh.hostKeyFingerprint
+    this.write(this.connectionsPath, this.connections)
+  }
+
+  /** A impressão digital guardada — a do disco, que o renderer não consegue alterar. */
+  chaveSshGuardada(id: string): { host?: string; port?: number; impressao?: string } | undefined {
+    const ssh = this.connections.find((c) => c.id === id)?.ssh as StoredSshTunnel | undefined
+    return ssh ? { host: ssh.host, port: ssh.port, impressao: ssh.hostKeyFingerprint } : undefined
   }
 
   save(config: ConnectionConfig, savePassword = true): StoredConnection {
@@ -121,11 +203,15 @@ export class ConnectionStore {
       hasPassword?: boolean
     }
     const existing = this.connections.find((c) => c.id === config.id)
+    const { ssh, ...semSsh } = rest
     const stored: StoredConnection = {
-      ...rest,
+      ...semSsh,
       createdAt: existing?.createdAt ?? Date.now(),
       encryptedPassword: savePassword
         ? this.encrypt(password) ?? existing?.encryptedPassword
+        : undefined,
+      ssh: ssh
+        ? this.sshParaGravar(ssh, existing?.ssh as StoredSshTunnel | undefined, savePassword)
         : undefined
     }
     this.senhasNaMemoria.delete(config.id)
@@ -141,8 +227,13 @@ export class ConnectionStore {
   }
 
   /** Versão segura de um registro: sem o cifrado, com o sinal que a UI usa. */
-  private paraUI({ encryptedPassword, ...rest }: StoredConnection): StoredConnection {
-    return { ...rest, hasPassword: !!encryptedPassword }
+  private paraUI({ encryptedPassword, ssh, ...rest }: StoredConnection): StoredConnection {
+    let sshParaUI: SshTunnelConfig | undefined
+    if (ssh) {
+      const { encryptedPassword: senha, encryptedPassphrase: frase, ...resto } = ssh as StoredSshTunnel
+      sshParaUI = { ...resto, hasPassword: !!senha, hasPassphrase: !!frase }
+    }
+    return { ...rest, hasPassword: !!encryptedPassword, ssh: sshParaUI }
   }
 
   remove(id: string): void {

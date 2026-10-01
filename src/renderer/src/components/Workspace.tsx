@@ -11,6 +11,7 @@ import { ErrorPanel } from './ErrorPanel'
 import { HelpPanel } from './HelpPanel'
 import { TableView } from './TableView'
 import { MongoDocumentView } from './MongoDocumentView'
+import { fusoDoMongo } from '@shared/datas'
 import { ModelDiagram } from './ModelDiagram'
 import { WelcomeScreen } from './WelcomeScreen'
 import { ExportChoiceDialog } from './ExportChoiceDialog'
@@ -486,7 +487,7 @@ function QueryPane({ tabId }: { tabId: string }): React.JSX.Element | null {
         )}
 
         {!tab.running && result && comoDocumento && result.documents && (
-          <MongoDocumentView documentos={result.documents} onNotify={notify} />
+          <MongoDocumentView documentos={result.documents} fuso={fusoDoMongo(conexao)} onNotify={notify} />
         )}
         {!tab.running && result && !comoDocumento && (
           <GradeDoResultado tab={tab} result={result} />

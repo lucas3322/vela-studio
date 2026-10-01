@@ -12,6 +12,7 @@ import type {
 } from '../../shared/types'
 import { DEFAULT_MAX_ROWS, PREVIEW_ROWS, type DatabaseDriver, type QueryOptions } from './types'
 import { toGrid } from './value-types'
+import { fusoDoMongo } from '../../shared/datas'
 import { opcoesDeBusca, parseMongoCommand, splitMongoCommands, type MongoPlan } from './mongo-parser'
 
 /** Operações que alteram dados — bloqueadas no modo somente-leitura. */
@@ -94,6 +95,14 @@ export class MongoDriver implements DatabaseDriver {
     } finally {
       await client.close().catch(() => undefined)
     }
+  }
+
+  /**
+   * O MongoDB não tem fuso de sessão: é o relógio em que a IDE mostra e lê as
+   * datas dele. `UTC` quando a conexão pede o do servidor — ver `fusoDoMongo`.
+   */
+  sessionTimeZone(): string | undefined {
+    return this.config ? fusoDoMongo(this.config) : undefined
   }
 
   async serverVersion(): Promise<string | undefined> {
@@ -365,7 +374,7 @@ export class MongoDriver implements DatabaseDriver {
       if (Array.isArray(outcome)) {
         const truncated = outcome.length > maxRows
         const rows = truncated ? outcome.slice(0, maxRows) : outcome
-        const { columns, matrix } = toGrid(rows as Record<string, unknown>[])
+        const { columns, matrix } = toGrid(rows as Record<string, unknown>[], undefined, fusoDoMongo(this.config))
         results.push({
           columns,
           rows: matrix,
@@ -376,7 +385,7 @@ export class MongoDriver implements DatabaseDriver {
           documents: emEjson(rows as Record<string, unknown>[])
         })
       } else if (outcome && typeof outcome === 'object') {
-        const { columns, matrix } = toGrid([outcome as Record<string, unknown>])
+        const { columns, matrix } = toGrid([outcome as Record<string, unknown>], undefined, fusoDoMongo(this.config))
         results.push({
           columns,
           rows: matrix,

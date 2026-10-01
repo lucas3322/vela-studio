@@ -12,6 +12,8 @@ import {
   IconWarning
 } from './Icons'
 import { needsPassword } from '../utils/connection'
+import { fusoDoComputador } from '@shared/datas'
+import { SshTunnelFields } from './SshTunnelFields'
 
 function emptyConfig(driver: DriverId = 'mysql'): ConnectionConfig {
   return {
@@ -432,6 +434,55 @@ export function ConnectionModal(): React.JSX.Element {
                     onChange={(e) => update({ database: e.target.value })}
                   />
                 </div>
+              )}
+
+              {/*
+                Fuso só onde existe data com fuso: SQLite guarda data como texto
+                ou número, e o Redis não tem tipo de data nenhum.
+              */}
+              {(config.driver === 'mysql' ||
+                config.driver === 'postgres' ||
+                config.driver === 'mongodb') && (
+                <div className="field">
+                  <span className="field__label">Fuso horário das datas</span>
+                  <select
+                    className="input"
+                    value={config.sessionTimeZone ?? 'local'}
+                    onChange={(e) =>
+                      update({ sessionTimeZone: e.target.value as 'local' | 'server' })
+                    }
+                  >
+                    <option value="local">O deste computador ({fusoDoComputador()})</option>
+                    <option value="server">
+                      {config.driver === 'mongodb' ? 'UTC' : 'O do servidor'}
+                    </option>
+                  </select>
+                  <span className="field__hint">
+                    {config.driver === 'mongodb'
+                      ? 'O MongoDB guarda toda data em UTC. Aqui você escolhe em que hora ela aparece — e em que hora é lida a data que você digita num filtro.'
+                      : (config.sessionTimeZone ?? 'local') === 'local'
+                        ? 'TIMESTAMP, NOW() e CURRENT_TIMESTAMP na hora deste computador. Se a sua aplicação grava DATETIME em UTC, escolha o do servidor — senão as linhas criadas pela IDE ficam em outro fuso que as da aplicação.'
+                        : 'TIMESTAMP, NOW() e CURRENT_TIMESTAMP na hora configurada no servidor — em nuvem e Docker, quase sempre UTC.'}
+                  </span>
+                </div>
+              )}
+
+              {/* Túnel não se aplica ao SQLite: o banco é um arquivo deste computador. */}
+              {config.driver !== 'sqlite' && (
+                <SshTunnelFields
+                  ssh={config.ssh}
+                  onChange={(ssh) => update({ ssh })}
+                  // Pelo id, não por `existing`: aberto pelo "Editar" da lista, o
+                  // `existing` fica vazio e o botão sumia de uma conexão salva.
+                  podeEsquecerChave={saved.some((c) => c.id === config.id)}
+                  onEsquecerChave={() => {
+                    void window.vela.connections.forgetSshHostKey(config.id).then(() => {
+                      if (config.ssh) update({ ssh: { ...config.ssh, hostKeyFingerprint: undefined } })
+                      void refreshSaved()
+                      notify('Chave do servidor SSH esquecida. A próxima conexão guarda a nova.', 'info')
+                    })
+                  }}
+                />
               )}
 
               <div style={{ display: 'flex', gap: 'var(--space-5)', flexWrap: 'wrap' }}>

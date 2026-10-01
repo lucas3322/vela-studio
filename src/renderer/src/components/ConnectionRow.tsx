@@ -2,6 +2,7 @@ import { DRIVERS, type StoredConnection } from '@shared/types'
 import { useAppStore } from '../store/app'
 import { corDaConexao } from '../styles/connection-colors'
 import { IconDatabase, IconEdit, IconTrash } from './Icons'
+import { destinoDaConexao } from '../utils/destino'
 
 interface Props {
   connection: StoredConnection
@@ -41,11 +42,7 @@ export function ConnectionRow({
   const temAcoes = !!onEdit || !!onRemove
   const tema = useAppStore((s) => s.resolvedTheme)
   const cor = corDaConexao(connection.color, tema)
-  const destino =
-    connection.filePath ??
-    `${connection.host ?? 'localhost'}${connection.port ? `:${connection.port}` : ''}${
-      connection.database ? `/${connection.database}` : ''
-    }`
+  const destino = destinoDaConexao(connection, { comBanco: true })
 
   return (
     /*

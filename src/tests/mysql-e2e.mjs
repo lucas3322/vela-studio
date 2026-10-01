@@ -17,6 +17,13 @@ import assert from 'node:assert/strict'
 import { test, before, after } from 'node:test'
 import { MySQLDriver } from './.mysql-bundle.mjs'
 
+/*
+  Fuso fixado em São Paulo para os testes de fuso horário no fim do arquivo
+  darem o mesmo resultado em qualquer máquina. O Node relê o fuso quando
+  `process.env.TZ` muda, inclusive o do `Intl` — que é o que a IDE usa.
+*/
+process.env.TZ = 'America/Sao_Paulo'
+
 const config = {
   id: 'test',
   name: 'test',
@@ -428,10 +435,14 @@ test('NULL atravessa como null', async () => {
   assert.equal(result.rows[0][0], null)
 })
 
-test('DATETIME é serializado como string ISO', async () => {
+test('DATETIME é serializado como o texto que o MySQL guarda', async () => {
+  // Este teste afirmava o formato ISO (`...T13:00:00.000Z`), e era exatamente o
+  // bug de fuso: o ISO vinha de um `Date` montado no fuso do Mac e impresso em
+  // UTC. O que atravessa o IPC agora é o texto do banco, sem conversão.
   const [result] = await driver.query('SELECT criado_em FROM clientes LIMIT 1', { queryId: 'q5' })
   assert.equal(typeof result.rows[0][0], 'string')
-  assert.match(result.rows[0][0], /^\d{4}-\d{2}-\d{2}T/)
+  assert.match(result.rows[0][0], /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+  assert.equal(result.columns[0].type, 'date', 'continua sendo coluna de data para a grade')
 })
 
 test('colunas homônimas de JOIN não se sobrescrevem', async () => {
@@ -742,4 +753,79 @@ test('maxRows do chamador continua sendo teto absoluto', async () => {
     previewRows: 50
   })
   assert.equal(r.rowCount, 300)
+})
+
+// ── fuso horário ──────────────────────────────────────────────────────
+//
+// O bug: o driver convertia DATETIME num `Date` no fuso do Mac e a tela
+// imprimia em UTC — o "10:00" gravado aparecia 13:00, a coluna DATE ganhava
+// um "03:00" inventado, e editar a célula mandava de volta um ISO com `Z` que o
+// MySQL recusa. E a sessão ficava no fuso do servidor (UTC): um TIMESTAMP
+// digitado "10:00" por quem está em Brasília era gravado como 10:00 UTC.
+
+const minutosDeDiferenca = (texto, agora) => {
+  const [data, hora] = texto.split(' ')
+  const [a, m, d] = data.split('-').map(Number)
+  const [h, mi, se] = hora.split(':').map(Number)
+  const lido = new Date(a, m - 1, d, h, mi, Math.floor(se))
+  return Math.abs(lido.getTime() - agora.getTime()) / 60000
+}
+
+test('fuso · DATETIME, TIMESTAMP e DATE aparecem exatamente como digitados', async () => {
+  await driver.query('DROP TABLE IF EXISTS fuso_datas', { queryId: 'fz0' })
+  await driver.query(
+    `CREATE TABLE fuso_datas (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      dt DATETIME NULL, ts TIMESTAMP NULL, d DATE NULL,
+      criado DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+    { queryId: 'fz1' }
+  )
+  await driver.insertRow({
+    table: 'fuso_datas',
+    values: { dt: '2025-08-01 10:00:00', ts: '2025-08-01 10:00:00', d: '2025-08-01' }
+  })
+  const [r] = await driver.query('SELECT dt, ts, d FROM fuso_datas', { queryId: 'fz2' })
+  assert.deepEqual(r.rows[0], ['2025-08-01 10:00:00', '2025-08-01 10:00:00', '2025-08-01'])
+})
+
+test('fuso · o TIMESTAMP digitado é hora de Brasília, não de UTC', async () => {
+  // Visto de uma sessão no fuso do servidor (UTC), o "10:00" de Brasília é 13:00.
+  // Antes da correção ele aparecia 10:00 aqui também — gravado como UTC.
+  const servidor = new MySQLDriver()
+  await servidor.connect({ ...config, sessionTimeZone: 'server' })
+  const [r] = await servidor.query('SELECT ts FROM fuso_datas', { queryId: 'fz3' })
+  assert.equal(r.rows[0][0], '2025-08-01 13:00:00')
+  assert.match(servidor.sessionTimeZone(), /\(servidor\)$/)
+  await servidor.disconnect()
+})
+
+test('fuso · abrir a célula e confirmar sem mudar nada não altera o valor', async () => {
+  const [antes] = await driver.query('SELECT id, dt FROM fuso_datas', { queryId: 'fz4' })
+  const [id, dt] = antes.rows[0]
+  // O editor da célula vem preenchido com String(valor).
+  await driver.updateCell({ table: 'fuso_datas', column: 'dt', value: String(dt), keys: { id } })
+  const [depois] = await driver.query('SELECT dt FROM fuso_datas', { queryId: 'fz5' })
+  assert.equal(depois.rows[0][0], '2025-08-01 10:00:00')
+})
+
+test('fuso · CURRENT_TIMESTAMP gravado pela IDE é o relógio do computador', async () => {
+  const [r] = await driver.query('SELECT criado FROM fuso_datas', { queryId: 'fz6' })
+  assert.ok(
+    minutosDeDiferenca(r.rows[0][0], new Date()) < 2,
+    `criado=${r.rows[0][0]}, agora=${new Date().toString()}`
+  )
+})
+
+test('fuso · toda conexão do pool nasce no mesmo fuso', async () => {
+  // Um SET feito numa conexão só vale para ela. Consultas em paralelo forçam o
+  // pool a abrir conexões novas — todas têm que estar no fuso pedido.
+  const lotes = await Promise.all(
+    [1, 2, 3, 4, 5, 6].map((i) => driver.query('SELECT @@session.time_zone', { queryId: `fzp${i}` }))
+  )
+  const fusos = new Set(lotes.map(([r]) => r.rows[0][0]))
+  assert.equal(fusos.size, 1, [...fusos].join(', '))
+  // O nome, ou o deslocamento quando o servidor não tem as tabelas de fuso.
+  assert.ok(['America/Sao_Paulo', '-03:00'].includes([...fusos][0]))
+  assert.equal(driver.sessionTimeZone(), [...fusos][0], 'a status bar mostra o fuso que vale')
 })

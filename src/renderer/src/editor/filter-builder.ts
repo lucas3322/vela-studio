@@ -1,4 +1,5 @@
 import type { Dialect } from '@shared/types'
+import { fusoDoComputador, paraIsoComDeslocamento } from '../../../shared/datas.ts'
 
 /**
  * Monta a cláusula `WHERE` da barra de filtro rápido.
@@ -166,11 +167,31 @@ export function montarWhere(condicoes: Condicao[], dialect: Dialect): string {
  * O driver já amostra os documentos e sabe o tipo de cada campo. Usar isso é a
  * própria tese do produto: a IDE conhece o schema e usa o que conhece.
  */
-export function valorParaMongo(bruto: string, tipoDoCampo?: string): string {
+export function valorParaMongo(
+  bruto: string,
+  tipoDoCampo?: string,
+  fuso: string = fusoDoComputador()
+): string {
   const limpo = bruto.trim()
   const tipos = (tipoDoCampo ?? '').split('|').map((t) => t.trim().toLowerCase())
   const temTexto = tipos.includes('string')
   const temNumero = tipos.includes('number')
+
+  /*
+    Campo de data: o valor vira `ISODate(...)`, não texto.
+
+    Comparar `"2025-08-01 00:00:00"` com um campo `Date` não dá erro — o Mongo
+    ordena por tipo antes de ordenar por valor, e texto nunca é "maior" que
+    data. O filtro voltava vazio e dizia "executado com sucesso".
+
+    O texto digitado é lido no mesmo fuso em que a grade mostra as datas, e o
+    deslocamento vai **escrito** na prévia (`-03:00`): filtrar pelo valor que se
+    está vendo na tela acha exatamente aquele documento.
+  */
+  if (tipos.includes('date') && !temTexto) {
+    const iso = paraIsoComDeslocamento(limpo, fuso)
+    if (iso) return `ISODate(${JSON.stringify(iso)})`
+  }
 
   // Campo declaradamente de texto: cita sempre, mesmo parecendo número. É o
   // caso do MSISDN que motivou tudo.
@@ -193,48 +214,108 @@ function tipoMisto(tipoDoCampo: string | undefined, bruto: string): boolean {
   return tipos.includes('string') && tipos.includes('number') && ehNumero(bruto.trim())
 }
 
-/** Filtro equivalente para o MongoDB, já como texto do `find()`. */
+/**
+ * O que uma condição exige do campo: um valor exato, ou uma lista de operadores.
+ *
+ * Separado do texto final porque duas condições sobre o **mesmo campo**
+ * precisam ser juntadas, e juntar texto pronto é o que causava o bug — ver
+ * `montarFiltroMongo`.
+ */
+type Exigencia = { valor: string } | { operadores: Array<[string, string]> }
+
+function exigenciaMongo(c: Condicao, tipo: string | undefined, fuso: string): Exigencia {
+  const escapar = (v: string): string => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const bruto = c.valor.trim()
+  const valor = valorParaMongo(bruto, tipo, fuso)
+  const ambos = `[${bruto}, ${JSON.stringify(bruto)}]`
+
+  switch (c.operador) {
+    case 'igual':
+      // Campo com os dois tipos na amostra: procura pelos dois. Um `$in`
+      // continua usando o índice, então não custa desempenho — e achar metade
+      // dos documentos seria pior do que demorar um pouco mais.
+      return tipoMisto(tipo, bruto) ? { operadores: [['$in', ambos]] } : { valor }
+    case 'diferente':
+      return tipoMisto(tipo, bruto)
+        ? { operadores: [['$nin', ambos]] }
+        : { operadores: [['$ne', valor]] }
+    case 'maior':
+      return { operadores: [['$gt', valor]] }
+    case 'menor':
+      return { operadores: [['$lt', valor]] }
+    case 'contem':
+      return { operadores: [['$regex', JSON.stringify(escapar(bruto))]] }
+    case 'comeca':
+      return { operadores: [['$regex', JSON.stringify('^' + escapar(bruto))]] }
+    case 'termina':
+      return { operadores: [['$regex', JSON.stringify(escapar(bruto) + '$')]] }
+    case 'vazio':
+      return { valor: 'null' }
+    case 'naoVazio':
+      return { operadores: [['$ne', 'null']] }
+  }
+}
+
+function comoTexto(exigencia: Exigencia): string {
+  if ('valor' in exigencia) return exigencia.valor
+  return `{ ${exigencia.operadores.map(([op, v]) => `${op}: ${v}`).join(', ')} }`
+}
+
+/**
+ * Filtro equivalente para o MongoDB, já como texto do `find()`.
+ *
+ * ## Duas condições no mesmo campo
+ *
+ * "Data maior que 01/08 **e** menor que 31/08" são duas condições no mesmo
+ * campo. Escritas uma ao lado da outra, viravam
+ * `{ "DATA": { $gt: … }, "DATA": { $lt: … } }` — chave repetida num objeto, e
+ * a segunda **apaga** a primeira. O `$gt` sumia calado: o filtro devolvia tudo
+ * até o dia 31, desde o começo da coleção.
+ *
+ * Agora as condições do mesmo campo se juntam num objeto só
+ * (`{ $gt: …, $lt: … }`). Quando não dá para juntar — duas vezes o mesmo
+ * operador, ou um valor exato ao lado de um operador —, vão para um `$and`,
+ * que é a forma que nunca perde nada.
+ */
 export function montarFiltroMongo(
   condicoes: Condicao[],
-  tiposPorCampo: Record<string, string> = {}
+  tiposPorCampo: Record<string, string> = {},
+  fuso: string = fusoDoComputador()
 ): string {
   const usaveis = condicoes.filter(condicaoUsavel)
   if (usaveis.length === 0) return '{}'
 
-  const escapar = (v: string): string => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const partes = usaveis.map((c) => {
-    const chave = JSON.stringify(c.coluna)
-    const bruto = c.valor.trim()
-    const tipo = tiposPorCampo[c.coluna]
-    const valor = valorParaMongo(bruto, tipo)
+  // Agrupadas por campo, na ordem em que o campo apareceu pela primeira vez.
+  const porCampo = new Map<string, Exigencia[]>()
+  for (const c of usaveis) {
+    const lista = porCampo.get(c.coluna) ?? []
+    lista.push(exigenciaMongo(c, tiposPorCampo[c.coluna], fuso))
+    porCampo.set(c.coluna, lista)
+  }
 
-    // Campo com os dois tipos na amostra: procura pelos dois. Um `$in` continua
-    // usando o índice, então não custa desempenho — e achar metade dos
-    // documentos seria pior do que demorar um pouco mais.
-    const ambos = `{ $in: [${bruto}, ${JSON.stringify(bruto)}] }`
+  const partes: string[] = []
+  const conjuncao: string[] = []
 
-    switch (c.operador) {
-      case 'igual':
-        return tipoMisto(tipo, bruto) ? `${chave}: ${ambos}` : `${chave}: ${valor}`
-      case 'diferente':
-        return tipoMisto(tipo, bruto)
-          ? `${chave}: { $nin: [${bruto}, ${JSON.stringify(bruto)}] }`
-          : `${chave}: { $ne: ${valor} }`
-      case 'maior':
-        return `${chave}: { $gt: ${valor} }`
-      case 'menor':
-        return `${chave}: { $lt: ${valor} }`
-      case 'contem':
-        return `${chave}: { $regex: ${JSON.stringify(escapar(bruto))} }`
-      case 'comeca':
-        return `${chave}: { $regex: ${JSON.stringify('^' + escapar(bruto))} }`
-      case 'termina':
-        return `${chave}: { $regex: ${JSON.stringify(escapar(bruto) + '$')} }`
-      case 'vazio':
-        return `${chave}: null`
-      case 'naoVazio':
-        return `${chave}: { $ne: null }`
+  for (const [campo, exigencias] of porCampo) {
+    const chave = JSON.stringify(campo)
+    if (exigencias.length === 1) {
+      partes.push(`${chave}: ${comoTexto(exigencias[0])}`)
+      continue
     }
-  })
+
+    const soOperadores = exigencias.every((e) => 'operadores' in e)
+    const pares = soOperadores
+      ? exigencias.flatMap((e) => ('operadores' in e ? e.operadores : []))
+      : []
+    const operadoresDistintos = new Set(pares.map(([op]) => op)).size === pares.length
+
+    if (soOperadores && operadoresDistintos) {
+      partes.push(`${chave}: ${comoTexto({ operadores: pares })}`)
+    } else {
+      for (const e of exigencias) conjuncao.push(`{ ${chave}: ${comoTexto(e)} }`)
+    }
+  }
+
+  if (conjuncao.length > 0) partes.push(`$and: [${conjuncao.join(', ')}]`)
   return `{ ${partes.join(', ')} }`
 }

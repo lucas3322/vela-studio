@@ -1,4 +1,5 @@
 import type { QueryColumn } from '../../shared/types'
+import { formatarInstante } from '../../shared/datas'
 
 /**
  * O grid alinha números à direita, pinta datas e colapsa JSON.
@@ -32,12 +33,23 @@ export function typeFromDeclared(declared: string | undefined): QueryColumn['typ
 
 /**
  * Serializa um valor para atravessar o IPC.
- * Datas viram ISO, Buffers viram um resumo legível, BigInt vira string —
- * structured clone não passa BigInt e o renderer não precisa do valor bruto.
+ * Buffers viram um resumo legível, BigInt vira string — structured clone não
+ * passa BigInt e o renderer não precisa do valor bruto.
+ *
+ * ## Datas
+ *
+ * Com `fuso`, um `Date` vira o relógio de parede daquele fuso
+ * (`2025-08-01 07:00:00`) — é como o MongoDB aparece na grade, no fuso da
+ * conexão. Sem `fuso`, vira ISO em UTC, com o `Z` que diz isso.
+ *
+ * Os drivers SQL não mandam mais `Date` nenhum: data de MySQL e PostgreSQL
+ * volta como o texto que o banco imprimiu, porque converter para `Date` era o
+ * bug — ver `src/shared/datas.ts`. O ramo sem fuso fica como rede de
+ * segurança, e com o `Z` à vista para não se passar por hora local.
  */
-export function serializeValue(value: unknown): unknown {
+export function serializeValue(value: unknown, fuso?: string): unknown {
   if (value === null || value === undefined) return null
-  if (value instanceof Date) return value.toISOString()
+  if (value instanceof Date) return fuso ? formatarInstante(value, fuso) : value.toISOString()
   if (typeof value === 'bigint') return value.toString()
   if (Buffer.isBuffer(value)) {
     return `0x${value.subarray(0, 32).toString('hex')}${value.length > 32 ? '…' : ''}`
@@ -47,7 +59,17 @@ export function serializeValue(value: unknown): unknown {
   }
   if (typeof value === 'object') {
     try {
-      return JSON.parse(JSON.stringify(value, (_k, v) => (typeof v === 'bigint' ? v.toString() : v)))
+      // `function`, não seta: o `this` do replacer é o objeto que contém a
+      // chave, e `this[k]` ainda é o `Date` original — o `v` já chega
+      // convertido pelo `toJSON` dele, em UTC. Sem isso, a data de dentro de um
+      // subdocumento sairia em UTC ao lado da de fora, no fuso da conexão.
+      return JSON.parse(
+        JSON.stringify(value, function (this: Record<string, unknown>, k, v) {
+          const original = this[k]
+          if (fuso && original instanceof Date) return formatarInstante(original, fuso)
+          return typeof v === 'bigint' ? v.toString() : v
+        })
+      )
     } catch {
       return String(value)
     }
@@ -75,13 +97,17 @@ export function toGridFromArrays(
       typeFromDeclared(declaredTypes?.[index]) ??
       inferColumnType(sample.map((row) => row[index]))
   }))
-  return { columns, matrix: rows.map((row) => row.map(serializeValue)) }
+  // Seta explícita: `row.map(serializeValue)` passaria o índice da coluna
+  // como segundo argumento, que agora é o fuso.
+  return { columns, matrix: rows.map((row) => row.map((valor) => serializeValue(valor))) }
 }
 
 /** Converte um array de objetos (formato de driver de documentos) na matriz do grid. */
 export function toGrid(
   rows: Record<string, unknown>[],
-  declaredTypes?: Record<string, string>
+  declaredTypes?: Record<string, string>,
+  /** Fuso em que as datas aparecem. Só o MongoDB passa — ver `serializeValue`. */
+  fuso?: string
 ): { columns: QueryColumn[]; matrix: unknown[][] } {
   if (rows.length === 0) return { columns: [], matrix: [] }
 
@@ -104,6 +130,6 @@ export function toGrid(
       inferColumnType(rows.slice(0, 50).map((r) => r[name]))
   }))
 
-  const matrix = rows.map((row) => names.map((name) => serializeValue(row[name])))
+  const matrix = rows.map((row) => names.map((name) => serializeValue(row[name], fuso)))
   return { columns, matrix }
 }

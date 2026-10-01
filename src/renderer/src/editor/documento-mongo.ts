@@ -10,6 +10,8 @@
  * objeto e lista, os filhos já interpretados.
  */
 
+import { formatarInstante } from '../../../shared/datas.ts'
+
 export type TipoDeValor =
   | 'objectid'
   | 'data'
@@ -63,20 +65,19 @@ function comoTexto(valor: unknown): string {
 }
 
 /**
- * A data como a grade também a mostra: `AAAA-MM-DD HH:MM:SS`, sem converter
- * para o fuso local.
+ * A data no mesmo relógio em que a grade a mostra: o fuso da conexão.
  *
- * Converter seria pior do que parece: o documento guarda um instante em UTC, e
- * mostrar a hora local sem dizer que é local faz duas telas do mesmo dado
- * discordarem — a grade dizendo 14:07 e esta dizendo 11:07, sem nada
- * explicando a diferença.
+ * As duas telas têm que concordar. Antes as duas mostravam UTC sem dizer — e a
+ * pessoa lia como hora de Brasília. Agora as duas mostram o fuso da conexão
+ * (o do computador, por padrão), e o instante exato em UTC fica no `detalhe`,
+ * a um hover de distância.
  */
-function dataLegivel(iso: string): string {
-  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/.exec(iso)
-  return match ? `${match[1]} ${match[2]}` : iso
+function dataLegivel(iso: string, fuso: string): string {
+  const instante = new Date(iso)
+  return Number.isNaN(instante.getTime()) ? iso : formatarInstante(instante, fuso)
 }
 
-export function interpretarValor(valor: unknown): ValorDoDocumento {
+export function interpretarValor(valor: unknown, fuso = 'UTC'): ValorDoDocumento {
   if (valor === null || valor === undefined) return { tipo: 'nulo', texto: 'null' }
 
   if (typeof valor === 'string') return { tipo: 'texto', texto: `"${valor}"`, detalhe: valor }
@@ -86,7 +87,7 @@ export function interpretarValor(valor: unknown): ValorDoDocumento {
   if (Array.isArray(valor)) {
     const filhos = valor.map((item, indice) => ({
       chave: String(indice),
-      valor: interpretarValor(item)
+      valor: interpretarValor(item, fuso)
     }))
     return {
       tipo: 'lista',
@@ -106,7 +107,7 @@ export function interpretarValor(valor: unknown): ValorDoDocumento {
       }
       case '$date': {
         const iso = comoTexto(conteudo)
-        return { tipo: 'data', texto: dataLegivel(iso), detalhe: iso }
+        return { tipo: 'data', texto: dataLegivel(iso, fuso), detalhe: iso }
       }
       case '$numberLong':
       case '$numberInt':
@@ -145,7 +146,7 @@ export function interpretarValor(valor: unknown): ValorDoDocumento {
         break
     }
 
-    const filhos = campos(valor as Record<string, unknown>)
+    const filhos = campos(valor as Record<string, unknown>, fuso)
     return {
       tipo: 'objeto',
       texto: `{ ${filhos.length} ${filhos.length === 1 ? 'campo' : 'campos'} }`,
@@ -163,10 +164,10 @@ export function interpretarValor(valor: unknown): ValorDoDocumento {
  * mesma que o shell e o Compass mostram. Ordenar alfabeticamente aqui daria
  * uma tela mais bonita e um documento que não existe assim em lugar nenhum.
  */
-export function campos(documento: Record<string, unknown>): CampoDoDocumento[] {
+export function campos(documento: Record<string, unknown>, fuso = 'UTC'): CampoDoDocumento[] {
   return Object.entries(documento).map(([chave, valor]) => ({
     chave,
-    valor: interpretarValor(valor)
+    valor: interpretarValor(valor, fuso)
   }))
 }
 

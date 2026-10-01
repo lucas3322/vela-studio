@@ -55,3 +55,32 @@ services:
       interval: 3s
       timeout: 5s
       retries: 20
+
+  # Servidor SSH para os testes de túnel. Da rede interna do compose ele
+  # enxerga os bancos pelo nome do serviço (mysql:3306, postgres:5432, ...) —
+  # do mesmo jeito que um bastion enxerga o banco de produção, que de fora
+  # não está acessível. Senha e chave são de teste, só existem aqui.
+  ssh:
+    image: alpine:3.20
+    container_name: vela-ssh-test
+    command:
+      - sh
+      - -c
+      - >-
+        apk add --no-cache openssh >/dev/null &&
+        ssh-keygen -A &&
+        echo 'root:vela123' | chpasswd &&
+        sed -i
+        -e 's/^#\?PermitRootLogin.*/PermitRootLogin yes/'
+        -e 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/'
+        -e 's/^#\?AllowTcpForwarding.*/AllowTcpForwarding yes/'
+        /etc/ssh/sshd_config &&
+        mkdir -p /root/.ssh && chmod 700 /root/.ssh &&
+        exec /usr/sbin/sshd -D -e
+    ports:
+      - '22221:22'
+    healthcheck:
+      test: ['CMD', 'sh', '-c', 'nc -z 127.0.0.1 22']
+      interval: 3s
+      timeout: 5s
+      retries: 30

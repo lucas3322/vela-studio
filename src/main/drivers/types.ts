@@ -199,6 +199,16 @@ export interface DatabaseDriver {
 
   /** Versão do servidor, para exibir na status bar. */
   serverVersion(): Promise<string | undefined>
+
+  /**
+   * O fuso em que esta sessão está de fato trabalhando, para a status bar.
+   *
+   * O **efetivo**, não o pedido: no MySQL sem tabelas de fuso carregadas,
+   * `America/Sao_Paulo` é recusado e a sessão cai para `-03:00` — e a tela tem
+   * que dizer `-03:00`, porque é o que vale (e porque um deslocamento fixo não
+   * acompanha horário de verão). `undefined` onde fuso não se aplica.
+   */
+  sessionTimeZone(): string | undefined
 }
 
 /**

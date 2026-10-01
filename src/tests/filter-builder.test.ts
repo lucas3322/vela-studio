@@ -216,3 +216,88 @@ test('valorParaMongo decide sozinho, e é testável à parte', () => {
   assert.equal(valorParaMongo('123', 'ObjectId'), '123')
   assert.equal(valorParaMongo('  123  ', 'string'), '"123"', 'precisa aparar o espaço')
 })
+
+// ── datas e condições no mesmo campo (Mongo) ─────────────────────────────
+
+const SP = 'America/Sao_Paulo'
+
+test('campo de data vira ISODate com o deslocamento do fuso escrito', () => {
+  // Antes saía `$gt: "2025-08-01 00:00:00"` — texto comparado com Date, que no
+  // Mongo nunca casa. O filtro voltava vazio e dizia "sucesso".
+  assert.equal(
+    montarFiltroMongo([c('ACTIVATION_DATE', 'maior', '2025-08-01 00:00:00')], { ACTIVATION_DATE: 'date' }, SP),
+    '{ "ACTIVATION_DATE": { $gt: ISODate("2025-08-01T00:00:00-03:00") } }'
+  )
+})
+
+test('data digitada é lida no fuso pedido, não no da máquina', () => {
+  assert.equal(
+    valorParaMongo('2025-08-01', 'date', 'UTC'),
+    'ISODate("2025-08-01T00:00:00+00:00")'
+  )
+})
+
+test('texto que não tem forma de data continua texto, em vez de virar data inventada', () => {
+  assert.equal(valorParaMongo('ontem', 'date', SP), '"ontem"')
+})
+
+test('campo de texto que por acaso guarda datas não é convertido', () => {
+  // `string|date` na amostra: há documentos com texto ali, e converter perderia
+  // exatamente esses.
+  assert.equal(valorParaMongo('2025-08-01', 'string|date', SP), '"2025-08-01"')
+})
+
+test('maior E menor no mesmo campo: nenhuma das duas se perde', () => {
+  // O filtro dos usuários, do jeito que eles montam. Antes a chave aparecia
+  // duas vezes no mesmo objeto, e a segunda apagava a primeira: o `$gt` sumia
+  // calado e o filtro trazia tudo desde o começo da coleção até o dia 31.
+  const filtro = montarFiltroMongo(
+    [
+      c('PRODUCT', 'igual', 'MOT'),
+      c('PARENT_ID', 'igual', '10000'),
+      c('ACTIVATION_DATE', 'maior', '2025-08-01 00:00:00'),
+      c('ACTIVATION_DATE', 'menor', '2025-08-31 23:59:59')
+    ],
+    { PRODUCT: 'string', PARENT_ID: 'number', ACTIVATION_DATE: 'date' },
+    SP
+  )
+  assert.equal(
+    filtro,
+    '{ "PRODUCT": "MOT", "PARENT_ID": 10000, "ACTIVATION_DATE": { $gt: ISODate("2025-08-01T00:00:00-03:00"), $lt: ISODate("2025-08-31T23:59:59-03:00") } }'
+  )
+  assert.equal(filtro.match(/"ACTIVATION_DATE"/g)?.length, 1, 'a chave não pode se repetir')
+})
+
+test('o mesmo operador duas vezes vai para um $and, que não perde nada', () => {
+  const filtro = montarFiltroMongo(
+    [c('status', 'diferente', 'CANCELADO'), c('status', 'diferente', 'SUSPENSO')],
+    { status: 'string' }
+  )
+  assert.equal(
+    filtro,
+    '{ $and: [{ "status": { $ne: "CANCELADO" } }, { "status": { $ne: "SUSPENSO" } }] }'
+  )
+})
+
+test('valor exato ao lado de operador no mesmo campo também vai para o $and', () => {
+  const filtro = montarFiltroMongo(
+    [c('nome', 'igual', 'Ana'), c('nome', 'contem', 'an')],
+    { nome: 'string' }
+  )
+  assert.equal(filtro, '{ $and: [{ "nome": "Ana" }, { "nome": { $regex: "an" } }] }')
+})
+
+test('o filtro montado é um objeto válido, que o parser do Mongo aceita', async () => {
+  // A prévia é o que roda. Um texto bonito que não compila seria o pior caso.
+  const { parseMongoCommand } = await import('../main/drivers/mongo-parser.ts')
+  const filtro = montarFiltroMongo(
+    [c('d', 'maior', '2025-08-01'), c('d', 'menor', '2025-09-01'), c('s', 'diferente', 'a'), c('s', 'diferente', 'b')],
+    { d: 'date', s: 'string' },
+    SP
+  )
+  const plano = parseMongoCommand(`db.x.find(${filtro})`)
+  const consulta = plano.args[0] as Record<string, any>
+  assert.ok(consulta.d.$gt instanceof Date)
+  assert.equal(consulta.d.$gt.toISOString(), '2025-08-01T03:00:00.000Z')
+  assert.equal(consulta.$and.length, 2)
+})

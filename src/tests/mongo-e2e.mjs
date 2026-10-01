@@ -10,6 +10,13 @@ import assert from 'node:assert/strict'
 import { test, before, after } from 'node:test'
 import { MongoDriver } from './.mongo-bundle.mjs'
 
+/*
+  Fuso fixado em São Paulo para os testes de fuso horário no fim do arquivo
+  darem o mesmo resultado em qualquer máquina. O Node relê o fuso quando
+  `process.env.TZ` muda, inclusive o do `Intl` — que é o que a IDE usa.
+*/
+process.env.TZ = 'America/Sao_Paulo'
+
 const config = {
   id: 'test',
   name: 'test',
@@ -327,4 +334,60 @@ test('edição em grade avisa que ainda não vale para o Mongo', async () => {
     () => driver.deleteRow({ table: 'clientes', keys: { _id: '1' } }),
     /editor/i
   )
+})
+
+// ── fuso horário e filtro de data ─────────────────────────────────────
+//
+// A Date do Mongo é um instante em UTC. A grade a mostrava em UTC sem dizer, e
+// a pessoa lia como hora de Brasília. E o filtro montava a data como TEXTO —
+// `$gt: "2025-08-01 00:00:00"` —, que o Mongo nunca casa com uma Date.
+
+test('fuso · a data aparece no fuso da conexão, na grade e no documento', async () => {
+  await driver.query('db.fuso.deleteMany({})', { queryId: 'fz0' })
+  await driver.query('db.fuso.insertOne({ nome: "a", em: ISODate("2025-08-01T13:00:00Z") })', { queryId: 'fz1' })
+
+  const [local] = await driver.query('db.fuso.find({})', { queryId: 'fz2' })
+  const indice = local.columns.findIndex((c) => c.name === 'em')
+  assert.equal(local.rows[0][indice], '2025-08-01 10:00:00')
+  // O documento guarda o instante exato, em EJSON — é dele que a visão de
+  // documento calcula a hora, no mesmo fuso da grade.
+  assert.equal(new Date(local.documents[0].em.$date).toISOString(), '2025-08-01T13:00:00.000Z')
+  assert.equal(driver.sessionTimeZone(), 'America/Sao_Paulo')
+
+  const utc = new MongoDriver()
+  await utc.connect({ ...config, sessionTimeZone: 'server' })
+  const [servidor] = await utc.query('db.fuso.find({})', { queryId: 'fz3' })
+  assert.equal(servidor.rows[0][servidor.columns.findIndex((c) => c.name === 'em')], '2025-08-01 13:00:00')
+  assert.equal(utc.sessionTimeZone(), 'UTC')
+  await utc.disconnect()
+})
+
+test('fuso · o filtro de datas dos usuários acha o que devia', async () => {
+  await driver.query('db.fuso.deleteMany({})', { queryId: 'fz4' })
+  await driver.query(
+    `db.fuso.insertMany([
+      { nome: "antes", em: ISODate("2025-08-01T01:00:00Z") },
+      { nome: "dentro", em: ISODate("2025-08-15T15:00:00Z") },
+      { nome: "depois", em: ISODate("2025-09-01T01:00:00Z") }
+    ])`,
+    { queryId: 'fz5' }
+  )
+  // "antes" é 31/07 às 22:00 em Brasília: fora de agosto, embora em UTC já
+  // seja 1º de agosto. É ele que prova que o fuso está sendo aplicado.
+  // "depois" é 31/08 às 22:00 em Brasília: dentro.
+
+  // O que a IDE montava antes: texto, com a chave repetida.
+  const [antigo] = await driver.query(
+    'db.fuso.find({ "em": { $gt: "2025-08-01 00:00:00" }, "em": { $lt: "2025-08-31 23:59:59" } })',
+    { queryId: 'fz6' }
+  )
+  assert.equal(antigo.rowCount, 0, 'texto comparado com Date não casa nunca — era o bug')
+
+  // O que a IDE monta agora (a saída de montarFiltroMongo, travada no teste unitário).
+  const [novo] = await driver.query(
+    'db.fuso.find({ "em": { $gt: ISODate("2025-08-01T00:00:00-03:00"), $lt: ISODate("2025-08-31T23:59:59-03:00") } })',
+    { queryId: 'fz7' }
+  )
+  const nomes = novo.rows.map((linha) => linha[novo.columns.findIndex((c) => c.name === 'nome')]).sort()
+  assert.deepEqual(nomes, ['dentro', 'depois'])
 })

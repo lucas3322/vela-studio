@@ -28,6 +28,11 @@ interface Props {
   onAplicar: (condicoes: Condicao[]) => void
   /** Avisa qual coluna acabou de ser escolhida, para a grade rolar até ela. */
   onColunaEscolhida?: (coluna: string) => void
+  /**
+   * Fuso em que uma data digitada é lida no MongoDB — o mesmo em que a grade
+   * mostra as datas. Filtrar pelo valor que se está vendo tem que achá-lo.
+   */
+  fuso?: string
   disabled?: boolean
 }
 
@@ -125,7 +130,8 @@ function FiltroPorCondicoes({
   onCondicoes,
   onAplicar,
   onColunaEscolhida,
-  disabled
+  disabled,
+  fuso
 }: Props): React.JSX.Element {
   // A barra sempre mostra pelo menos uma linha, mas a linha em branco não é
   // escrita na aba: aba sem filtro guarda nada, não guarda um vazio.
@@ -150,7 +156,7 @@ function FiltroPorCondicoes({
     prontas.length === 0
       ? ''
       : dialect === 'mongodb'
-        ? montarFiltroMongo(prontas, tiposPorCampo)
+        ? montarFiltroMongo(prontas, tiposPorCampo, fuso)
         : montarWhere(prontas, dialect)
 
   const aplicar = (): void => onAplicar(prontas)

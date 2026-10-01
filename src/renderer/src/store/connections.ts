@@ -30,6 +30,8 @@ interface ConnectionState {
   activeDatabase: string | null
   databases: string[]
   serverVersion?: string
+  /** Fuso em que a sessão está de fato — mostrado na status bar. */
+  sessionTimeZone?: string
   connecting: boolean
   /** Schema por `${connectionId}::${database}` — é a base do autocomplete. */
   schemas: Record<string, SchemaCache>
@@ -69,7 +71,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   connect: async (config) => {
     set({ connecting: true })
     try {
-      const { serverVersion } = await window.vela.connections.open(config)
+      const { serverVersion, sessionTimeZone } = await window.vela.connections.open(config)
       const databases = await window.vela.schema
         .databases(config.id)
         .catch((): string[] => [])
@@ -89,6 +91,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
         activeDatabase: database,
         databases,
         serverVersion,
+        sessionTimeZone,
         connecting: false
       })
       await get().refreshSaved()
@@ -113,7 +116,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
     const { activeId } = get()
     if (!activeId) return
     await window.vela.connections.close(activeId)
-    set({ activeId: null, activeDatabase: null, databases: [], serverVersion: undefined })
+    set({ activeId: null, activeDatabase: null, databases: [], serverVersion: undefined, sessionTimeZone: undefined })
   },
 
   selectDatabase: async (database) => {

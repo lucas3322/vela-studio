@@ -26,6 +26,7 @@ import {
 } from './types'
 import { isMutation, splitStatements } from '../../shared/sql-shape'
 import { toGridFromArrays } from './value-types'
+import { deslocamentoComoTexto, deslocamentoEm, fusoDoComputador } from '../../shared/datas'
 
 /**
  * Teto de parâmetros de uma prepared statement do MySQL/MariaDB. O protocolo
@@ -38,6 +39,8 @@ export class MySQLDriver implements DatabaseDriver {
   readonly dialect: Dialect = 'mysql'
   private pool?: mysql.Pool
   private config?: ConnectionConfig
+  /** O que a status bar mostra como fuso desta sessão. */
+  private fusoMostrado?: string
   /** connectionId do MySQL por queryId, para conseguir mandar KILL QUERY. */
   private running = new Map<string, number>()
 
@@ -55,7 +58,17 @@ export class MySQLDriver implements DatabaseDriver {
       supportBigNumbers: true,
       bigNumberStrings: false,
       multipleStatements: false,
-      dateStrings: false,
+      /*
+        Data volta como o texto que o MySQL imprime, nunca como `Date`.
+
+        Com `false`, o `DATETIME` "10:00" virava um `Date` às 10:00 do fuso do
+        Mac — 13:00 UTC em São Paulo — e a tela imprimia 13:00. A coluna `DATE`
+        ganhava um horário inventado (03:00), e editar a célula mandava de volta
+        um ISO com `Z` que o MySQL recusa. `DATETIME` não tem fuso: o que está
+        gravado é o que se mostra. Quem tem fuso é o `TIMESTAMP`, e esse o
+        próprio MySQL já devolve no fuso da sessão — ver `ajustarFuso`.
+      */
+      dateStrings: true,
       connectTimeout: 15_000
     }
   }
@@ -65,12 +78,78 @@ export class MySQLDriver implements DatabaseDriver {
     this.pool = mysql.createPool(this.buildOptions(config))
     // createPool é preguiçoso: forçamos um handshake pra falhar agora, não na primeira query.
     const conn = await this.pool.getConnection()
-    conn.release()
+    let fusoDaSessao: string | undefined
+    try {
+      const ajuste = await this.ajustarFuso(conn, config)
+      fusoDaSessao = ajuste.aplicado
+      this.fusoMostrado = ajuste.mostrado
+    } finally {
+      conn.release()
+    }
+
+    /*
+      O fuso é da **conexão**, não do pool. Um `SET time_zone` feito numa
+      conexão só vale para ela, e o pool abre outras conforme a demanda — a
+      exportação, uma consulta em paralelo. Sem isto, metade das consultas
+      rodaria no fuso pedido e metade no do servidor, e o mesmo TIMESTAMP
+      apareceria com duas horas diferentes conforme a sorte.
+
+      O comando entra na fila da conexão antes de ela ser entregue a quem pediu,
+      então nenhuma consulta roda antes do ajuste.
+    */
+    if (fusoDaSessao) {
+      const fuso = fusoDaSessao
+      this.pool.pool.on('connection', (bruta) => {
+        bruta.query('SET time_zone = ?', [fuso], () => undefined)
+      })
+    }
+  }
+
+  /**
+   * Põe a sessão no fuso escolhido na conexão e diz qual ficou valendo.
+   *
+   * `aplicado` é o que vai no `SET` das próximas conexões do pool; `mostrado`
+   * é o que a status bar exibe. São diferentes quando a sessão fica no fuso
+   * do servidor: aí não há nada a aplicar, mas há o que mostrar.
+   */
+  private async ajustarFuso(
+    conn: mysql.PoolConnection,
+    config: ConnectionConfig
+  ): Promise<{ aplicado?: string; mostrado: string }> {
+    if (config.sessionTimeZone === 'server') {
+      const [linhas] = await conn.query<mysql.RowDataPacket[]>(
+        'SELECT @@session.time_zone AS sessao, @@system_time_zone AS sistema'
+      )
+      const { sessao, sistema } = linhas[0] ?? {}
+      return { mostrado: `${sessao === 'SYSTEM' ? sistema : sessao} (servidor)` }
+    }
+
+    const nome = fusoDoComputador()
+    try {
+      await conn.query('SET time_zone = ?', [nome])
+      return { aplicado: nome, mostrado: nome }
+    } catch {
+      /*
+        MySQL sem as tabelas de fuso carregadas — que é o padrão da imagem
+        Docker e de muita instalação — recusa `America/Sao_Paulo`. O
+        deslocamento numérico sempre funciona, com um custo: é fixo, não
+        acompanha horário de verão. Por isso é ele que a status bar mostra, e
+        não o nome — mostrar o nome aqui seria afirmar algo que não vale.
+      */
+      const deslocamento = deslocamentoComoTexto(deslocamentoEm(nome, new Date()))
+      await conn.query('SET time_zone = ?', [deslocamento])
+      return { aplicado: deslocamento, mostrado: deslocamento }
+    }
+  }
+
+  sessionTimeZone(): string | undefined {
+    return this.fusoMostrado
   }
 
   async disconnect(): Promise<void> {
     await this.pool?.end()
     this.pool = undefined
+    this.fusoMostrado = undefined
     // Nada além disso. Havia aqui uma chamada a `buildOptions` cujo resultado
     // era descartado, com o comentário de que "forçava erro se reconectasse
     // sem config" — o que ela de fato fazia era estourar em quem só testou a

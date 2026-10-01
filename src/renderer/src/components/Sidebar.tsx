@@ -1,3 +1,4 @@
+import { destinoDaConexao } from '../utils/destino'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   DRIVERS,
@@ -504,9 +505,7 @@ export function Sidebar(): React.JSX.Element {
                 {connection?.name ?? 'Escolher conexão'}
               </div>
               <div className="sidebar__connection-meta">
-                {connection
-                  ? `${connection.host ?? connection.filePath ?? 'local'}${connection.port ? `:${connection.port}` : ''}`
-                  : 'nenhuma conexão ativa'}
+                {connection ? destinoDaConexao(connection) : 'nenhuma conexão ativa'}
               </div>
             </span>
             <IconChevronDown size={13} style={{ color: 'var(--text-tertiary)' }} />

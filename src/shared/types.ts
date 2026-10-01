@@ -8,6 +8,51 @@ export type DriverId = 'mysql' | 'postgres' | 'sqlite' | 'mongodb' | 'redis'
 /** Dialeto usado pelo editor para escolher keywords, funções e regras de citação. */
 export type Dialect = 'mysql' | 'postgres' | 'sqlite' | 'mongodb' | 'redis'
 
+/**
+ * Túnel SSH até o banco.
+ *
+ * Com túnel, o `host` e a `port` da conexão passam a ser o endereço do banco
+ * **visto de dentro do servidor SSH** — quase sempre `localhost`. É a confusão
+ * mais comum de quem configura túnel pela primeira vez, e por isso a interface
+ * diz isso junto do campo.
+ */
+export interface SshTunnelConfig {
+  enabled: boolean
+  host: string
+  /** Padrão 22. */
+  port?: number
+  user: string
+  /**
+   * `agent` usa o agente SSH do sistema (`SSH_AUTH_SOCK`) — é como funciona
+   * quem guarda a chave no 1Password ou no chaveiro do macOS.
+   */
+  auth: 'password' | 'key' | 'agent'
+  /** Só em trânsito, do formulário para o main. Nunca vai para o disco em texto. */
+  password?: string
+  /** Caminho da chave privada. Aceita `~`. */
+  privateKeyPath?: string
+  /** Senha da chave privada, quando ela é protegida. Só em trânsito, como `password`. */
+  passphrase?: string
+  /**
+   * Impressão digital (SHA256) da chave do servidor SSH, guardada na primeira
+   * conexão. Numa conexão seguinte com chave diferente, a IDE **recusa**: pode
+   * ser uma reinstalação do servidor, pode ser alguém no meio do caminho — e
+   * decidir qual das duas não é trabalho para um padrão silencioso.
+   */
+  hostKeyFingerprint?: string
+  /** Só na listagem para a UI: existe senha SSH guardada. */
+  hasPassword?: boolean
+  /** Só na listagem para a UI: existe senha da chave guardada. */
+  hasPassphrase?: boolean
+}
+
+/** Como o túnel fica no disco: segredos cifrados, nunca o texto. */
+export interface StoredSshTunnel
+  extends Omit<SshTunnelConfig, 'password' | 'passphrase' | 'hasPassword' | 'hasPassphrase'> {
+  encryptedPassword?: string
+  encryptedPassphrase?: string
+}
+
 export interface ConnectionConfig {
   id: string
   name: string
@@ -27,13 +72,37 @@ export interface ConnectionConfig {
   ssl?: boolean
   /** Bloqueia qualquer statement que escreva. */
   readOnly?: boolean
+  /**
+   * Em que fuso a sessão com o banco trabalha.
+   *
+   * - `local` (padrão): o do computador de quem usa. É o que faz `TIMESTAMP` e
+   *   `timestamptz` aparecerem e serem digitados na hora de Brasília, e o que
+   *   faz `NOW()` e `CURRENT_TIMESTAMP` baterem com o relógio da pessoa.
+   * - `server`: o que o servidor tiver configurado (em nuvem e Docker, quase
+   *   sempre UTC).
+   *
+   * A escolha existe porque há um caso em que `local` não é o que se quer: a
+   * aplicação da empresa grava `DATETIME` em UTC. Inserir pela IDE uma linha
+   * com `DEFAULT CURRENT_TIMESTAMP` gravaria a hora de Brasília ali, misturada
+   * com as linhas em UTC da aplicação — e nada na coluna diria qual é qual.
+   *
+   * Não vale para SQLite (não tem fuso) nem Redis (não tem tipo de data).
+   */
+  sessionTimeZone?: 'local' | 'server'
+  /** Túnel SSH até o banco. Não vale para SQLite, que é um arquivo local. */
+  ssh?: SshTunnelConfig
   createdAt?: number
   lastUsedAt?: number
 }
 
 /** O que fica salvo em disco: igual ao config, mas com a senha já cifrada. */
-export interface StoredConnection extends Omit<ConnectionConfig, 'password'> {
+export interface StoredConnection extends Omit<ConnectionConfig, 'password' | 'ssh'> {
   encryptedPassword?: string
+  /**
+   * No disco, com os segredos cifrados. Na listagem para a UI, sem eles e com
+   * `hasPassword`/`hasPassphrase` no lugar — o mesmo trato da senha do banco.
+   */
+  ssh?: StoredSshTunnel | SshTunnelConfig
   /**
    * Só na listagem enviada ao renderer. Diz se existe senha guardada sem
    * expor o texto cifrado — a UI precisa saber para pedir a senha antes de
@@ -174,6 +243,11 @@ export interface ConnectionStatus {
 export interface TestResult {
   ok: boolean
   message: string
+  /**
+   * A falha foi no túnel SSH, não no banco. A mensagem já vem pronta — o
+   * tradutor de erro de banco não deve reescrevê-la.
+   */
+  falhaNoTunel?: boolean
   serverVersion?: string
   latencyMs?: number
 }

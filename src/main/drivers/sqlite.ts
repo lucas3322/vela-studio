@@ -76,6 +76,11 @@ export class SQLiteDriver implements DatabaseDriver {
     }
   }
 
+  /** Não se aplica: o SQLite guarda data como texto ou número, sem fuso. */
+  sessionTimeZone(): string | undefined {
+    return undefined
+  }
+
   async serverVersion(): Promise<string | undefined> {
     return (this.require().prepare('SELECT sqlite_version() AS v').get() as { v: string }).v
   }

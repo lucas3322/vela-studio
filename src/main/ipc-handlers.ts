@@ -1,3 +1,4 @@
+import { homedir } from 'node:os'
 import { randomUUID } from 'node:crypto'
 import { exportarEmFluxo } from './export-writer'
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
@@ -15,6 +16,7 @@ import type {
   PreviaDeImportacao,
   QueryRunResult,
   ResultadoDaImportacao,
+  SshTunnelConfig,
   TableInfo
 } from '../shared/types'
 import type { DatabaseDriver } from './drivers/types'
@@ -55,6 +57,9 @@ export function registerIpcHandlers(manager: ConnectionManager, store: Connectio
     // sem credencial nenhuma — enquanto conectar pela lista funcionava.
     const resultado = await manager.test(comSenhaGuardada(config, store))
     if (resultado.ok) return resultado
+    // Erro de túnel já vem em português e com a causa. O tradutor é de erro de
+    // banco — passado por ele, "senha SSH recusada" viraria outra coisa.
+    if (resultado.falhaNoTunel) return resultado
     // O driver devolve a mensagem crua; traduzimos aqui, onde sabemos o driver.
     const traduzido = translateError(new Error(resultado.message), { driver: config.driver })
     return {
@@ -65,20 +70,28 @@ export function registerIpcHandlers(manager: ConnectionManager, store: Connectio
 
   ipcMain.handle(IPC.connectionsOpen, async (_e, config: ConnectionConfig) => {
     const resolved = comSenhaGuardada(config, store)
+    let aberta: { impressaoDigitalSsh?: string }
     try {
-      await manager.open(resolved)
+      aberta = await manager.open(resolved)
     } catch (error) {
+      if ((error as Error).name === 'ErroDoTunel') throw new Error((error as Error).message)
       // Sem isto o renderer recebe "Error invoking remote method
       // 'connections:open': Error: …" com a mensagem crua do driver dentro.
       const traduzido = translateError(error, { driver: config.driver })
       throw new Error(traduzido.hint ? `${traduzido.friendly} ${traduzido.hint}` : traduzido.friendly)
     }
+    // Primeira conexão por este túnel: a chave do servidor passa a ser a
+    // confiável. Nas seguintes, uma chave diferente é recusada no `abrirTunel`.
+    if (aberta.impressaoDigitalSsh) store.guardarChaveSsh(config.id, aberta.impressaoDigitalSsh)
     store.touch(config.id)
-    const serverVersion = await manager.get(config.id).driver.serverVersion().catch(() => undefined)
-    return { serverVersion }
+    const driver = manager.get(config.id).driver
+    const serverVersion = await driver.serverVersion().catch(() => undefined)
+    return { serverVersion, sessionTimeZone: driver.sessionTimeZone() }
   })
 
   ipcMain.handle(IPC.connectionsClose, (_e, id: string) => manager.close(id))
+
+  ipcMain.handle(IPC.connectionsForgetSshHostKey, (_e, id: string) => store.esquecerChaveSsh(id))
 
   // ── Schema ────────────────────────────────────────────────────────────
   ipcMain.handle(IPC.schemaDatabases, (_e, id: string) => manager.get(id).driver.listDatabases())
@@ -282,6 +295,14 @@ export function registerIpcHandlers(manager: ConnectionManager, store: Connectio
           knownColumns
         })
 
+        // Túnel caído por baixo: o driver só vê a rede sumir e diz
+        // "Connection lost". A causa de verdade é o SSH, e é ela que aparece.
+        const queda = manager.motivoDaQuedaDoTunel(params.connectionId)
+        if (queda) {
+          translated.friendly = queda
+          translated.hint = 'Reconecte para abrir o túnel de novo.'
+        }
+
         store.addHistory({
           id: randomUUID(),
           connectionId: params.connectionId,
@@ -313,10 +334,16 @@ export function registerIpcHandlers(manager: ConnectionManager, store: Connectio
 
   ipcMain.handle(
     IPC.appPickFile,
-    async (event, filters?: { name: string; extensions: string[] }[]) => {
+    async (
+      event,
+      filters?: { name: string; extensions: string[] }[],
+      opcoes?: { pastaInicial?: string; mostrarOcultos?: boolean }
+    ) => {
       const window = BrowserWindow.fromWebContents(event.sender)
+      const pasta = opcoes?.pastaInicial?.replace(/^~(?=$|\/)/, homedir())
       const result = await dialog.showOpenDialog(window!, {
-        properties: ['openFile'],
+        properties: opcoes?.mostrarOcultos ? ['openFile', 'showHiddenFiles'] : ['openFile'],
+        defaultPath: pasta,
         filters: filters ?? [{ name: 'Banco SQLite', extensions: ['db', 'sqlite', 'sqlite3'] }]
       })
       return result.canceled ? undefined : result.filePaths[0]
@@ -524,12 +551,37 @@ export function registerIpcHandlers(manager: ConnectionManager, store: Connectio
  * parecer coisa de outro mundo.
  */
 function comSenhaGuardada(config: ConnectionConfig, store: ConnectionStore): ConnectionConfig {
-  if (config.password) return config
   const guardada = store.resolve(config.id)
-  if (!guardada?.password) return config
+  let resultado = config
   // Só a senha vem do disco: o resto é o que está no formulário agora, senão
   // uma edição de host ou de porta seria descartada ao testar.
-  return { ...config, password: guardada.password }
+  if (!config.password && guardada?.password) resultado = { ...resultado, password: guardada.password }
+  if (config.ssh?.enabled) resultado = { ...resultado, ssh: comSegredosSsh(config, guardada, store) }
+  return resultado
+}
+
+/**
+ * O túnel do formulário, com os segredos e a chave do servidor vindos do disco.
+ *
+ * A impressão digital **nunca** vem do renderer: é ela que barra um servidor
+ * impostor, e um bug no formulário que a apagasse desligaria a verificação sem
+ * ninguém perceber. Vale a do disco — e só se o servidor SSH for o mesmo do
+ * formulário; trocar de servidor começa uma confiança nova.
+ */
+function comSegredosSsh(
+  config: ConnectionConfig,
+  guardada: ConnectionConfig | undefined,
+  store: ConnectionStore
+): SshTunnelConfig {
+  const ssh = config.ssh!
+  const chave = store.chaveSshGuardada(config.id)
+  const mesmoServidor = chave && chave.host === ssh.host && (chave.port || 22) === (ssh.port || 22)
+  return {
+    ...ssh,
+    password: ssh.password || guardada?.ssh?.password,
+    passphrase: ssh.passphrase || guardada?.ssh?.passphrase,
+    hostKeyFingerprint: mesmoServidor ? chave.impressao : undefined
+  }
 }
 
 /* ── Importação de arquivo ─────────────────────────────────────────────── */

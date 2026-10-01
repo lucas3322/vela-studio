@@ -11,6 +11,7 @@ export function StatusBar(): React.JSX.Element {
   const activeId = useConnectionStore((s) => s.activeId)
   const database = useConnectionStore((s) => s.activeDatabase)
   const serverVersion = useConnectionStore((s) => s.serverVersion)
+  const fuso = useConnectionStore((s) => s.sessionTimeZone)
   const loadingSchema = useConnectionStore((s) => s.loadingSchema)
   const tab = useTabStore((s) =>
     activeId ? s.tabs.find((t) => t.id === s.activeByConnection[activeId]) : undefined
@@ -33,6 +34,21 @@ export function StatusBar(): React.JSX.Element {
       )}
 
       {database && <div className="statusbar__item">{database}</div>}
+
+      {/*
+        O fuso da sessão fica à vista porque ele decide como uma data é lida e
+        mostrada — e "a hora está errada" é o tipo de bug que ninguém liga a
+        uma configuração invisível. É o fuso efetivo: se o MySQL recusou o nome
+        e caiu para `-03:00`, é `-03:00` que aparece.
+      */}
+      {fuso && (
+        <div
+          className="statusbar__item"
+          title="Fuso em que as datas desta conexão são mostradas e lidas. Muda em Editar conexão."
+        >
+          fuso {fuso}
+        </div>
+      )}
 
       {loadingSchema && (
         <div className="statusbar__item">

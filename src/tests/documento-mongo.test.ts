@@ -23,13 +23,23 @@ test('texto que parece um ObjectId continua sendo texto', () => {
   assert.equal(valor.tipo, 'texto')
 })
 
-test('a data mostra o mesmo texto da grade, e guarda o instante completo', () => {
-  const valor = interpretarValor({ $date: '2023-06-06T14:07:47.000Z' })
+test('a data aparece no fuso da conexão, e guarda o instante completo', () => {
+  // As duas telas — grade e documento — usam o mesmo fuso, o da conexão. O
+  // instante em UTC fica no detalhe, para quem precisa do valor exato.
+  const valor = interpretarValor({ $date: '2023-06-06T14:07:47.000Z' }, 'America/Sao_Paulo')
   assert.equal(valor.tipo, 'data')
-  assert.equal(valor.texto, '2023-06-06 14:07:47')
-  // Sem converter para o fuso local: a grade mostra UTC, e duas telas do mesmo
-  // dado discordando em três horas é pior do que um texto mais longo.
+  assert.equal(valor.texto, '2023-06-06 11:07:47')
   assert.equal(valor.detalhe, '2023-06-06T14:07:47.000Z')
+
+  // Conexão no fuso do servidor: UTC, igual à grade nesse caso.
+  assert.equal(interpretarValor({ $date: '2023-06-06T14:07:47.000Z' }, 'UTC').texto, '2023-06-06 14:07:47')
+})
+
+test('data dentro de subdocumento usa o mesmo fuso da de fora', () => {
+  const [campo] = campos({ plano: { renovaEm: { $date: '2025-08-01T02:00:00Z' } } }, 'America/Sao_Paulo')
+  const [dentro] = campo.valor.filhos!
+  // 02:00 UTC ainda é o dia anterior em São Paulo.
+  assert.equal(dentro.valor.texto, '2025-07-31 23:00:00')
 })
 
 test('data fora da faixa do ISO não vira [object Object]', () => {

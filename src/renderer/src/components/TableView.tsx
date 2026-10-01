@@ -9,6 +9,7 @@ import { EditableGrid, type OrdenacaoDaGrade } from './EditableGrid'
 import { AlterColumnDialog } from './AlterColumnDialog'
 import { TableFilterBar } from './TableFilterBar'
 import { montarFiltroMongo, montarWhere, type Condicao } from '../editor/filter-builder'
+import { fusoDoMongo } from '@shared/datas'
 import { ErrorPanel } from './ErrorPanel'
 import { IconKey, IconLink, IconPlus, IconRefresh } from './Icons'
 import { InsertRowDialog } from './InsertRowDialog'
@@ -104,6 +105,8 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
   const connectionId = useConnectionStore((s) => s.activeId)
   const database = useConnectionStore((s) => s.activeDatabase)
   const connection = useConnectionStore((s) => s.saved.find((c) => c.id === s.activeId))
+  /** Fuso das datas do Mongo nesta conexão — grade, documento e filtro usam o mesmo. */
+  const fusoMongo = fusoDoMongo(connection)
   const updateTab = useTabStore((s) => s.updateTab)
   const reloadTab = useTabStore((s) => s.reloadTab)
   const openTableTab = useTabStore((s) => s.openTableTab)
@@ -230,7 +233,11 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
               // procura número onde o documento guarda texto e volta vazia —
               // aqui é o caminho que **executa**, então errar aqui é pior do
               // que errar na prévia.
-              montarFiltroMongo(filtro, Object.fromEntries(columns.map((c) => [c.name, c.type])))
+              montarFiltroMongo(
+                filtro,
+                Object.fromEntries(columns.map((c) => [c.name, c.type])),
+                fusoMongo
+              )
             )
           : dialect === 'redis'
             ? // O único filtro é a `key`: FiltroDeChaveRedis sempre manda uma
@@ -313,6 +320,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
     ordem,
     chaveDeOrdem,
     filtro,
+    fusoMongo,
     pagina,
     tamanhoPagina,
     tab.id,
@@ -439,6 +447,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
         <div className={`results ${loading ? 'results--recarregando' : ''}`}>
           <TableFilterBar
             onColunaEscolhida={setColunaEmEvidencia}
+            fuso={fusoMongo}
             columns={columns}
             dialect={dialect}
             aplicado={filtro}
@@ -454,7 +463,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
           {tab.error && <ErrorPanel error={tab.error} />}
 
           {comoDocumento && result?.documents && (
-            <MongoDocumentView documentos={result.documents} onNotify={notify} />
+            <MongoDocumentView documentos={result.documents} fuso={fusoMongo} onNotify={notify} />
           )}
 
           {result && !comoDocumento && (

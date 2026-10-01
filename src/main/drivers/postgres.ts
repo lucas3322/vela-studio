@@ -25,6 +25,7 @@ import {
 } from './types'
 import { isMutation, splitStatements } from '../../shared/sql-shape'
 import { toGridFromArrays } from './value-types'
+import { fusoDoComputador } from '../../shared/datas'
 
 /**
  * Teto de parâmetros de uma consulta parametrizada do PostgreSQL: o
@@ -39,6 +40,80 @@ const MAX_PLACEHOLDERS_POSTGRES = 60_000
 pg.types.setTypeParser(20, (v) => (v === null ? null : Number(v)))
 pg.types.setTypeParser(1700, (v) => (v === null ? null : Number(v)))
 
+/*
+  Data volta como o texto que o PostgreSQL imprime, nunca como `Date`.
+
+  O parser padrão do `pg` lia o `timestamp` "10:00" como 10:00 do fuso do Mac —
+  13:00 UTC em São Paulo — e a tela imprimia 13:00. A coluna `date` ganhava um
+  horário inventado (03:00). E o pior: o editor da célula vinha preenchido com
+  "2025-08-01T13:00:00.000Z", que o PostgreSQL aceita em `timestamp` jogando o
+  `Z` fora. Abrir a célula e confirmar sem mudar nada gravava 13:00. Três horas
+  a mais por edição, sem erro nenhum.
+
+  Com o texto cru, `timestamp` e `date` aparecem exatamente como gravados, e o
+  `timestamptz` aparece no fuso da sessão com o deslocamento escrito
+  (`2025-08-01 07:00:00-03`) — ver `connect`. Os três tipos de lista vão junto,
+  senão um `timestamp[]` teria a mesma conversão por dentro.
+*/
+for (const oid of [
+  1082, // date
+  1114, // timestamp
+  1184, // timestamptz
+  1182, // date[]
+  1115, // timestamp[]
+  1185 // timestamptz[]
+]) {
+  pg.types.setTypeParser(oid, (v) => v)
+}
+
+/**
+ * Nome de tipo, a partir do OID que o PostgreSQL manda em cada coluna do
+ * resultado, na forma que `typeFromDeclared` entende.
+ *
+ * Existe porque a grade inferia o tipo pelo valor em JavaScript — e data só
+ * era reconhecida como data por chegar como `Date`. Com as datas voltando como
+ * texto (ver os parsers acima), a coluna `timestamp` passaria a ser tratada
+ * como texto comum e perderia a cor e o alinhamento de data. O tipo declarado
+ * pelo banco é a fonte certa de qualquer jeito: não depende de qual valor veio
+ * na primeira linha.
+ *
+ * OID fora da lista devolve `undefined`, e a grade volta a inferir pelo valor —
+ * o comportamento de antes, para `uuid`, enum, lista e o resto.
+ */
+function tipoDoOid(oid: number): string | undefined {
+  switch (oid) {
+    case 16:
+      return 'bool'
+    case 20:
+    case 21:
+    case 23:
+    case 26:
+      return 'int'
+    case 700:
+    case 701:
+      return 'float'
+    case 790:
+      return 'money'
+    case 1700:
+      return 'numeric'
+    case 1082:
+      return 'date'
+    case 1083:
+    case 1266:
+      return 'time'
+    case 1114:
+    case 1184:
+      return 'timestamp'
+    case 114:
+    case 3802:
+      return 'json'
+    case 17:
+      return 'bytea'
+    default:
+      return undefined
+  }
+}
+
 /** Códigos de ação do `pg_constraint` por extenso. */
 const FK_ACTIONS: Record<string, string> = {
   a: 'NO ACTION',
@@ -52,6 +127,8 @@ export class PostgresDriver implements DatabaseDriver {
   readonly dialect: Dialect = 'postgres'
   private pool?: pg.Pool
   private config?: ConnectionConfig
+  /** O que a status bar mostra como fuso desta sessão. */
+  private fusoMostrado?: string
   private running = new Map<string, number>()
 
   private buildOptions(config: ConnectionConfig): pg.PoolConfig {
@@ -77,14 +154,64 @@ export class PostgresDriver implements DatabaseDriver {
 
   async connect(config: ConnectionConfig): Promise<void> {
     this.config = config
-    this.pool = new pg.Pool(this.buildOptions(config))
-    const client = await this.pool.connect()
-    client.release()
+    const pool = new pg.Pool(this.buildOptions(config))
+    this.pool = pool
+    const client = await pool.connect()
+    try {
+      this.fusoMostrado = await this.ajustarFuso(client, config)
+    } finally {
+      client.release()
+    }
+
+    /*
+      O fuso é da **conexão**, não do pool: um `set_config` só vale para o
+      cliente onde rodou, e o pool abre outros conforme a demanda. Sem isto,
+      metade das consultas veria o `timestamptz` no fuso pedido e metade no do
+      servidor. O comando entra na fila do cliente antes de ele ser entregue,
+      então nenhuma consulta roda antes do ajuste.
+
+      Só é registrado depois que o primeiro cliente aceitou o fuso — se o
+      servidor tivesse recusado, cada conexão nova falharia calada e a status
+      bar continuaria dizendo um fuso que não vale.
+    */
+    if (config.sessionTimeZone !== 'server' && this.fusoMostrado === fusoDoComputador()) {
+      const fuso = this.fusoMostrado
+      pool.on('connect', (novo) => {
+        novo.query("SELECT set_config('TimeZone', $1, false)", [fuso]).catch(() => undefined)
+      })
+    }
+  }
+
+  /**
+   * Põe a sessão no fuso escolhido e devolve o que ficou valendo.
+   *
+   * `set_config` em vez de `SET TIME ZONE` porque aceita parâmetro — o nome do
+   * fuso nunca é colado dentro do SQL.
+   */
+  private async ajustarFuso(client: pg.PoolClient, config: ConnectionConfig): Promise<string> {
+    if (config.sessionTimeZone !== 'server') {
+      const nome = fusoDoComputador()
+      try {
+        await client.query("SELECT set_config('TimeZone', $1, false)", [nome])
+        return nome
+      } catch {
+        // PostgreSQL sem esse nome de fuso: fica no do servidor, e a status bar
+        // diz isso em vez de afirmar o fuso pedido.
+      }
+    }
+    const res = await client.query('SHOW timezone')
+    const doServidor = res.rows[0]?.TimeZone ?? res.rows[0]?.timezone ?? '?'
+    return `${doServidor} (servidor)`
+  }
+
+  sessionTimeZone(): string | undefined {
+    return this.fusoMostrado
   }
 
   async disconnect(): Promise<void> {
     await this.pool?.end()
     this.pool = undefined
+    this.fusoMostrado = undefined
   }
 
   async testConnection(config: ConnectionConfig): Promise<TestResult> {
@@ -652,7 +779,8 @@ export class PostgresDriver implements DatabaseDriver {
           // colapsaria colunas homônimas de um JOIN (`c.id` e `p.id`).
           const { columns, matrix } = toGridFromArrays(
             fields.map((f) => f.name),
-            sliced
+            sliced,
+            fields.map((f) => tipoDoOid(f.dataTypeID))
           )
           results.push({
             columns,
