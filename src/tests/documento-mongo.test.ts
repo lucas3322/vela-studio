@@ -8,7 +8,7 @@
  */
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { campos, interpretarValor } from '../renderer/src/editor/documento-mongo.ts'
+import { caminhosCompostos, campos, interpretarValor, isoNoFuso, previa, recortar } from '../renderer/src/editor/documento-mongo.ts'
 
 test('ObjectId é reconhecido, e não vira texto', () => {
   const valor = interpretarValor({ $oid: '69c6e2ad9146e564fbad6a6c' })
@@ -122,4 +122,58 @@ test('campo ausente é ausente — não vira null', () => {
     lidos.map((c) => c.chave),
     ['nome']
   )
+})
+
+// ── Literal do shell e prévia (visão de documento em forma de JSON) ─────
+
+const juntar = (v: ReturnType<typeof interpretarValor>): string =>
+  (v.literal ?? []).map((p) => p.texto).join('')
+
+test('cada tipo BSON sai como o mongosh o escreve', () => {
+  assert.equal(juntar(interpretarValor({ $oid: '69c6e2ad9146e564fbad6a6c' })), 'ObjectId("69c6e2ad9146e564fbad6a6c")')
+  assert.equal(juntar(interpretarValor({ $numberDecimal: '189.90' })), 'Decimal128("189.90")')
+  assert.equal(juntar(interpretarValor('Ana "A" Souza')), '"Ana \\"A\\" Souza"')
+  assert.equal(juntar(interpretarValor(42)), '42')
+  assert.equal(juntar(interpretarValor(null)), 'null')
+  assert.equal(interpretarValor({ a: 1 }).literal, undefined)
+})
+
+test('ISODate leva o deslocamento do fuso: nunca hora local fingindo ser UTC', () => {
+  const iso = '2025-03-01T12:30:00.000Z'
+  assert.equal(isoNoFuso(iso, 'America/Sao_Paulo'), '2025-03-01T09:30:00-03:00')
+  assert.equal(isoNoFuso(iso, 'UTC'), '2025-03-01T12:30:00Z')
+  assert.equal(juntar(interpretarValor({ $date: iso }, 'UTC')), 'ISODate("2025-03-01T12:30:00Z")')
+})
+
+test('prévia mostra o começo do objeto recolhido', () => {
+  const cliente = interpretarValor({ nome: 'Ana', uf: 'SP', endereco: { cidade: 'Recife' } })
+  assert.equal(previa(cliente), '{ "nome": "Ana", "uf": "SP", "endereco": {…} }')
+  assert.equal(previa(interpretarValor(['web', 'promo'])), '[ "web", "promo" ]')
+  assert.equal(previa(interpretarValor({})), '{}')
+  assert.equal(previa(interpretarValor([])), '[]')
+})
+
+test('prévia longa corta no limite com reticências', () => {
+  const longo = interpretarValor({ a: 'x'.repeat(30), b: 'y'.repeat(30), c: 'z'.repeat(30) })
+  const texto = previa(longo, 72)
+  assert.ok(texto.length <= 76, texto)
+  assert.ok(texto.endsWith(', … }'), texto)
+})
+
+test('expandir tudo alcança objeto dentro de lista dentro de objeto', () => {
+  const lista = campos({ a: 1, b: { c: [{ d: 1 }], e: {} } })
+  const S = '\u001f'
+  assert.deepEqual(caminhosCompostos(lista), ['b', `b${S}c`, `b${S}c${S}0`])
+})
+
+test('bloco longo mostra dez e conta o resto; inteiro mostra tudo', () => {
+  const vinte = Array.from({ length: 20 }, (_, i) => i)
+  assert.deepEqual(recortar(vinte, false), { visiveis: vinte.slice(0, 10), ocultos: 10 })
+  assert.deepEqual(recortar(vinte, true), { visiveis: vinte, ocultos: 0 })
+})
+
+test('não esconde um campo só atrás de um botão', () => {
+  const onze = Array.from({ length: 11 }, (_, i) => i)
+  assert.equal(recortar(onze, false).ocultos, 0)
+  assert.equal(recortar(onze.concat(11), false).ocultos, 2)
 })

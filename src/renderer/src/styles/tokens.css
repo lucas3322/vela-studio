@@ -164,6 +164,15 @@
   --data-null: #7a8288;   /* era #5b636e, 2.92:1 — ilegível */
   --data-json: #fbbf24;
 
+  /*
+   * Cores de JSON da visão de documento do Mongo — as do VS Code, que é onde
+   * quem trabalha com JSON passa o dia. Reconhecer a cor da chave e a da
+   * string sem pensar é metade do "isto é JSON". Sobre `--bg-surface` sob
+   * `:hover` (#2a2e35): chave 9.1:1, texto 5.2:1.
+   */
+  --json-chave: #9cdcfe;
+  --json-texto: #ce9178;
+
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
   --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.55);
@@ -258,6 +267,9 @@
   --data-boolean: #15803d;
   --data-null: #70767e;   /* era #a8b0ba, 2.19:1 — quase invisível */
   --data-json: #b45309;
+  /* Sobre o branco sob `:hover` (#f5f5f5): chave 7.1:1, texto 7.2:1. */
+  --json-chave: #0451a5;
+  --json-texto: #a31515;
 
   --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
   --shadow-md: 0 4px 14px rgba(16, 24, 40, 0.1);

@@ -10,7 +10,7 @@
  * objeto e lista, os filhos já interpretados.
  */
 
-import { formatarInstante } from '../../../shared/datas.ts'
+import { deslocamentoComoTexto, deslocamentoEm, formatarInstante } from '../../../shared/datas.ts'
 
 export type TipoDeValor =
   | 'objectid'
@@ -24,6 +24,18 @@ export type TipoDeValor =
   | 'binario'
   | 'regex'
   | 'codigo'
+
+/**
+ * Um pedaço do valor escrito como o shell do Mongo o escreve.
+ *
+ * `funcao` é o construtor do BSON (`ObjectId(`, `)`), `texto` é o que vai
+ * entre aspas, e o resto tem o nome do próprio tipo. A tela pinta cada classe
+ * com a cor que um editor de JSON daria a ela.
+ */
+export interface PedacoLiteral {
+  classe: 'funcao' | 'texto' | 'numero' | 'booleano' | 'nulo' | 'data' | 'regex'
+  texto: string
+}
 
 export interface CampoDoDocumento {
   chave: string
@@ -44,6 +56,13 @@ export interface ValorDoDocumento {
   detalhe?: string
   /** Só em objeto e lista. */
   filhos?: CampoDoDocumento[]
+  /**
+   * O valor como literal do shell: `ObjectId("…")`, `ISODate("…")`,
+   * `"texto"`. É o que a visão de documento desenha — a forma que quem usa
+   * Mongo lê todo dia no mongosh, no Compass e no Studio 3T. Ausente em
+   * objeto e lista, que viram estrutura.
+   */
+  literal?: PedacoLiteral[]
 }
 
 /** Um objeto EJSON tem exatamente uma chave, e ela começa com `$`. */
@@ -77,7 +96,109 @@ function dataLegivel(iso: string, fuso: string): string {
   return Number.isNaN(instante.getTime()) ? iso : formatarInstante(instante, fuso)
 }
 
+/**
+ * A data como `ISODate` com o deslocamento do fuso escrito por extenso.
+ *
+ * O `ISODate` do shell é sempre UTC (`…Z`). Mostrar a hora local dentro dele
+ * sem o deslocamento seria mentir: quem lê `ISODate("2025-03-01T09:30:00")`
+ * entende 09:30 em UTC. Com `-03:00` no fim, o mesmo instante aparece no
+ * relógio da pessoa e continua sendo uma data ISO válida, que ela pode colar
+ * de volta num filtro.
+ */
+export function isoNoFuso(iso: string, fuso: string): string {
+  const instante = new Date(iso)
+  if (Number.isNaN(instante.getTime())) return iso
+  const minutos = deslocamentoEm(fuso, instante)
+  const relogio = formatarInstante(instante, fuso).replace(' ', 'T')
+  return `${relogio}${minutos === 0 ? 'Z' : deslocamentoComoTexto(minutos)}`
+}
+
+function construtor(
+  nome: string,
+  conteudo: string,
+  classe: PedacoLiteral['classe'] = 'texto'
+): PedacoLiteral[] {
+  return [
+    { classe: 'funcao', texto: `${nome}(` },
+    { classe, texto: JSON.stringify(conteudo) },
+    { classe: 'funcao', texto: ')' }
+  ]
+}
+
+/** O literal de um valor já interpretado. Objeto e lista não têm um. */
+function literalDe(valor: ValorDoDocumento, fuso: string): PedacoLiteral[] | undefined {
+  switch (valor.tipo) {
+    case 'texto':
+      return [{ classe: 'texto', texto: JSON.stringify(valor.detalhe ?? '') }]
+    case 'objectid':
+      return valor.detalhe !== undefined
+        ? construtor('ObjectId', valor.detalhe)
+        : [{ classe: 'funcao', texto: valor.texto }]
+    case 'data':
+      // A data por dentro do ISODate leva a cor de data, não a de texto: no
+      // olho ela tem que se separar de uma string que só parece data.
+      return construtor('ISODate', isoNoFuso(valor.detalhe ?? valor.texto, fuso), 'data')
+    case 'numero':
+      return valor.detalhe === 'Decimal128'
+        ? construtor('Decimal128', valor.texto)
+        : [{ classe: 'numero', texto: valor.texto }]
+    case 'booleano':
+      return [{ classe: 'booleano', texto: valor.texto }]
+    case 'nulo':
+      return [{ classe: 'nulo', texto: valor.texto }]
+    case 'regex':
+      return [{ classe: 'regex', texto: valor.texto }]
+    case 'binario':
+      return construtor('Binary', valor.detalhe ?? '')
+    case 'codigo':
+      return construtor('Code', valor.texto)
+    default:
+      return undefined
+  }
+}
+
 export function interpretarValor(valor: unknown, fuso = 'UTC'): ValorDoDocumento {
+  const interpretado = interpretarSemLiteral(valor, fuso)
+  const literal = literalDe(interpretado, fuso)
+  return literal ? { ...interpretado, literal } : interpretado
+}
+
+/** Texto curto do valor dentro de uma prévia — o literal colado, sem cores. */
+function textoCurto(valor: ValorDoDocumento): string {
+  if (valor.literal) return valor.literal.map((p) => p.texto).join('')
+  if (valor.tipo === 'objeto') return valor.filhos?.length ? '{…}' : '{}'
+  if (valor.tipo === 'lista') return valor.filhos?.length ? '[…]' : '[]'
+  return valor.texto
+}
+
+/**
+ * A linha de um objeto ou lista recolhidos: `{ "nome": "Ana", "uf": "SP" }`.
+ *
+ * Recolhido, o objeto dizia só "{ 3 campos }" — quem procura um pedido pelo
+ * nome do cliente tinha que abrir um por um. Com a prévia, o começo do
+ * conteúdo já está na linha, como no Compass. Objeto dentro de objeto vira
+ * `{…}`; o que passa do limite vira `…` no fim.
+ */
+export function previa(valor: ValorDoDocumento, limite = 72): string {
+  const filhos = valor.filhos ?? []
+  const lista = valor.tipo === 'lista'
+  if (filhos.length === 0) return lista ? '[]' : '{}'
+
+  const [abre, fecha] = lista ? ['[ ', ' ]'] : ['{ ', ' }']
+  let corpo = ''
+  for (let i = 0; i < filhos.length; i++) {
+    const filho = filhos[i]
+    const parte = (lista ? '' : `${JSON.stringify(filho.chave)}: `) + textoCurto(filho.valor)
+    const proximo = corpo ? `${corpo}, ${parte}` : parte
+    if (abre.length + proximo.length + fecha.length > limite) {
+      return `${abre}${corpo ? `${corpo}, …` : `${parte.slice(0, Math.max(8, limite - 8))}…`}${fecha}`
+    }
+    corpo = proximo
+  }
+  return `${abre}${corpo}${fecha}`
+}
+
+function interpretarSemLiteral(valor: unknown, fuso: string): ValorDoDocumento {
   if (valor === null || valor === undefined) return { tipo: 'nulo', texto: 'null' }
 
   if (typeof valor === 'string') return { tipo: 'texto', texto: `"${valor}"`, detalhe: valor }
@@ -169,6 +290,40 @@ export function campos(documento: Record<string, unknown>, fuso = 'UTC'): CampoD
     chave,
     valor: interpretarValor(valor, fuso)
   }))
+}
+
+/**
+ * Quantos campos (ou itens) um bloco mostra antes do "ver mais".
+ *
+ * Um documento de 84 campos ocupava a tela inteira e escondia o seguinte; a
+ * pessoa rolava por um só sem conseguir comparar dois. Dez cabem numa olhada
+ * e quase sempre incluem o que identifica o documento — o `_id` e os campos
+ * gravados primeiro, que no Mongo costumam ser os principais.
+ */
+export const LIMITE_DE_CAMPOS = 10
+
+/** O que um bloco mostra agora e quantos ficaram atrás do "ver mais". */
+export function recortar<T>(itens: T[], inteiro: boolean, limite = LIMITE_DE_CAMPOS): { visiveis: T[]; ocultos: number } {
+  // Esconder um só não compensa: o botão ocuparia a mesma linha que o campo.
+  if (inteiro || itens.length <= limite + 1) return { visiveis: itens, ocultos: 0 }
+  return { visiveis: itens.slice(0, limite), ocultos: itens.length - limite }
+}
+
+/** Separador de caminho: um caractere que nenhuma chave real do Mongo usa. */
+export const SEPARADOR_DE_CAMINHO = '\u001f'
+
+/**
+ * Caminho de todo objeto ou lista não vazios do documento, em profundidade.
+ * É o que "Expandir tudo" abre de uma vez.
+ */
+export function caminhosCompostos(lista: CampoDoDocumento[], prefixo = ''): string[] {
+  const caminhos: string[] = []
+  for (const { chave, valor } of lista) {
+    if (!valor.filhos?.length) continue
+    const caminho = prefixo ? `${prefixo}${SEPARADOR_DE_CAMINHO}${chave}` : chave
+    caminhos.push(caminho, ...caminhosCompostos(valor.filhos, caminho))
+  }
+  return caminhos
 }
 
 /**

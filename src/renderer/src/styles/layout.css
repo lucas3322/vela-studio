@@ -4014,12 +4014,17 @@
   contain-intrinsic-size: auto 220px;
 }
 
+/* Número e ações flutuam no canto de cima, na altura do `{` — uma linha a
+   menos por documento, e o JSON começa onde o cartão começa. */
 .documento__topo {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-2);
+  z-index: 1;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  height: 18px;
-  padding: 0 var(--space-3);
+  gap: var(--space-2);
+  height: 22px;
 }
 
 .documento__numero {
@@ -4030,97 +4035,130 @@
 
 /* Ação revelada no hover: fora dele, o ícone competia com o dado em todo
    cartão da lista. `pointer-events` some junto, senão a área segue clicável. */
-.documento__copiar {
+.documento__acoes {
+  display: flex;
+  gap: 2px;
+}
+
+/* Ações reveladas no hover: fora dele, os ícones competiam com o dado em todo
+   cartão da lista. `pointer-events` some junto, senão a área segue clicável. */
+.documento__acoes .icon-btn {
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--duration-fast) var(--ease);
 }
 
-.documento:hover .documento__copiar,
-.documento:focus-within .documento__copiar {
+.documento:hover .documento__acoes .icon-btn,
+.documento:focus-within .documento__acoes .icon-btn {
   opacity: 1;
   pointer-events: auto;
 }
 
-.documento__campos {
-  display: flex;
-  flex-direction: column;
-}
-
-.documento__linha {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  padding: 1px var(--space-3);
+/*
+ * O documento escrito como JSON do shell: uma linha por campo, recuo de dois
+ * caracteres por nível, guias verticais marcando cada nível e a dobra na
+ * calha da esquerda — o layout de um editor de JSON, que é o que quem usa
+ * Mongo já sabe ler.
+ */
+.json {
+  --recuo: 2ch;
+  --calha: var(--space-6);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
-  line-height: 18px;
+  line-height: 20px;
 }
 
-.documento__linha--composta {
-  cursor: pointer;
-}
-
-.documento__linha--composta:hover {
-  background: var(--bg-hover);
-}
-
-.documento__seta {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 12px;
-  flex-shrink: 0;
-  color: var(--text-secondary);
-}
-
-.documento__chave {
-  color: var(--text-secondary);
-  flex-shrink: 0;
-}
-
-/* O dois-pontos herda a cor da chave de propósito: em terciário ele reprovava
-   o contraste sobre a linha em hover (4.22:1), e um separador ilegível é pior
-   do que um separador sem hierarquia própria. */
-.documento__chave::after {
-  content: ':';
-}
-
-.documento__valor {
-  color: var(--data-string);
+.json__linha {
+  position: relative;
+  min-height: 20px;
+  padding: 0 var(--space-4) 0 calc(var(--calha) + var(--nivel, 0) * var(--recuo));
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
-.documento__valor--numero {
-  color: var(--data-number);
-  font-variant-numeric: tabular-nums;
+.json__linha--dobravel {
+  cursor: pointer;
 }
 
-.documento__valor--data {
-  color: var(--data-date);
+.json__linha--dobravel:hover {
+  background: var(--bg-hover);
 }
 
-.documento__valor--booleano {
-  color: var(--data-boolean);
+/* Uma guia por nível acima deste, alinhada à chave que abriu o bloco. */
+.json__guias {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--calha) + 0.5ch);
+  width: calc(var(--nivel) * var(--recuo));
+  background: repeating-linear-gradient(
+    to right,
+    var(--border-subtle) 0 1px,
+    transparent 1px var(--recuo)
+  );
+  pointer-events: none;
 }
 
-.documento__valor--objectid,
-.documento__valor--binario,
-.documento__valor--regex,
-.documento__valor--codigo {
-  color: var(--data-json);
+.json__dobra {
+  position: absolute;
+  top: 0;
+  left: calc(var(--calha) + var(--nivel) * var(--recuo) - 14px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 20px;
+  color: var(--text-secondary);
+  transition: transform var(--duration-base) var(--ease-spring);
 }
 
-/* Objeto e lista fechados são estrutura, não dado: ficam com a cor de texto
-   comum para não competirem com os valores de verdade ao lado. */
-.documento__valor--objeto,
-.documento__valor--lista {
+.json__dobra--aberta {
+  transform: rotate(90deg);
+}
+
+.json__chave { color: var(--json-chave); }
+.json__pont { color: var(--text-secondary); }
+.json__texto { color: var(--json-texto); }
+.json__funcao,
+.json__regex { color: var(--data-json); }
+.json__numero { color: var(--data-number); font-variant-numeric: tabular-nums; }
+.json__data { color: var(--data-date); }
+.json__booleano { color: var(--data-boolean); }
+.json__nulo { color: var(--data-null); }
+
+/* Prévia do recolhido: estrutura, não dado — fica no cinza para não
+   competir com os valores abertos ao lado. */
+.json__previa {
   color: var(--text-secondary);
 }
 
-.documento__valor--nulo {
-  color: var(--data-null);
-  font-style: italic;
+/* "ver mais": texto em mono no ritmo das linhas, com cara de link —
+   está no lugar de dado, mas é uma ação. */
+.json__mais {
+  padding: 0 var(--space-1);
+  margin-left: calc(var(--space-1) * -1);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--accent-text);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease);
+}
+
+.json__mais:hover {
+  background: var(--accent-subtle);
+}
+
+.json__contagem {
+  margin-left: var(--space-2);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--bg-active);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  white-space: nowrap;
 }
 
 .documentos__rodape {

@@ -349,3 +349,15 @@ export const IconBolt = (p: IconProps): React.JSX.Element => (
     <path d="M9 1.5 3.5 9H8l-1 5.5L12.5 7H8l1-5.5Z" />
   </Icon>
 )
+
+export const IconExpandir = (p: IconProps): React.JSX.Element => (
+  <Icon {...p}>
+    <path d="M5 6 8 3l3 3M5 10l3 3 3-3" />
+  </Icon>
+)
+
+export const IconRecolher = (p: IconProps): React.JSX.Element => (
+  <Icon {...p}>
+    <path d="m5 3 3 3 3-3M5 13l3-3 3 3" />
+  </Icon>
+)
