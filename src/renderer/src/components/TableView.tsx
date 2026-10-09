@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useIndicadorDeslizante } from '../hooks/useIndicadorDeslizante'
+import { PainelColunas, PainelIndices, PainelRelacoes } from './EstruturaDaTabela'
 import { DRIVERS, type ColumnInfo, type IndexInfo, type RelationInfo } from '@shared/types'
 import { tiposDoDialeto } from '../editor/column-types'
 import { useAppStore } from '../store/app'
@@ -11,7 +13,7 @@ import { TableFilterBar } from './TableFilterBar'
 import { montarFiltroMongo, montarWhere, type Condicao } from '../editor/filter-builder'
 import { fusoDoMongo } from '@shared/datas'
 import { ErrorPanel } from './ErrorPanel'
-import { IconKey, IconLink, IconPlus, IconRefresh } from './Icons'
+import { IconPlus, IconRefresh } from './Icons'
 import { InsertRowDialog } from './InsertRowDialog'
 import { MongoDocumentView } from './MongoDocumentView'
 
@@ -79,6 +81,11 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
   */
   const panel: Panel = tab.view?.painel ?? tab.initialPanel ?? 'dados'
   const setPanel = (novo: Panel): void => updateTabView(tab.id, { painel: novo })
+  const {
+    trilho: trilhoDosPaineis,
+    estilo: estiloDoIndicador,
+    pronto: indicadorPronto
+  } = useIndicadorDeslizante<HTMLDivElement>(`${tab.id}|${panel}`)
 
   const ordem: OrdenacaoDaGrade | null = tab.view?.ordem ?? null
   const setOrdem = (nova: OrdenacaoDaGrade | null): void =>
@@ -390,12 +397,26 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
   */
   const comoDocumento = modo === 'documento' && !!result?.documents
 
+  // Contagem que a árvore já mostra — estimativa do catálogo, não COUNT(*).
+  const linhasNoCatalogo = schema?.tables.find((t) => t.name === table)?.rowCount
+  const abrirOutraTabela = (destino: string): void => {
+    if (!connectionId) return
+    openTableTab({ connectionId, database, table: destino })
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       <div className="structure__tabs">
+        <div className="trilho trilho--paineis" ref={trilhoDosPaineis}>
+        <span
+          className={`trilho__indicador ${indicadorPronto ? 'trilho__indicador--pronto' : ''}`}
+          style={estiloDoIndicador}
+          aria-hidden
+        />
         {(['dados', 'colunas', 'indices', 'relacoes'] as Panel[]).map((item) => (
           <button
             key={item}
+            data-ativo={panel === item}
             className={`structure__tab ${panel === item ? 'structure__tab--active' : ''}`}
             onClick={() => setPanel(item)}
           >
@@ -405,6 +426,7 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
             {item === 'relacoes' && relations.length > 0 && ` (${relations.length})`}
           </button>
         ))}
+        </div>
 
         {dialect === 'mongodb' && panel === 'dados' && (
           <>
@@ -654,37 +676,21 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
       )}
 
       {panel === 'colunas' && (
-        <div className="structure">
+        <>
           <datalist id="vela-tipos-de-coluna">
             {tiposDoDialeto(dialect).map((tipo) => (
               <option key={tipo} value={tipo} />
             ))}
           </datalist>
-
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th style={{ width: 30 }} />
-                <th>Nome</th>
-                <th>Tipo</th>
-                <th>Nulo</th>
-                <th>Padrão</th>
-                <th>Observação</th>
-              </tr>
-            </thead>
-            <tbody>
-              {columns.map((column) => (
-                <tr key={column.name}>
-                  <td>
-                    {column.isPrimaryKey ? (
-                      <IconKey size={13} style={{ color: 'var(--warning)' }} />
-                    ) : column.isForeignKey ? (
-                      <IconLink size={13} style={{ color: 'var(--info)' }} />
-                    ) : null}
-                  </td>
-                  <td style={{ fontWeight: 500 }}>{column.name}</td>
-                  <td className="mono">
-                    {tipoEmEdicao?.coluna === column.name ? (
+          <PainelColunas
+            table={table}
+            columns={columns}
+            relations={relations}
+            rowCount={linhasNoCatalogo}
+            semSchema={dialect === 'mongodb' || dialect === 'redis'}
+            onAbrirTabela={abrirOutraTabela}
+            renderTipo={(column) =>
+              tipoEmEdicao?.coluna === column.name ? (
                       <input
                         className="grid__input"
                         autoFocus
@@ -716,19 +722,10 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
                       >
                         {column.type}
                       </button>
-                    )}
-                  </td>
-                  <td className="mono">{column.nullable ? 'sim' : 'não'}</td>
-                  <td className="mono">{column.defaultValue ?? '—'}</td>
-                  <td style={{ color: 'var(--text-tertiary)' }}>
-                    {column.comment ??
-                      (column.frequency != null ? `em ${column.frequency}% dos documentos` : '')}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    )
+            }
+          />
+        </>
       )}
 
       {inserindo && (
@@ -783,77 +780,36 @@ export function TableView({ tab }: { tab: Tab }): React.JSX.Element {
       )}
 
       {panel === 'indices' && (
-        <div className="structure">
-          {indexes.length === 0 ? (
-            <div className="tree-empty">Esta tabela não tem índices além da chave primária.</div>
-          ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Nome</th>
-                  <th>Colunas</th>
-                  <th>Único</th>
-                  <th>Primário</th>
-                </tr>
-              </thead>
-              <tbody>
-                {indexes.map((index) => (
-                  <tr key={index.name}>
-                    <td style={{ fontWeight: 500 }}>{index.name}</td>
-                    <td className="mono">{index.columns.join(', ')}</td>
-                    <td>{index.unique ? 'sim' : 'não'}</td>
-                    <td>{index.primary ? 'sim' : 'não'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        <PainelIndices
+          table={table}
+          columns={columns}
+          indexes={indexes}
+          relations={relations}
+          rowCount={linhasNoCatalogo}
+          sugerir={dialect !== 'mongodb' && dialect !== 'redis'}
+          quote={(nome) => quote(nome, dialect)}
+          onGerarSql={(sql, titulo) => {
+            if (!connectionId) return
+            openQueryTab({ connectionId, database, sql, title: titulo })
+          }}
+        />
       )}
 
       {panel === 'relacoes' && (
-        <div className="structure">
-          {relations.length === 0 ? (
-            <div className="tree-empty">
-              Nenhuma chave estrangeira declarada.
-              {dialect === 'mongodb' && (
-                <>
-                  <br />
-                  O MongoDB não declara relações — elas ficam na aplicação.
-                </>
-              )}
-              {dialect === 'redis' && (
-                <>
-                  <br />
-                  O Redis não tem relação entre chaves.
-                </>
-              )}
-            </div>
-          ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Coluna</th>
-                  <th>Referencia</th>
-                  <th>Ao excluir</th>
-                  <th>Ao atualizar</th>
-                </tr>
-              </thead>
-              <tbody>
-                {relations.map((relation) => (
-                  <tr key={relation.constraintName + relation.column}>
-                    <td className="mono">{relation.column}</td>
-                    <td className="mono">
-                      {relation.referencedTable}.{relation.referencedColumn}
-                    </td>
-                    <td>{relation.onDelete ?? '—'}</td>
-                    <td>{relation.onUpdate ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        <PainelRelacoes
+          table={table}
+          columns={columns}
+          relations={relations}
+          rowCount={linhasNoCatalogo}
+          avisoSemRelacoes={
+            dialect === 'mongodb'
+              ? 'O MongoDB não declara relações — elas ficam na aplicação.'
+              : dialect === 'redis'
+                ? 'O Redis não tem relação entre chaves.'
+                : undefined
+          }
+          onAbrirTabela={abrirOutraTabela}
+        />
       )}
     </div>
   )

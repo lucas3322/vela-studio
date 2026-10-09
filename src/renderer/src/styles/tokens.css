@@ -40,7 +40,10 @@
   --leading-normal: 1.5;
 
   /* ── Dimensões estruturais ────────────────────────────────────── */
-  --titlebar-height: 38px;
+  /* 48px: o centro da barra cai em 24px, onde o macOS desenha o centro dos
+     semáforos (`trafficLightPosition.y` 18 + 6). Com 38 eles ficavam abaixo
+     do eixo do título e o campo de busca encostava no topo da janela. */
+  --titlebar-height: 48px;
   --statusbar-height: 28px;
   --tabbar-height: 36px;
   --sidebar-width: 264px;
@@ -49,8 +52,21 @@
   /* ── Movimento ────────────────────────────────────────────────── */
   /* Curto o bastante para não atrasar a interação, longo o bastante para ser lido. */
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  /*
+   * Curva de mola criticamente amortecida, aproximada em bézier — a mesma
+   * família que o macOS usa em folhas e popovers. Sai rápido e assenta sem
+   * passar do ponto: o objeto chega, não quica. É a curva de tudo que entra
+   * na tela (modal, menu, toast, indicador de segmento).
+   */
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  /* Saída: acelera para fora. Sair é sempre mais rápido que entrar. */
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
   --duration-fast: 120ms;
   --duration-base: 180ms;
+  --duration-slow: 280ms;
+
+  /* Retorno de pressão: o botão afunda no pointer-down, não no clique. */
+  --press-scale: 0.97;
 
   /* ── Acento (igual nos dois temas, ajustado por luminância) ────── */
   --accent-h: 38;
@@ -94,6 +110,14 @@
      uma malha de milhares de células. A 0.06 ela media 1.17:1 contra o fundo
      e simplesmente não era vista — o grid lia como texto solto, não tabela. */
   --grid-line: rgba(255, 255, 255, 0.13);
+  /*
+   * Zebra da grade. Com faixas alternadas, a linha horizontal deixa de ser
+   * necessária para o olho seguir a linha — e a malha completa nas duas
+   * direções era o que fazia a grade parecer planilha. A coluna mantém um
+   * fio mais leve: o alinhamento já separa as colunas, o fio só guia.
+   */
+  --grid-zebra: rgba(255, 255, 255, 0.032);
+  --grid-line-coluna: rgba(255, 255, 255, 0.07);
 
   --text-primary: #e8eaed;
   --text-secondary: #a2a9b5;
@@ -146,6 +170,26 @@
 
   --scrollbar-thumb: rgba(255, 255, 255, 0.14);
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.24);
+
+  /*
+   * Materiais — superfícies flutuantes translúcidas (menu, paleta, toast).
+   *
+   * Opacas o bastante para o texto não depender do que passa por baixo: a
+   * 0.86 o desvio da cor composta fica dentro do que a escala de texto já
+   * tolera sobre `--bg-elevated`. O desfoque é o que dá a sensação de
+   * material; a opacidade é o que garante a leitura.
+   */
+  --material-popover: rgba(38, 43, 51, 0.86);
+  --material-chrome: rgba(27, 30, 36, 0.78);
+  --material-blur: blur(24px) saturate(180%);
+  /* Fio de luz na borda de cima do material: a luz batendo no vidro. */
+  --material-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  /* Contorno de meio pixel que o macOS dá a todo popover. */
+  --hairline: 0 0 0 0.5px rgba(0, 0, 0, 0.6);
+  --scrim: rgba(0, 0, 0, 0.38);
+  /* Polegar do segmentado: no escuro ele clareia sobre o trilho, como o
+     controle do macOS — `--bg-elevated` ficaria mais escuro que o trilho. */
+  --segmento-ativo: rgba(255, 255, 255, 0.13);
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -170,6 +214,8 @@
   /* Ver a nota no bloco escuro. Medido em 3.10:1 sobre o branco. */
   --contorno-objeto: #8d939a;
   --grid-line: rgba(0, 0, 0, 0.14);
+  --grid-zebra: rgba(16, 24, 40, 0.032);
+  --grid-line-coluna: rgba(0, 0, 0, 0.07);
 
   --text-primary: #1a1d23;
   /*
@@ -219,4 +265,31 @@
 
   --scrollbar-thumb: rgba(0, 0, 0, 0.16);
   --scrollbar-thumb-hover: rgba(0, 0, 0, 0.28);
+
+  /* Ver a nota no bloco escuro. No claro a elevação é sombra, não cor. */
+  --material-popover: rgba(255, 255, 255, 0.86);
+  --material-chrome: rgba(246, 247, 249, 0.8);
+  --material-blur: blur(24px) saturate(180%);
+  --material-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --hairline: 0 0 0 0.5px rgba(16, 24, 40, 0.18);
+  --scrim: rgba(16, 24, 40, 0.22);
+  --segmento-ativo: #ffffff;
+}
+
+/*
+ * Menos transparência pedida no sistema: todo material vira sólido.
+ * O desfoque some junto — desfocar atrás de algo opaco é custo sem efeito.
+ */
+@media (prefers-reduced-transparency: reduce) {
+  :root,
+  :root[data-theme='dark'] {
+    --material-popover: #262b33;
+    --material-chrome: #1b1e24;
+    --material-blur: none;
+  }
+  :root[data-theme='light'] {
+    --material-popover: #ffffff;
+    --material-chrome: #f6f7f9;
+    --material-blur: none;
+  }
 }

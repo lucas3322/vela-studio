@@ -99,7 +99,14 @@ textarea {
   white-space: nowrap;
   transition: background var(--duration-fast) var(--ease),
     border-color var(--duration-fast) var(--ease),
-    opacity var(--duration-fast) var(--ease);
+    opacity var(--duration-fast) var(--ease),
+    transform var(--duration-fast) var(--ease);
+}
+
+/* Retorno no pointer-down, não no clique: o botão afunda enquanto o dedo
+   está nele, e é isso que faz a interface parecer responder ao toque. */
+.btn:active {
+  transform: scale(var(--press-scale));
 }
 
 .btn:disabled {
@@ -109,6 +116,9 @@ textarea {
 
 .btn--primary {
   background: var(--accent);
+  /* Brilho de cima e sombra curta: o botão principal tem volume, os outros
+     ficam rentes à superfície. */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), var(--shadow-sm);
   /* `--accent-ink`, não `--text-inverse`: o inverso do tema claro é branco, e
      branco sobre âmbar dava 2.87:1 — o botão principal do app era quase
      ilegível. Tinta escura sobre âmbar dá 5.9:1. */
@@ -243,6 +253,13 @@ textarea {
     opacity: 1;
     transform: none;
   }
+}
+
+/* Dissolução da troca de tema (ver `paintWithTransition` no store). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--duration-slow);
+  animation-timing-function: var(--ease);
 }
 
 /* Quem prefere menos movimento não deve receber nenhum. */

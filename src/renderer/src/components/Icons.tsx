@@ -296,3 +296,56 @@ export const IconFolder = (p: IconProps): React.JSX.Element => (
     <path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.6l1.2 1.5H12.5A1.5 1.5 0 0 1 14 6v5.5A1.5 1.5 0 0 1 12.5 13h-9A1.5 1.5 0 0 1 2 11.5Z" />
   </Icon>
 )
+
+/* ── Glifos de família de tipo (ficha de colunas) ─────────────────── */
+
+export const IconHash = (p: IconProps): React.JSX.Element => (
+  <Icon {...p}>
+    <path d="M6 2.5 5 13.5M11 2.5l-1 11M2.5 6h11M2 10h11" />
+  </Icon>
+)
+
+export const IconText = (p: IconProps): React.JSX.Element => (
+  <Icon {...p}>
+    <path d="M2.5 12.5 5.5 3.5l3 9M3.6 9.5h3.8M10.5 8.2a2 2 0 1 1 0 4.3 2 2 0 0 1 0-4.3Zm2 0v4.3" />
+  </Icon>
+)
+
+export const IconCalendar = (p: IconProps): React.JSX.Element => (
+  <Icon {...p}>
+    <rect x="2.5" y="3.5" width="11" height="10" rx="2" />
+    <path d="M2.5 7h11M5.5 2v3M10.5 2v3" />
+  </Icon>
+)
+
+export const IconToggle = (p: IconProps): React.JSX.Element => (
+  <Icon {...p}>
+    <rect x="1.5" y="4.5" width="13" height="7" rx="3.5" />
+    <circle cx="11" cy="8" r="1.75" />
+  </Icon>
+)
+
+export const IconBraces = (p: IconProps): React.JSX.Element => (
+  <Icon {...p}>
+    <path d="M5.5 2.5c-1.5 0-2 .7-2 2v1.6c0 .9-.5 1.4-1.5 1.9 1 .5 1.5 1 1.5 1.9v1.6c0 1.3.5 2 2 2M10.5 2.5c1.5 0 2 .7 2 2v1.6c0 .9.5 1.4 1.5 1.9-1 .5-1.5 1-1.5 1.9v1.6c0 1.3-.5 2-2 2" />
+  </Icon>
+)
+
+export const IconBinary = (p: IconProps): React.JSX.Element => (
+  <Icon {...p}>
+    <rect x="2.5" y="3" width="4" height="10" rx="2" />
+    <path d="M10 4.5 11.5 3v10M10 13h3" />
+  </Icon>
+)
+
+export const IconArrowRight = (p: IconProps): React.JSX.Element => (
+  <Icon {...p}>
+    <path d="M2.5 8h11M9.5 4l4 4-4 4" />
+  </Icon>
+)
+
+export const IconBolt = (p: IconProps): React.JSX.Element => (
+  <Icon {...p}>
+    <path d="M9 1.5 3.5 9H8l-1 5.5L12.5 7H8l1-5.5Z" />
+  </Icon>
+)

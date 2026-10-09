@@ -56,6 +56,12 @@ export function useMenuEvents(): void {
         const tab = useTabStore.getState().activeTabFor(connectionId)
         if (tab?.kind === 'query') useAppStore.getState().openModal('saveQuery')
       }),
+      // ⌘K de novo com a paleta aberta fecha: é o mesmo gesto do Spotlight.
+      window.velaEvents.on('menu:commandPalette', () => {
+        const app = useAppStore.getState()
+        if (app.commandPaletteOpen) app.closeCommandPalette()
+        else app.openCommandPalette()
+      }),
       window.velaEvents.on('menu:toggleSidebar', () => useAppStore.getState().toggleSidebar()),
       window.velaEvents.on('menu:toggleHelp', () => useAppStore.getState().toggleHelpPanel()),
       window.velaEvents.on('menu:theme', ((theme: ThemeMode) =>

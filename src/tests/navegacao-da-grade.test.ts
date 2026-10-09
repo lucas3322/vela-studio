@@ -57,3 +57,32 @@ test('busca e filtro não se confundem', () => {
  * posição de rolagem, tamanho da viewport. No dia em que ganhar, cada pixel de
  * arrasto volta a ser um pedido novo e o bug renasce inteiro.
  */
+
+/**
+ * Espelha os dois efeitos do EditableGrid durante um arrasto de borda, com a
+ * busca fechada e uma coluna escolhida no filtro. Cada pixel roda os dois de
+ * novo, na ordem em que estão declarados: o do filtro, depois o da busca —
+ * que, fechada, zera o próprio registro.
+ */
+function arrastar(pixels: number, registroCompartilhado: boolean): number {
+  const busca = { atual: null as string | null }
+  const filtro = registroCompartilhado ? busca : { atual: null as string | null }
+  const pedido = pedidoDaEvidencia('ativo')
+  let rolagens = 0
+  for (let i = 0; i < pixels; i++) {
+    if (deveNavegar(filtro.atual, pedido)) {
+      filtro.atual = pedido
+      rolagens++
+    }
+    busca.atual = null
+  }
+  return rolagens
+}
+
+test('busca fechada não reabre o pedido do filtro a cada pixel de arrasto', () => {
+  // O bug: com um registro só, a busca fechada o zerava e o filtro rolava a
+  // grade de volta para a coluna escolhida em todo movimento do mouse.
+  assert.equal(arrastar(40, true), 40)
+  // Com um registro por origem, o pedido do filtro é atendido uma vez.
+  assert.equal(arrastar(40, false), 1)
+})

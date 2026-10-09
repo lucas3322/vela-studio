@@ -155,7 +155,6 @@ const USOS: Uso[] = [
   { seletor: '.sidebar__connection-meta', arquivo: LAYOUT, token: 'tertiary', fundos: ['bg-surface'], tipo: 'texto' },
   { seletor: '.sidebar__search svg', arquivo: LAYOUT, token: 'tertiary', fundos: ['bg-input'], tipo: 'interface' },
   { seletor: '.sidebar__header', arquivo: LAYOUT, token: 'tertiary', fundos: ['bg-sidebar'], tipo: 'texto' },
-  { seletor: '.sidebar__modo', arquivo: LAYOUT, token: 'tertiary', fundos: ['bg-sidebar'], tipo: 'texto' },
   { seletor: '.tree-node__chevron', arquivo: LAYOUT, token: 'tertiary', fundos: ['bg-sidebar', 'bg-sidebar :hover'], tipo: 'interface' },
   { seletor: '.tree-node__icon--column', arquivo: LAYOUT, token: 'tertiary', fundos: ['bg-sidebar', 'bg-sidebar :hover'], tipo: 'interface' },
   { seletor: '.tree-node__type', arquivo: LAYOUT, token: 'tertiary', fundos: ['bg-sidebar', 'bg-sidebar :hover'], tipo: 'texto' },
@@ -230,7 +229,6 @@ const USOS: Uso[] = [
   // ── estilo inline em componentes ──────────────────────────────────────
   { seletor: 'Sidebar · chevron da conexão', arquivo: 'components/Sidebar.tsx', token: 'tertiary', fundos: ['bg-surface'], tipo: 'interface' },
   { seletor: 'Sidebar · "sem colunas carregadas"', arquivo: 'components/Sidebar.tsx', token: 'tertiary', fundos: ['bg-sidebar'], tipo: 'texto' },
-  { seletor: 'TableView · comentário da coluna', arquivo: 'components/TableView.tsx', token: 'tertiary', fundos: ['bg-app'], tipo: 'texto' },
   { seletor: 'HistoryModal · lupa', arquivo: 'components/HistoryModal.tsx', token: 'tertiary', fundos: ['bg-elevated'], tipo: 'interface' },
   { seletor: 'CheatsheetModal · lupa', arquivo: 'components/CheatsheetModal.tsx', token: 'tertiary', fundos: ['bg-elevated'], tipo: 'interface' },
 

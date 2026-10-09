@@ -12,6 +12,7 @@ import {
 } from '@shared/types'
 import { EXPORT_PROGRESS_EVENT, IMPORT_PROGRESS_EVENT } from '@shared/ipc'
 import { useAppStore } from '../store/app'
+import { useIndicadorDeslizante } from '../hooks/useIndicadorDeslizante'
 import { corDaConexao } from '../styles/connection-colors'
 import { useConnectionStore } from '../store/connections'
 import { useTabStore } from '../store/tabs'
@@ -33,6 +34,7 @@ import {
   IconPlus,
   IconRefresh,
   IconSearch,
+  IconSidebar,
   IconStructure,
   IconTable,
   IconTrash,
@@ -52,6 +54,7 @@ export function Sidebar(): React.JSX.Element {
   /** Árvore de tabelas ou lista de queries salvas — nunca as duas. */
   const [modo, setModo] = useState<'tabelas' | 'modelagem' | 'salvas'>('tabelas')
   const openModal = useAppStore((s) => s.openModal)
+  const toggleSidebar = useAppStore((s) => s.toggleSidebar)
   const notify = useAppStore((s) => s.notify)
   const iniciarExportacao = useAppStore((s) => s.iniciarExportacao)
   const atualizarProgressoExportacao = useAppStore((s) => s.atualizarProgressoExportacao)
@@ -476,8 +479,31 @@ export function Sidebar(): React.JSX.Element {
     return entries
   }
 
+  // O trilho só existe conectado: a chave inclui a conexão para remedir
+  // quando ele monta, não só quando o modo troca.
+  const {
+    trilho: trilhoDosModos,
+    estilo: estiloDoIndicador,
+    pronto: indicadorPronto
+  } = useIndicadorDeslizante<HTMLDivElement>(`${modo}|${activeId ?? ''}`)
+
   return (
     <aside className="sidebar" ref={sidebarRef} style={{ width }}>
+      {/*
+        Topo da barra lateral: a faixa onde moram os semáforos do macOS.
+        Arrastável como uma barra de título, com o botão de recolher a barra
+        no canto — o mesmo lugar do Finder, do Notas e do Xcode.
+      */}
+      <div className="sidebar__topo drag-region">
+        <button
+          className="icon-btn no-drag"
+          onClick={toggleSidebar}
+          title="Ocultar barra lateral (⌘B)"
+        >
+          <IconSidebar />
+        </button>
+      </div>
+
       {/*
         O seletor de conexão só aparece conectado. Desconectado, a lista de
         conexões logo abaixo já é o seletor — repetir "Escolher conexão" em cima
@@ -551,15 +577,22 @@ export function Sidebar(): React.JSX.Element {
 
       {activeId && (
       <>
-      <div className="sidebar__modos">
+      <div className="sidebar__modos trilho" ref={trilhoDosModos}>
+        <span
+          className={`trilho__indicador ${indicadorPronto ? 'trilho__indicador--pronto' : ''}`}
+          style={estiloDoIndicador}
+          aria-hidden
+        />
         <button
           className={`sidebar__modo ${modo === 'tabelas' ? 'sidebar__modo--ativo' : ''}`}
+          data-ativo={modo === 'tabelas'}
           onClick={() => setModo('tabelas')}
         >
           {isMongo ? 'Coleções' : isRedis ? 'Tipos' : 'Tabelas'}
         </button>
         <button
           className={`sidebar__modo ${modo === 'modelagem' ? 'sidebar__modo--ativo' : ''}`}
+          data-ativo={modo === 'modelagem'}
           onClick={() => setModo('modelagem')}
           title={
             isMongo
@@ -573,6 +606,7 @@ export function Sidebar(): React.JSX.Element {
         </button>
         <button
           className={`sidebar__modo ${modo === 'salvas' ? 'sidebar__modo--ativo' : ''}`}
+          data-ativo={modo === 'salvas'}
           onClick={() => setModo('salvas')}
           title="Queries que você salvou (⌘S salva a aba atual)"
         >
@@ -775,8 +809,10 @@ function TableNode({
         onContextMenu={onContextMenu}
         title={`${table.name} — duplo clique abre os dados, botão direito mostra as ações`}
       >
-        <span className="tree-node__chevron">
-          {shouldExpand ? <IconChevronDown size={12} /> : <IconChevronRight size={12} />}
+        {/* Um chevron só, que gira: a troca de ícone era um corte seco, e o
+            giro mostra para onde a lista vai abrir. */}
+        <span className={`tree-node__chevron ${shouldExpand ? 'tree-node__chevron--aberto' : ''}`}>
+          <IconChevronRight size={12} />
         </span>
         <span className="tree-node__icon">
           {table.type === 'view' ? <IconView size={14} /> : <IconTable size={14} />}

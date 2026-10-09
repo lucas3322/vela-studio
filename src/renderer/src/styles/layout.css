@@ -4,16 +4,44 @@
    ══════════════════════════════════════════════════════════════════ */
 
 .app {
-  display: grid;
-  grid-template-rows: var(--titlebar-height) 1fr var(--statusbar-height);
+  display: flex;
+  flex-direction: column;
   height: 100%;
   background: var(--bg-app);
 }
 
 .app__body {
   display: flex;
+  flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+
+/* Coluna de conteúdo: barra de ferramentas, abas, área de trabalho e status. */
+.app__main {
+  display: grid;
+  grid-template-rows: var(--titlebar-height) 1fr var(--statusbar-height);
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-app);
+}
+
+/*
+ * Vibrancy nativa do macOS.
+ *
+ * A janela é criada com `vibrancy: 'sidebar'` e fundo transparente; para o
+ * material aparecer, a página precisa deixar de pintar por baixo da barra
+ * lateral. Só ela fica translúcida — a coluna de conteúdo continua opaca,
+ * porque é ali que se lê dado, e dado não pode depender do papel de parede.
+ */
+:root[data-vibrancy='on'] body,
+:root[data-vibrancy='on'] .app {
+  background: transparent;
+}
+
+:root[data-vibrancy='on'] .sidebar {
+  background: var(--material-chrome);
 }
 
 /* ── Barra de título ─────────────────────────────────────────────── */
@@ -22,21 +50,121 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  /* 78px reserva espaço para os semáforos do macOS. */
-  padding: 0 var(--space-3) 0 78px;
+  padding: 0 var(--space-3) 0 var(--space-4);
+  /* Mesma cor da barra de abas logo abaixo, e sem fio entre as duas: lidas
+     juntas, formam uma barra unificada, como no Safari. */
   background: var(--bg-sidebar);
-  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Sem a barra lateral, os semáforos caem sobre a barra de ferramentas.
+   78px é a largura deles mais o respiro. */
+.app__body:not(:has(> .sidebar)) .titlebar {
+  padding-left: 78px;
 }
 
 .titlebar__title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
   flex: 1;
-  text-align: center;
-  font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--text-secondary);
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
+}
+
+.titlebar__nome {
+  font-size: var(--text-base);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.titlebar__nome--vazio {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* O banco vem depois do nome, separado por um chevron — é um caminho:
+   conexão › banco. */
+.titlebar__banco {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.titlebar__banco::before {
+  content: '›';
+  color: var(--text-secondary);
+}
+
+.titlebar__driver {
+  align-self: center;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-active);
+}
+
+/*
+ * Campo de "Ir para…" — é um botão vestido de busca. Abre a paleta de
+ * comandos; não é um input de verdade porque digitar aqui teria que
+ * competir com o foco do editor.
+ */
+.titlebar__busca {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 240px;
+  height: 28px;
+  margin-right: var(--space-2);
+  padding: 0 var(--space-1) 0 var(--space-3);
+  /* Cápsula, como o campo de busca da barra do Finder. */
+  border-radius: var(--radius-xl);
+  background: var(--bg-active);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  transition: background var(--duration-fast) var(--ease),
+    transform var(--duration-fast) var(--ease);
+}
+
+.titlebar__busca:hover {
+  background: var(--bg-hover);
+  box-shadow: inset 0 0 0 1px var(--border-default);
+}
+
+.titlebar__busca:active {
+  transform: scale(var(--press-scale));
+}
+
+.titlebar__busca span {
+  flex: 1;
+  text-align: left;
+}
+
+.titlebar__busca kbd {
+  border-radius: var(--radius-lg);
+}
+
+.titlebar__busca kbd,
+.atalho kbd {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  box-shadow: 0 0 0 1px var(--border-default), 0 1px 0 var(--border-default);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
 }
 
 .titlebar__brand {
@@ -68,7 +196,12 @@
   border-radius: var(--radius-md);
   color: var(--text-secondary);
   transition: background var(--duration-fast) var(--ease),
-    color var(--duration-fast) var(--ease);
+    color var(--duration-fast) var(--ease),
+    transform var(--duration-fast) var(--ease);
+}
+
+.icon-btn:active {
+  transform: scale(0.92);
 }
 
 .icon-btn:hover {
@@ -95,6 +228,17 @@
   position: relative;
 }
 
+/* Faixa dos semáforos. 78px à esquerda são deles; o botão de recolher fica
+   no canto oposto. */
+.sidebar__topo {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  height: var(--titlebar-height);
+  padding: 0 var(--space-2) 0 78px;
+}
+
 .sidebar__resize {
   position: absolute;
   top: 0;
@@ -107,6 +251,7 @@
 
 .sidebar__resize:hover {
   background: var(--accent-subtle);
+  transition: background var(--duration-base) var(--ease) 120ms;
 }
 
 .sidebar__section {
@@ -201,7 +346,9 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-bottom: var(--space-4);
+  /* Linhas recuadas das bordas, com canto arredondado: a lista de origem do
+     Finder. A seleção vira uma pílula, não uma faixa de parede a parede. */
+  padding: 0 var(--space-2) var(--space-4);
 }
 
 /* ── Conexões na barra lateral (quando não há conexão ativa) ─────── */
@@ -257,7 +404,7 @@
   font-size: var(--text-base);
   color: var(--text-primary);
   text-align: left;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   transition: background var(--duration-fast) var(--ease);
 }
 
@@ -275,6 +422,11 @@
   width: 14px;
   color: var(--text-tertiary);
   flex-shrink: 0;
+  transition: transform var(--duration-base) var(--ease-spring);
+}
+
+.tree-node__chevron--aberto {
+  transform: rotate(90deg);
 }
 
 .tree-node__icon {
@@ -357,6 +509,7 @@
 }
 
 .tab {
+  animation: aba-entra var(--duration-base) var(--ease-spring);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -380,7 +533,15 @@
 .tab--active {
   background: var(--bg-surface);
   color: var(--text-primary);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-sm), 0 0 0 0.5px var(--border-default);
+}
+
+/* Aba nova cresce do lugar onde vai ficar — não aparece de estalo. */
+@keyframes aba-entra {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
 }
 
 /*
@@ -608,16 +769,22 @@
   top: 0;
   z-index: 2;
   background: var(--bg-sidebar);
-  border-bottom: 1px solid var(--border-default);
+  box-shadow: 0 1px 0 var(--border-default);
 }
 
+/*
+ * Cabeçalho em duas linhas: o nome lidera, o tipo vem embaixo, menor. Na
+ * mesma linha os dois brigavam por largura e o tipo cortava o nome.
+ */
 .grid__th {
   display: flex;
-  align-items: center;
-  gap: 4px;
-  height: 28px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  height: 40px;
   padding: 0 var(--space-2);
-  border-right: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--grid-line-coluna);
   font-family: var(--font-ui);
   font-size: var(--text-xs);
   font-weight: 600;
@@ -630,7 +797,30 @@
 
 /* Em caixa alta o rótulo do tipo gritava mais que o nome da coluna, que é o
    que a pessoa procura. E 10px era valor mágico — não existe no sistema. */
+.grid__th-nome {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.grid__th-nome > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.grid__th-chave {
+  flex-shrink: 0;
+  color: var(--warning);
+}
+
 .grid__th-type {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
   font-weight: 400;
   color: var(--text-tertiary);
   font-size: var(--text-xs);
@@ -666,26 +856,38 @@
   opacity: 0.75;
 }
 
+/* O nome e a chave têm cor própria fora do realce; sobre o âmbar, os dois
+   passam à tinta de contraste — senão o nome claro sumia no fundo. */
+.grid__th--realcada .grid__th-nome,
+.grid__th--realcada .grid__th-chave {
+  color: var(--accent-ink);
+}
+
+/* A alça de arrastar acende em âmbar no hover; sobre o cabeçalho já âmbar
+   ela ficaria invisível justo quando a pessoa vai pegá-la. */
+.grid__th--realcada .grid__th-resize:hover {
+  background: var(--accent-ink);
+}
+
 .grid__row {
   display: flex;
   height: var(--row-height);
-  border-bottom: 1px solid var(--grid-line);
+}
+
+.grid__row--odd {
+  background: var(--grid-zebra);
 }
 
 .grid__row:hover {
   background: var(--bg-hover);
 }
 
-.grid__row--odd {
-  background: rgba(127, 127, 127, 0.025);
-}
-
 .grid__cell {
   display: flex;
   align-items: center;
   height: var(--row-height);
-  padding: 0 var(--space-2);
-  border-right: 1px solid var(--grid-line);
+  padding: 0 var(--space-3);
+  border-right: 1px solid var(--grid-line-coluna);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -707,7 +909,8 @@
 
 .grid__cell--selected {
   background: var(--bg-selected);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  border-radius: var(--radius-sm);
 }
 
 .grid__cell--number {
@@ -730,7 +933,25 @@
 
 .grid__cell--null {
   color: var(--data-null);
-  font-style: italic;
+}
+
+/*
+ * NULL como etiqueta contornada, não como texto em itálico. "NULL" em
+ * itálico parecia uma string com essa palavra; o contorno diz "isto é
+ * ausência de valor", e sem preenchimento o contraste do texto continua o
+ * medido para `--data-null`.
+ */
+.grid__nulo {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.04em;
 }
 
 .grid__gutter {
@@ -739,7 +960,7 @@
   justify-content: flex-end;
   width: 52px;
   padding-right: var(--space-2);
-  border-right: 1px solid var(--grid-line);
+  border-right: 1px solid var(--grid-line-coluna);
   color: var(--text-tertiary);
   font-size: var(--text-xs);
   flex-shrink: 0;
@@ -747,6 +968,12 @@
   left: 0;
   background: var(--bg-app);
   z-index: 1;
+}
+
+/* A calha é fixa e precisa ser opaca (as células passam por baixo dela), então
+   a zebra é composta sobre o fundo, não herdada da linha. */
+.grid__row--odd .grid__gutter {
+  background: linear-gradient(var(--grid-zebra), var(--grid-zebra)), var(--bg-app);
 }
 
 .grid__row:hover .grid__gutter {
@@ -893,6 +1120,11 @@
   flex: 1;
 }
 
+/* Algarismos de largura fixa: o relógio corre sem o texto ao lado tremer. */
+.statusbar__cronometro {
+  font-variant-numeric: tabular-nums;
+}
+
 .statusbar__dot {
   width: 6px;
   height: 6px;
@@ -913,9 +1145,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.42);
-  backdrop-filter: blur(3px);
-  animation: fade-in var(--duration-fast) var(--ease);
+  /* Escurece para focar: o modal é uma tarefa que interrompe o fluxo. */
+  background: var(--scrim);
+  backdrop-filter: blur(6px) saturate(120%);
+  animation: escurecer var(--duration-base) var(--ease);
 }
 
 .modal {
@@ -926,8 +1159,29 @@
   background: var(--bg-elevated);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-lg), var(--material-highlight);
   overflow: hidden;
+  animation: materializar var(--duration-slow) var(--ease-spring);
+}
+
+@keyframes escurecer {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0) saturate(100%);
+  }
+}
+
+/*
+ * O modal se materializa: cresce de levemente menor, sobe um pouco e entra
+ * em foco ao mesmo tempo. Só opacidade seria um papel aparecendo; escala e
+ * desfoque juntos fazem ele chegar como um objeto.
+ */
+@keyframes materializar {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+    filter: blur(2px);
+  }
 }
 
 .modal--wide {
@@ -1004,7 +1258,13 @@
   background: var(--bg-surface);
   text-align: left;
   transition: border-color var(--duration-fast) var(--ease),
-    background var(--duration-fast) var(--ease);
+    background var(--duration-fast) var(--ease),
+    box-shadow var(--duration-base) var(--ease),
+    transform var(--duration-fast) var(--ease);
+}
+
+.driver-card:active {
+  transform: scale(0.98);
 }
 
 .driver-card:hover {
@@ -1015,6 +1275,7 @@
 .driver-card--selected {
   border-color: var(--accent);
   background: var(--accent-subtle);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
 }
 
 .driver-card__name {
@@ -1069,13 +1330,22 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--bg-elevated);
+  border-radius: var(--radius-xl);
+  background: var(--material-popover);
+  backdrop-filter: var(--material-blur);
   border: 1px solid var(--border-default);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-md), var(--material-highlight);
   font-size: var(--text-base);
-  animation: fade-in var(--duration-base) var(--ease);
+  animation: toast-sobe var(--duration-slow) var(--ease-spring);
   max-width: 520px;
+}
+
+/* Sobe de onde está ancorado — a borda de baixo — e assenta. */
+@keyframes toast-sobe {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 16px) scale(0.96);
+  }
 }
 
 .toast--success {
@@ -1161,16 +1431,21 @@
 }
 
 .structure__tab {
-  height: 26px;
+  height: 24px;
   padding: 0 var(--space-3);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   color: var(--text-secondary);
+  transition: color var(--duration-fast) var(--ease);
+}
+
+.structure__tab:hover,
+.structure__tab--active {
+  color: var(--text-primary);
 }
 
 .structure__tab--active {
-  background: var(--bg-active);
-  color: var(--text-primary);
+  font-weight: 500;
 }
 
 .data-table {
@@ -1218,15 +1493,82 @@
   text-align: center;
 }
 
+/*
+ * Ícone em ladrilho, como o de um app no Dock: o barco ganha um objeto onde
+ * morar, em vez de flutuar solto no meio da tela.
+ */
+.welcome__icone {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, var(--accent-subtle), transparent),
+    var(--bg-surface);
+  box-shadow: var(--shadow-md), 0 0 0 0.5px var(--border-default), var(--material-highlight);
+}
+
 .welcome__logo {
   color: var(--accent);
-  opacity: 0.9;
 }
 
 .welcome__title {
   font-size: var(--text-2xl);
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-weight: 700;
+  /* Tracking negativo em texto grande: as letras se afastam ao crescer. */
+  letter-spacing: -0.025em;
+  line-height: var(--leading-tight);
+}
+
+.welcome__acoes {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.welcome__atalhos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-6);
+  margin: var(--space-4) 0 0;
+  padding: var(--space-4) var(--space-5);
+  list-style: none;
+  border-radius: var(--radius-lg);
+  background: var(--bg-sidebar);
+  text-align: left;
+}
+
+.atalho {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.atalho__teclas {
+  display: inline-flex;
+  gap: 2px;
+  min-width: 56px;
+}
+
+/*
+ * Entrada escalonada: o ícone chega, depois o título, depois as ações.
+ * Cada peça sobe um pouco e entra em foco — 40ms de distância entre elas,
+ * curto o bastante para ler como um gesto só.
+ */
+.welcome > * {
+  animation: welcome-sobe var(--duration-slow) var(--ease-spring) both;
+}
+.welcome > :nth-child(2) { animation-delay: 40ms; }
+.welcome > :nth-child(3) { animation-delay: 80ms; }
+.welcome > :nth-child(4) { animation-delay: 120ms; }
+.welcome > :nth-child(n + 5) { animation-delay: 160ms; }
+
+@keyframes welcome-sobe {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 
 .welcome__text {
@@ -1351,11 +1693,21 @@
   z-index: 300;
   min-width: 216px;
   padding: var(--space-1);
-  background: var(--bg-elevated);
+  background: var(--material-popover);
+  backdrop-filter: var(--material-blur);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  animation: fade-in var(--duration-fast) var(--ease);
+  box-shadow: var(--shadow-lg), var(--material-highlight);
+  /* Nasce do cursor: o menu abre para baixo e à direita do clique. */
+  transform-origin: top left;
+  animation: menu-abre var(--duration-base) var(--ease-spring);
+}
+
+@keyframes menu-abre {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
 }
 
 .context-menu__item {
@@ -1372,8 +1724,16 @@
   transition: background var(--duration-fast) var(--ease);
 }
 
+/* Item sob o cursor ganha o acento cheio, como no menu do macOS — a linha
+   inteira diz "é este", sem depender de um cinza de 4% sobre vidro. */
 .context-menu__item:hover:not(:disabled) {
-  background: var(--bg-hover);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.context-menu__item:hover:not(:disabled) .context-menu__icon,
+.context-menu__item:hover:not(:disabled) .context-menu__hint {
+  color: var(--accent-ink);
 }
 
 .context-menu__item:disabled {
@@ -1561,6 +1921,26 @@
   color: var(--accent);
 }
 
+/*
+ * Realce da busca vence hover e ordenação.
+ *
+ * As duas regras acima vêm depois de `.grid__th--realcada` e têm a mesma
+ * especificidade: passar o mouse trocava o âmbar do cabeçalho pelo cinza do
+ * hover — justo ao pegar a borda para alargar a coluna, com as células ainda
+ * acesas embaixo —, e uma coluna realçada e ordenada ficava com texto âmbar
+ * sobre fundo âmbar.
+ */
+.grid__th--realcada.grid__th--ordenavel:hover {
+  /* O mesmo âmbar, não `--accent-hover`: no claro ele escurece a 36% e a
+     tinta escura por cima cai a ~3.2:1. */
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.grid__th--realcada.grid__th--ordenada {
+  color: var(--accent-ink);
+}
+
 .grid__th-ordem {
   font-size: 11px;
   line-height: 1;
@@ -1721,31 +2101,66 @@
 /* ── Alternador Tabelas / Salvas ───────────────────────────────────── */
 
 .sidebar__modos {
-  display: flex;
-  gap: 2px;
-  padding: var(--space-2) var(--space-3) 0;
+  margin: var(--space-2) var(--space-2) 0;
 }
 
 .sidebar__modo {
   flex: 1;
-  padding: 5px 8px;
-  border: none;
-  border-bottom: 2px solid transparent;
-  background: none;
-  color: var(--text-tertiary);
-  font: inherit;
-  font-size: var(--text-xs);
+  height: 22px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
   font-weight: 500;
-  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease);
 }
 
 .sidebar__modo:hover {
-  color: var(--text-secondary);
+  color: var(--text-primary);
 }
 
 .sidebar__modo--ativo {
   color: var(--text-primary);
-  border-bottom-color: var(--accent);
+}
+
+/*
+ * Trilho de controle segmentado com polegar deslizante.
+ *
+ * O polegar é um elemento só, que viaja até o item ativo (ver
+ * `useIndicadorDeslizante`). Os botões ficam por cima dele, transparentes.
+ */
+.trilho {
+  position: relative;
+  display: flex;
+  padding: 2px;
+  border-radius: calc(var(--radius-md) + 1px);
+  background: var(--bg-active);
+}
+
+.trilho > button {
+  position: relative;
+  z-index: 1;
+}
+
+.trilho > button:active {
+  transform: scale(var(--press-scale));
+}
+
+.trilho__indicador {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  border-radius: var(--radius-sm);
+  background: var(--segmento-ativo);
+  box-shadow: var(--shadow-sm), 0 0 0 0.5px var(--border-default);
+  pointer-events: none;
+}
+
+.trilho__indicador--pronto {
+  transition: transform var(--duration-slow) var(--ease-spring),
+    width var(--duration-slow) var(--ease-spring),
+    opacity var(--duration-fast) var(--ease);
 }
 
 /* ── Lista de queries salvas ───────────────────────────────────────── */
@@ -3095,7 +3510,8 @@
   pelo canto do olho, não competir com o conteúdo.
 */
 .titlebar__faixa {
-  position: absolute;
+  position: fixed;
+  z-index: 400;
   top: 0;
   left: 0;
   right: 0;
@@ -3763,4 +4179,569 @@
   font-size: var(--text-xs);
   color: var(--text-primary);
   overflow-wrap: anywhere;
+}
+
+/* ── Paleta de comandos (⌘K) ───────────────────────────────────────── */
+
+/*
+ * Fundo quase sem escurecer: a paleta é um gesto de passagem, não uma tarefa
+ * que interrompe. Escurecer a tela inteira para três letras e um Enter seria
+ * desproporcional — é o mesmo peso do Spotlight.
+ */
+.comandos-fundo {
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 16vh var(--space-8) var(--space-10);
+  background: color-mix(in srgb, var(--scrim) 40%, transparent);
+}
+
+/*
+ * Material translúcido: o conteúdo de trás continua presente, borrado, e a
+ * paleta se lê como uma camada por cima dele — não como uma janela nova.
+ */
+.comandos {
+  --comandos-item: 40px;
+  display: flex;
+  flex-direction: column;
+  width: min(680px, 100%);
+  max-height: min(560px, 100%);
+  background: var(--material-popover);
+  backdrop-filter: var(--material-blur);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg), var(--material-highlight);
+  overflow: hidden;
+  transform-origin: 50% 0;
+  animation: comandos-entrada var(--duration-base) var(--ease-spring);
+}
+
+@keyframes comandos-entrada {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.comandos__busca {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-5);
+  height: 56px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.comandos__busca input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  background: transparent;
+  font-size: var(--text-lg);
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+/* Sobre `--bg-elevated` o terciário não vale — ver `.modal__subtitle`. */
+/* O campo é a paleta inteira — o cursor piscando já diz onde está o foco.
+   O anel global desenharia um retângulo âmbar dentro do vidro. */
+.comandos__busca input:focus-visible {
+  outline: none;
+}
+
+.comandos__busca input::placeholder {
+  color: var(--text-secondary);
+}
+
+.comandos__lista {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  scroll-padding: var(--space-3);
+}
+
+.comandos__grupo-titulo {
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+}
+
+.comandos__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: var(--comandos-item);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-base);
+  color: var(--text-primary);
+}
+
+.comandos__item--ativo {
+  background: var(--bg-selected);
+}
+
+.comandos__icone {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.comandos__item--ativo .comandos__icone {
+  color: var(--accent-text);
+}
+
+.comandos__rotulo {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* As letras que casaram: peso, não fundo — um marca-texto amarelo em cada
+   letra solta viraria ruído com três caracteres digitados. */
+.comandos__casou {
+  background: none;
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.comandos__detalhe {
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 40%;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.comandos__atalho,
+.comandos__rodape kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.comandos__vazio {
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+.comandos__rodape {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--space-5);
+  padding: var(--space-3) var(--space-5);
+  background: var(--bg-hover);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.comandos__rodape span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Menos transparência no sistema: `--material-*` já vira sólido em tokens.css. */
+
+/* ── Ficha da tabela: Colunas, Índices e Relações ──────────────────── */
+
+/*
+ * Lista agrupada, como nos Ajustes do macOS: cada coluna é uma linha com
+ * glifo, nome e selos, num grupo de cantos arredondados. O grupo usa
+ * `--bg-sidebar`, não `--bg-surface` — no tema claro surface e app são
+ * ambos brancos e o grupo sumiria (armadilha 8 do CLAUDE.md).
+ */
+.ficha {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-6) var(--space-8) var(--space-10);
+}
+
+.ficha > * {
+  width: 100%;
+  max-width: 960px;
+}
+
+/* Cada bloco sobe e entra em foco na ordem de leitura. */
+.ficha > :not(.ficha__cabeca) {
+  animation: welcome-sobe var(--duration-slow) var(--ease-spring) both;
+}
+.ficha > :nth-child(3) { animation-delay: 40ms; }
+.ficha > :nth-child(n + 4) { animation-delay: 80ms; }
+
+.ficha__cabeca {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.ficha__icone {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: var(--radius-lg);
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+}
+
+.ficha__titulos {
+  min-width: 0;
+}
+
+.ficha__titulo {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: var(--leading-tight);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ficha__resumo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.ficha__resumo span + span::before {
+  content: '·';
+  margin-right: var(--space-2);
+}
+
+.ficha__resumo code,
+.ficha__sugestao code {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-primary);
+}
+
+.ficha__grupo {
+  border-radius: var(--radius-lg);
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+}
+
+.ficha__linha {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-2) var(--space-4);
+  transition: background var(--duration-fast) var(--ease);
+}
+
+.ficha__linha:hover {
+  background: var(--bg-hover);
+}
+
+/* Separador recuado até depois do glifo, como numa lista do iOS: a linha
+   divide o conteúdo, não os ícones. */
+.ficha__linha + .ficha__linha::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 56px;
+  right: 0;
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+.ficha__glifo {
+  --glifo: var(--text-secondary);
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  color: var(--glifo);
+  background: color-mix(in srgb, var(--glifo) 14%, transparent);
+}
+
+/* Mesmo vocabulário de cor da grade: a coluna numérica tem a cor do número. */
+.ficha__glifo--numero { --glifo: var(--data-number); }
+.ficha__glifo--data { --glifo: var(--data-date); }
+.ficha__glifo--booleano { --glifo: var(--data-boolean); }
+.ficha__glifo--json { --glifo: var(--data-json); }
+.ficha__glifo--chave { --glifo: var(--warning); }
+.ficha__glifo--indice { --glifo: var(--accent-text); }
+
+.ficha__corpo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.ficha__nome-linha {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.ficha__nome {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ficha__tipo {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.ficha__tipo .grid__input {
+  width: 180px;
+  height: 22px;
+}
+
+.ficha__nota {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.ficha__selos {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  flex-shrink: 0;
+  max-width: 55%;
+}
+
+.selo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 20px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-lg);
+  background: var(--bg-active);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.selo--forte {
+  color: var(--text-primary);
+}
+
+.selo--mono {
+  font-family: var(--font-mono);
+  font-weight: 400;
+}
+
+.selo--chave {
+  background: var(--warning-subtle);
+  color: var(--warning);
+}
+
+.selo--ligacao {
+  background: var(--info-subtle);
+  color: var(--info);
+  font-family: var(--font-mono);
+  transition: box-shadow var(--duration-fast) var(--ease),
+    transform var(--duration-fast) var(--ease);
+}
+
+.selo--ligacao:hover {
+  box-shadow: inset 0 0 0 1px var(--info);
+}
+
+.selo--ligacao:active {
+  transform: scale(var(--press-scale));
+}
+
+.ficha__colunas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.ficha__coluna-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--bg-active);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.ficha__secao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ficha__secao-titulo {
+  margin: 0;
+  padding: 0 var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Ligação: coluna → tabela.coluna, lida da esquerda para a direita. */
+.ligacao__coluna {
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--bg-active);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.ligacao__seta {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.ligacao__alvo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  color: var(--accent-text);
+  transition: background var(--duration-fast) var(--ease),
+    transform var(--duration-fast) var(--ease);
+}
+
+.ligacao__alvo span {
+  margin-left: -6px;
+  font-family: var(--font-mono);
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.ligacao__alvo:hover {
+  background: var(--accent-subtle);
+}
+
+.ligacao__alvo:active {
+  transform: scale(var(--press-scale));
+}
+
+.ligacao .ficha__selos {
+  margin-left: auto;
+}
+
+/* Sugestão de índice: a única coisa da ficha que pede uma decisão. */
+.ficha__sugestao {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--warning-subtle);
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+  color: var(--warning);
+}
+
+.ficha__sugestao > svg {
+  flex-shrink: 0;
+}
+
+.ficha__sugestao-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.ficha__sugestao-texto strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ficha__vazio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-10) var(--space-6);
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--border-default);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.ficha__vazio strong {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ficha__vazio > span:last-child {
+  max-width: 440px;
+}
+
+.ficha__vazio-icone {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: var(--space-1);
+  border-radius: var(--radius-lg);
+  background: var(--bg-active);
+  color: var(--text-secondary);
 }

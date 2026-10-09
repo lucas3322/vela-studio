@@ -18,6 +18,7 @@ import { SaveQueryModal } from './components/SaveQueryModal'
 import { PreferencesModal } from './components/PreferencesModal'
 import { UnboundedMutationDialog } from './components/UnboundedMutationDialog'
 import { Toast } from './components/Toast'
+import { CommandPalette } from './components/CommandPalette'
 import { useAppStore } from './store/app'
 import { useConnectionStore } from './store/connections'
 import { useTabStore } from './store/tabs'
@@ -27,6 +28,7 @@ import './styles/layout.css'
 
 export function App(): React.JSX.Element {
   const { sidebarVisible, modal, applySystemTheme } = useAppStore()
+  const commandPaletteOpen = useAppStore((s) => s.commandPaletteOpen)
   const confirmacaoDeEscrita = useAppStore((s) => s.confirmacaoDeEscrita)
   const fecharConfirmacaoDeEscrita = useAppStore((s) => s.fecharConfirmacaoDeEscrita)
   const refreshSaved = useConnectionStore((s) => s.refreshSaved)
@@ -100,12 +102,21 @@ export function App(): React.JSX.Element {
 
   return (
     <div className="app">
-      <TitleBar />
+      {/*
+        Barra lateral de altura inteira, como no Finder e no Xcode: ela sobe
+        até o topo da janela e os semáforos moram nela. A barra de ferramentas
+        e a de status pertencem só à coluna de conteúdo — cada coluna tem o
+        próprio cromo, e a lateral lê como um material à parte, não como uma
+        faixa espremida entre duas barras.
+      */}
       <div className="app__body">
         {sidebarVisible && <Sidebar />}
-        <Workspace />
+        <div className="app__main">
+          <TitleBar />
+          <Workspace />
+          <StatusBar />
+        </div>
       </div>
-      <StatusBar />
 
       <div className="corner-stack">
         <UpdateBanner />
@@ -150,6 +161,7 @@ export function App(): React.JSX.Element {
           onCancel={fecharConfirmacaoDeEscrita}
         />
       )}
+      {commandPaletteOpen && <CommandPalette />}
       <Toast />
     </div>
   )

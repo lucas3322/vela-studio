@@ -20,6 +20,7 @@ import { CellEditorModal } from './CellEditorModal'
 import { ContextMenu, type MenuEntry } from './ContextMenu'
 import { TruncationNotice } from './TruncationNotice'
 import {
+  IconKey,
   IconClose,
   IconCopy,
   IconPlus,
@@ -251,6 +252,17 @@ export function EditableGrid({
    * aberta era impossível.
    */
   const pedidoAtendido = useRef<string | null>(null)
+  /**
+   * O mesmo registro, para a coluna escolhida na barra de filtro.
+   *
+   * Separado do da busca de propósito. Com um registro só, a busca fechada
+   * o zerava a cada execução do efeito dela — e o efeito roda a cada pixel
+   * de arrasto, porque `irPara` muda junto com as larguras. Zerado, o pedido
+   * do filtro voltava a valer como novo: com uma coluna escolhida no "onde",
+   * alargar qualquer coluna fazia a grade rolar de volta para a escolhida a
+   * cada movimento do mouse.
+   */
+  const evidenciaAtendida = useRef<string | null>(null)
 
   /**
    * Coluna inteira em realce, quando o achado da busca é um **nome de coluna**.
@@ -414,13 +426,13 @@ export function EditableGrid({
    * no meio do arrasto e travava o redimensionamento de qualquer outra.
    */
   const irPara = useCallback(
-    (achado: Achado, pedido: string) => {
+    (achado: Achado, pedido: string, registro: React.MutableRefObject<string | null>) => {
       const caixa = scroller.current
       // Sem larguras medidas não há para onde rolar — e o pedido fica sem
       // atender de propósito, para ser atendido quando elas chegarem.
       if (!caixa || widths.length === 0) return
-      if (!deveNavegar(pedidoAtendido.current, pedido)) return
-      pedidoAtendido.current = pedido
+      if (!deveNavegar(registro.current, pedido)) return
+      registro.current = pedido
 
       const esquerda = widths
         .slice(0, achado.coluna)
@@ -453,7 +465,8 @@ export function EditableGrid({
     if (indice >= 0) {
       irPara(
         { tipo: 'coluna', coluna: indice, texto: colunaEmEvidencia },
-        pedidoDaEvidencia(colunaEmEvidencia)
+        pedidoDaEvidencia(colunaEmEvidencia),
+        evidenciaAtendida
       )
     }
   }, [colunaEmEvidencia, widths.length, result.columns, irPara])
@@ -473,7 +486,7 @@ export function EditableGrid({
       return
     }
     const indice = Math.min(busca.indice, achados.length - 1)
-    irPara(achados[indice], pedidoDaBusca(busca.pedido, indice))
+    irPara(achados[indice], pedidoDaBusca(busca.pedido, indice), pedidoAtendido)
   }, [busca.aberta, busca.indice, busca.pedido, achados, irPara])
 
   const chaveDaLinha = useCallback(
@@ -1195,13 +1208,13 @@ export function EditableGrid({
                       : `${coluna.name} (${coluna.type})${ehChave ? ' · chave primária' : ''}`
                   }
                 >
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {ehChave && <span style={{ color: 'var(--warning)' }}>🔑 </span>}
-                    {coluna.name}
+                  <span className="grid__th-nome">
+                    {ehChave && <IconKey size={11} className="grid__th-chave" />}
+                    <span>{coluna.name}</span>
+                    {ordenadaPor && (
+                      <span className="grid__th-ordem">{ordenadaPor === 'asc' ? '↑' : '↓'}</span>
+                    )}
                   </span>
-                  {ordenadaPor && (
-                    <span className="grid__th-ordem">{ordenadaPor === 'asc' ? '↑' : '↓'}</span>
-                  )}
                   <span className="grid__th-type">
                     {tiposReais[coluna.name] ?? coluna.type}
                   </span>
@@ -1342,7 +1355,7 @@ export function EditableGrid({
                             })
                           }}
                         >
-                          {valor === null ? 'NULL' : formatarCelula(valor)}
+                          {valor === null ? <span className="grid__nulo">NULL</span> : formatarCelula(valor)}
 
                           {/*
                             Ícone revelado no hover, no canto direito. Fixo em

@@ -120,6 +120,12 @@ export function buildMenu(getWindow: () => BrowserWindow | null): Menu {
       label: 'Visualizar',
       submenu: [
         {
+          label: 'Ir para…',
+          accelerator: 'Cmd+K',
+          click: () => send('menu:commandPalette')
+        },
+        { type: 'separator' },
+        {
           label: 'Alternar Barra Lateral',
           accelerator: 'Cmd+B',
           click: () => send('menu:toggleSidebar')

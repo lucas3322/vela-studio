@@ -21,7 +21,15 @@ function createWindow(): BrowserWindow {
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 18 },
     vibrancy: 'sidebar',
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#16181d' : '#f7f7f8',
+    // No macOS o fundo é transparente para o material da vibrancy aparecer
+    // atrás da barra lateral — a página pinta o resto por conta própria.
+    // Nos outros sistemas não há material, e transparente viraria preto.
+    backgroundColor:
+      process.platform === 'darwin'
+        ? '#00000000'
+        : nativeTheme.shouldUseDarkColors
+          ? '#16181d'
+          : '#f7f7f8',
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
       sandbox: false,

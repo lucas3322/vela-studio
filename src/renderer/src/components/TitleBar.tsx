@@ -1,11 +1,12 @@
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
 import { corDaConexao } from '../styles/connection-colors'
+import { DRIVERS } from '@shared/types'
 import {
   IconHelp,
   IconHistory,
-  IconSail,
   IconMoon,
+  IconSearch,
   IconSettings,
   IconSidebar,
   IconSun
@@ -21,6 +22,7 @@ export function TitleBar(): React.JSX.Element {
     setTheme,
     openModal
   } = useAppStore()
+  const openCommandPalette = useAppStore((s) => s.openCommandPalette)
   const connection = useConnectionStore((s) => s.saved.find((c) => c.id === s.activeId))
   const database = useConnectionStore((s) => s.activeDatabase)
 
@@ -38,22 +40,51 @@ export function TitleBar(): React.JSX.Element {
       */}
       {cor && <span className="titlebar__faixa" style={{ background: cor }} aria-hidden />}
 
-      <div className="titlebar__brand no-drag">
-        <IconSail size={15} />
-        Vela
-      </div>
+      {/*
+        Com a barra lateral aberta, o botão de recolhê-la mora nela, ao lado
+        dos semáforos. Fechada, ele vem para cá — senão a pessoa perde o
+        caminho de volta junto com a barra.
+      */}
+      {!sidebarVisible && (
+        <button
+          className="icon-btn no-drag"
+          onClick={toggleSidebar}
+          title="Mostrar barra lateral (⌘B)"
+        >
+          <IconSidebar />
+        </button>
+      )}
 
-      <button
-        className={`icon-btn no-drag ${sidebarVisible ? 'icon-btn--active' : ''}`}
-        onClick={toggleSidebar}
-        title="Alternar barra lateral (⌘B)"
-      >
-        <IconSidebar />
-      </button>
-
+      {/*
+        Título à esquerda, como na barra unificada do macOS: nome em peso,
+        banco em secundário. Centralizado ele flutuava longe de tudo, sem
+        pertencer nem ao conteúdo nem às ações.
+      */}
       <div className="titlebar__title">
-        {connection ? `${connection.name}${database ? ` — ${database}` : ''}` : 'Nenhuma conexão'}
+        {connection ? (
+          <>
+            <span className="titlebar__nome">{connection.name}</span>
+            {database && <span className="titlebar__banco">{database}</span>}
+            <span className="titlebar__driver">{DRIVERS[connection.driver].label}</span>
+          </>
+        ) : (
+          <span className="titlebar__nome titlebar__nome--vazio">Vela Studio</span>
+        )}
       </div>
+
+      {/*
+        Atalho visível para a paleta. Quem nunca leu o menu descobre o ⌘K
+        aqui; quem já sabe nem olha para ele.
+      */}
+      <button
+        className="titlebar__busca no-drag"
+        onClick={() => openCommandPalette()}
+        title="Ir para qualquer lugar (⌘K)"
+      >
+        <IconSearch size={13} />
+        <span>Ir para…</span>
+        <kbd>⌘K</kbd>
+      </button>
 
       <div className="titlebar__actions no-drag">
         <button

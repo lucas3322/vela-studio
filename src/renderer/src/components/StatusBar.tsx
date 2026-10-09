@@ -1,9 +1,35 @@
+import { useEffect, useState } from 'react'
 import { DRIVERS } from '@shared/types'
 import { useAppStore } from '../store/app'
 import { useConnectionStore } from '../store/connections'
 import { useTabStore } from '../store/tabs'
 
 const numberFormat = new Intl.NumberFormat('pt-BR')
+const segundosFormat = new Intl.NumberFormat('pt-BR', {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1
+})
+
+/**
+ * Tempo decorrido da execução, contando ao vivo.
+ *
+ * "executando…" parado diz que algo está acontecendo, mas não diz se é
+ * normal: uma query de 2 s e uma travada há 40 s mostravam a mesma tela. O
+ * relógio correndo responde "vale esperar ou cancelo?" sem a pessoa abrir
+ * nada. Começa a contar quando o componente monta, que é o instante em que a
+ * aba entra em execução.
+ */
+function Cronometro(): React.JSX.Element {
+  const [inicio] = useState(() => performance.now())
+  const [agora, setAgora] = useState(inicio)
+
+  useEffect(() => {
+    const id = setInterval(() => setAgora(performance.now()), 100)
+    return () => clearInterval(id)
+  }, [])
+
+  return <span className="statusbar__cronometro">{segundosFormat.format((agora - inicio) / 1000)} s</span>
+}
 
 export function StatusBar(): React.JSX.Element {
   const openModal = useAppStore((s) => s.openModal)
@@ -60,9 +86,9 @@ export function StatusBar(): React.JSX.Element {
       <div className="statusbar__spacer" />
 
       {tab?.running && (
-        <div className="statusbar__item">
+        <div className="statusbar__item" title="Cancelar: ⌘.">
           <span className="spinner" style={{ width: 10, height: 10 }} />
-          executando…
+          executando… <Cronometro key={tab.id} />
         </div>
       )}
 

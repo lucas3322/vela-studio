@@ -117,6 +117,14 @@ interface AppState {
    */
   inferirRelacoes: 'auto' | 'sim' | 'nao'
   helpPanelVisible: boolean
+  /**
+   * Paleta de comandos (⌘K) aberta.
+   *
+   * Fica fora de `modal` de propósito: ela abre por cima de qualquer coisa,
+   * inclusive sem conexão, e fechar não pode derrubar um modal que já estava
+   * aberto embaixo.
+   */
+  commandPaletteOpen: boolean
   modal: 'connection' | 'history' | 'cheatsheet' | 'preferences' | 'update' | 'saveQuery' | null
   /** Conexão sendo editada no modal, se houver. */
   editingConnectionId: string | null
@@ -178,6 +186,8 @@ interface AppState {
   aplicarAcentoDaConexao: (corDaConexao: string | undefined) => void
   setInferirRelacoes: (valor: 'auto' | 'sim' | 'nao') => void
   toggleHelpPanel: () => void
+  openCommandPalette: () => void
+  closeCommandPalette: () => void
   openModal: (
     modal: AppState['modal'],
     connectionId?: string,
@@ -287,6 +297,29 @@ function paint(resolved: 'light' | 'dark'): void {
   document.documentElement.dataset.theme = resolved
 }
 
+/**
+ * Troca de tema com dissolução, não com corte.
+ *
+ * Um salto de branco para quase-preto no mesmo quadro é o tipo de mudança
+ * brusca de brilho que cansa a vista — e o macOS faz a mesma troca em
+ * dissolução quando o modo escuro entra pelo agendamento. A View Transition
+ * fotografa a tela antes e depois e funde as duas.
+ *
+ * Sem a API, ou com menos movimento pedido, a troca é imediata como antes.
+ * Só a primeira pintura (na criação do store) não passa por aqui: abrir o
+ * app não é trocar de tema.
+ */
+function paintWithTransition(resolved: 'light' | 'dark'): void {
+  if (document.documentElement.dataset.theme === resolved) return
+  const doc = document as Document & { startViewTransition?: (update: () => void) => unknown }
+  const menosMovimento = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (!doc.startViewTransition || menosMovimento) {
+    paint(resolved)
+    return
+  }
+  doc.startViewTransition(() => paint(resolved))
+}
+
 let toastTimer: ReturnType<typeof setTimeout> | undefined
 
 export const useAppStore = create<AppState>((set, get) => {
@@ -310,6 +343,7 @@ export const useAppStore = create<AppState>((set, get) => {
     corDaConexaoAberta: undefined,
     inferirRelacoes: prefs.inferirRelacoes,
     helpPanelVisible: false,
+    commandPaletteOpen: false,
     modal: null,
     editingConnectionId: null,
     novaConexao: false,
@@ -324,14 +358,14 @@ export const useAppStore = create<AppState>((set, get) => {
     setTheme: (theme) => {
       localStorage.setItem(STORAGE_KEY, theme)
       const resolved = resolve(theme)
-      paint(resolved)
+      paintWithTransition(resolved)
       void window.vela.app.setTheme(theme)
       set({ theme, resolvedTheme: resolved })
     },
 
     applySystemTheme: (systemTheme) => {
       if (get().theme !== 'system') return
-      paint(systemTheme)
+      paintWithTransition(systemTheme)
       set({ resolvedTheme: systemTheme })
     },
 
@@ -380,6 +414,8 @@ export const useAppStore = create<AppState>((set, get) => {
       gravarPrefs({ ...prefsAtuais(get), inferirRelacoes: valor })
     },
     toggleHelpPanel: () => set((s) => ({ helpPanelVisible: !s.helpPanelVisible })),
+    openCommandPalette: () => set({ commandPaletteOpen: true }),
+    closeCommandPalette: () => set({ commandPaletteOpen: false }),
 
     openModal: (modal, connectionId, opcoes) =>
       set({
