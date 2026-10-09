@@ -80,5 +80,11 @@ reportam "Intel Mac OS X" mesmo em M1/M2/M3 por compatibilidade, e a única
 pista prática é o renderizador do WebGL. Por isso a interface apenas *sugere*
 uma opção e nunca esconde a outra.
 
-**Fontes.** Instrument Serif, IBM Plex Sans e IBM Plex Mono, via Google Fonts.
-Para hospedar sem depender de CDN, baixe os arquivos e troque o `<link>`.
+**Fontes.** A do sistema: SF Pro no Mac e no iPhone, Segoe UI no Windows,
+e `ui-monospace` para código. Nenhuma fonte é baixada — a página não depende
+de CDN e o texto aparece no primeiro quadro, sem troca de fonte no meio.
+
+**Movimento.** A janela do hero se endireita com a rolagem via
+`animation-timeline: view()`; onde o navegador não suporta, ela fica reta. A
+frase da tese acende palavra por palavra conforme a rolagem. Com
+`prefers-reduced-motion`, tudo aparece pronto e parado.
