@@ -3,6 +3,16 @@
 Todas as mudanças relevantes do Vela Studio.
 Gerado por `npm run release` a partir dos commits.
 
+## 2.7.1 — 2026-10-09
+
+### Correções
+
+- resolvendo bugs na visualizacao documento no MONGO (812638f)
+
+### Outras mudanças
+
+- melhorando layoout e designer da pagnia landing page (ba3b8d0)
+
 ## 2.7.0 — 2026-10-09
 
 ### Novidades
